@@ -82,6 +82,7 @@ export function registerBuddyTools(server: McpServer, ctx: ToolContext): void {
             annotations: READ_ONLY,
         },
         async ({ query, kind, status, limit }) => {
+            if (ctx.workMode) return 'Not in a work folder: his buddy’s memory stays out of work chats.';
             const list = await api.get<Memory[]>('/api/buddy/memories', { q: query, kind, status, limit: limit ?? 20 });
             return list.length ? list.map(memoryLine).join('\n') : query ? `Nothing about "${query}" yet.` : 'Nothing yet.';
         }

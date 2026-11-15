@@ -291,12 +291,14 @@ export interface ServerOptions {
     newId?: () => string;
     /** The tool groups listed from the start (default DEFAULT_GROUPS; the manager passes them all). */
     groups?: readonly ToolGroup[];
+    /** A work folder: the brief and the buddy's memory stay personal (BUDDY_MEMORY_PLAN §4.3). */
+    workMode?: boolean;
 }
 
 export function createRecollectServer(options: ServerOptions): McpServer {
     const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: INSTRUCTIONS });
     const registry = new Map<string, RegisteredTool>();
-    const ctx: ToolContext = { api: options.api, problem: options.problem ?? null, registry };
+    const ctx: ToolContext = { api: options.api, problem: options.problem ?? null, registry, ...(options.workMode ? { workMode: true } : {}) };
     registerRecordTools(server, ctx);
     registerWeekTools(server, ctx);
     registerMirrorTools(server, ctx);

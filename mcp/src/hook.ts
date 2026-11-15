@@ -2,29 +2,50 @@
 // session in an allowed folder starts knowing where Ramin stands. No model has to remember anything.
 //
 //   node <mcp>/dist/hook.js start    SessionStart       sweep stale sessions; open this one; print the brief
-//   node <mcp>/dist/hook.js prompt   UserPromptSubmit   one timestamp (active minutes), no network
-//   node <mcp>/dist/hook.js stop     Stop               one timestamp, no network
-//   node <mcp>/dist/hook.js end      SessionEnd         close: PUT /api/sessions/by-key/cc_<session>
+//   node <mcp>/dist/hook.js prompt   UserPromptSubmit   one timestamp (active minutes); in a "full" folder his
+//                                                      words go to the session's words file; the buddy's note
+//                                                      is printed once (no network)
+//   node <mcp>/dist/hook.js stop     Stop               one timestamp; the agent's reply's start joins his last
+//                                                      words; when a piece is due, a detached `flush` sends it
+//   node <mcp>/dist/hook.js end      SessionEnd         flush, then close: PUT /api/sessions/by-key/cc_<session>
+//   node <mcp>/dist/hook.js flush <session>             POST /api/buddy/words, then GET /api/buddy/note
 //
-// Config: ~/.recollect/hooks.json { url, token, allow: ["E:/PERSONAL_PROJECTS/"], brief: true }; the
-// token needs only read + sessions:write. Open sessions: ~/.recollect/open/<session>.json. Folders
-// outside `allow`, subagents (their input has agent_id) and RECOLLECT_HOOKS=off do nothing. Never
-// blocks Claude Code: every call has a 3 s limit, every failure is one line in ~/.recollect/hook.log,
-// and the exit code is always 0. The transcript is never read (its format is internal).
+// Config: ~/.recollect/hooks.json { url, token, allow, brief: true }; the token needs only read +
+// sessions:write. `allow` entries are a folder (today's meaning: logged, briefed, words not read) or
+// { path, mode: "full" | "light" | "off", brief } (BUDDY_MEMORY_PLAN §3.1): the longest matching path
+// wins, "*" matches any folder; full = his typed words are read for his buddy; brief: false = the
+// session is logged (and read) but never shown his brief, portrait or the buddy's notes (a work folder).
+// Open sessions: ~/.recollect/open/<session>.json (+ .words.jsonl, .flush.json). Folders no entry
+// allows, subagents (their input has agent_id) and RECOLLECT_HOOKS=off do nothing. Never blocks Claude
+// Code: every call has a 3 s limit, every failure is one line in ~/.recollect/hook.log, and the exit
+// code is always 0. The transcript is never read (its format is internal): his words come from the
+// prompt hook's own input, the reply from the Stop hook's last_assistant_message.
 // Test knobs: RECOLLECT_HOOKS_HOME (instead of ~/.recollect), RECOLLECT_HOOKS_CONFIG,
-// RECOLLECT_HOOKS_MIN_MINUTES (default 2), RECOLLECT_HOOKS_MIN_PROMPTS (default 2).
-import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+// RECOLLECT_HOOKS_MIN_MINUTES (default 2), RECOLLECT_HOOKS_MIN_PROMPTS (default 2),
+// RECOLLECT_HOOKS_FLUSH=inline (the stop hook flushes in its own process: tests).
+import { execFileSync, spawn } from 'node:child_process';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { RecollectApi } from './api.js';
 import { briefText, type Brief } from './tools/record.js';
+
+export type FolderMode = 'full' | 'light' | 'off';
+/** A folder (logged, briefed, words not read) or a rule. */
+export type AllowEntry = string | { path: string; mode?: FolderMode; brief?: boolean };
 
 export interface HookConfig {
     url: string;
     token: string;
-    allow: string[];
+    allow: AllowEntry[];
+    brief: boolean;
+}
+
+/** What the hooks do in a folder. */
+export interface FolderRule {
+    path: string;
+    mode: FolderMode;
     brief: boolean;
 }
 
@@ -45,6 +66,23 @@ export interface OpenSession {
     sessionTitle?: string;
     /** Set when closing failed (the backend was down): the next sweep sends it. */
     endedAt?: string;
+    /** The buddy's notes already shown in this session (each is shown once). */
+    notesShown?: string[];
+}
+
+/** One line of a session's words file: his words, or the start of the agent's reply to them. */
+type WordsLine = { at: string; text: string } | { at: string; reply: string };
+/** What the flush has sent of a session's words file. */
+interface FlushState {
+    sent: number;
+    seq: number;
+}
+
+/** A note from the buddy for his chats (GET /api/buddy/note), kept in ~/.recollect/note.json. */
+export interface BuddyNote {
+    id: string;
+    text: string;
+    day: string;
 }
 
 const FIRST_PROMPT_MAX = 120;
@@ -54,6 +92,15 @@ type Env = Record<string, string | undefined>;
 const GAP_MAX_MS = 5 * 60_000;
 const STALE_MS = 30 * 60_000;
 const NET_TIMEOUT_MS = 3000;
+/** A piece of words is sent when this much is waiting, or when its first words are this old. */
+export const FLUSH_CHARS = 2000;
+export const FLUSH_AGE_MS = 30 * 60_000;
+const WORDS_PER_POST = 50;
+const TEXT_MAX = 4000;
+const REPLY_MAX = 300;
+const LOCK_STALE_MS = 2 * 60_000;
+/** A note older than this is not shown mid-session. */
+const NOTE_FRESH_MS = 24 * 3600_000;
 
 export const hooksHome = (env: Env = process.env): string => env['RECOLLECT_HOOKS_HOME'] || path.join(os.homedir(), '.recollect');
 export const configPath = (env: Env = process.env): string => env['RECOLLECT_HOOKS_CONFIG'] || path.join(hooksHome(env), 'hooks.json');
@@ -61,9 +108,56 @@ export const configPath = (env: Env = process.env): string => env['RECOLLECT_HOO
 /** "E:\\A\\b" → "e:/a/b/": compared case-insensitively, as Windows paths are. */
 export const normalizePath = (p: string): string => `${p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()}/`;
 
-export function isAllowed(cwd: string, allow: readonly string[]): boolean {
+const ruleOf = (e: AllowEntry): FolderRule | null => {
+    if (typeof e === 'string') return e.trim() ? { path: e, mode: 'light', brief: true } : null;
+    if (!e || typeof e.path !== 'string' || !e.path.trim()) return null;
+    const mode: FolderMode = e.mode === 'full' || e.mode === 'off' ? e.mode : 'light';
+    return { path: e.path, mode, brief: e.brief !== false };
+};
+
+/** The rule for a folder: the longest matching entry ("*" matches any folder, last); null = none. */
+export function folderRule(cwd: string, allow: readonly AllowEntry[]): FolderRule | null {
     const c = normalizePath(cwd);
-    return allow.some((a) => a.trim() && c.startsWith(normalizePath(a)));
+    let best: { rule: FolderRule; len: number } | null = null;
+    for (const e of allow) {
+        const rule = ruleOf(e);
+        if (!rule) continue;
+        const len = rule.path.trim() === '*' ? 0 : c.startsWith(normalizePath(rule.path)) ? normalizePath(rule.path).length : -1;
+        if (len >= 0 && (!best || len > best.len)) best = { rule, len };
+    }
+    return best?.rule ?? null;
+}
+
+/** The hooks act in this folder (a matching entry that is not "off"). */
+export function isAllowed(cwd: string, allow: readonly AllowEntry[]): boolean {
+    const rule = folderRule(cwd, allow);
+    return !!rule && rule.mode !== 'off';
+}
+
+/** The folders the entries name (not "*"): the roots a project folder is found under. */
+export const allowRoots = (allow: readonly AllowEntry[]): string[] =>
+    allow.map(ruleOf).filter((r): r is FolderRule => !!r && r.path.trim() !== '*').map((r) => r.path);
+
+const lineCount = (text: string) => text.split(/\r?\n/).length;
+
+/**
+ * His typed prompt as his buddy gets it, or null when it isn't worth reading: a slash command, a
+ * reply under 3 words ("yes", "go on"). Pasted blocks and code become a marker with their size; the
+ * IDE's attachments go; at most 4,000 characters (the start and the end of a long one).
+ */
+export function promptWords(prompt: unknown): string | null {
+    if (typeof prompt !== 'string') return null;
+    let t = prompt
+        .replace(/<(system-reminder|ide_selection|ide_opened_file|ide_diagnostics|command-[a-z-]+|local-command-[a-z-]+)\b[^>]*>[\s\S]*?<\/\1>/g, ' ')
+        .replace(/<pasted_content\b[^>]*>([\s\S]*?)<\/pasted_content[^>]*>/g, (_m, body: string) => ` [pasted text, ${lineCount(body.trim())} lines] `)
+        .replace(/```[^\n]*\n([\s\S]*?)(```|$)/g, (_m, body: string) => ` [code, ${lineCount(body.trimEnd())} lines] `)
+        .replace(/[ \t]{2,}/g, ' ')
+        .replace(/ *\n */g, '\n')
+        .trim();
+    if (!t || t.startsWith('/')) return null;
+    if ((t.match(/[\p{L}\p{N}]+/gu) ?? []).length < 3) return null;
+    if (t.length > TEXT_MAX) t = `${t.slice(0, 3000)} […] ${t.slice(-800)}`;
+    return t;
 }
 
 /** Active minutes: the gaps between consecutive timestamps, none counted above 5 minutes. */
@@ -86,10 +180,10 @@ export function worthLogging(session: Pick<OpenSession, 'prompts'>, minutes: num
  * (`E:/PERSONAL_PROJECTS/second_brain/backend` → `E:/PERSONAL_PROJECTS/second_brain`); the folder
  * itself when it is a root, or under no root.
  */
-export function projectRoot(cwd: string, allow: readonly string[] = []): string {
+export function projectRoot(cwd: string, allow: readonly AllowEntry[] = []): string {
     const orig = cwd.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/\/$/, '');
     const c = normalizePath(orig);
-    const root = allow
+    const root = allowRoots(allow)
         .filter((a) => a.trim())
         .map(normalizePath)
         .filter((a) => c.startsWith(a))
@@ -100,7 +194,7 @@ export function projectRoot(cwd: string, allow: readonly string[] = []): string 
 }
 
 /** The project of a folder: its project folder's name, lower case (the API finds or makes it). */
-export const projectOf = (cwd: string, allow: readonly string[] = []): string => path.basename(projectRoot(cwd, allow)).toLowerCase() || 'home';
+export const projectOf = (cwd: string, allow: readonly AllowEntry[] = []): string => path.basename(projectRoot(cwd, allow)).toLowerCase() || 'home';
 
 /** A prompt worth naming a session by: its first line, not a slash command, not "go" or "yes". */
 export function promptTitle(prompt: unknown): string | null {
@@ -168,12 +262,148 @@ export function loadHookConfig(env: Env = process.env): HookConfig | null {
     return { url: c.url, token: c.token, allow: Array.isArray(c.allow) ? c.allow : [], brief: c.brief !== false };
 }
 
+// ─── His words for the buddy (BUDDY_MEMORY_PLAN §3.1) ─────────────────────────
+
+const wordsFile = (dir: string, sessionId: string) => path.join(dir, `${sessionId}.words.jsonl`);
+const flushFile = (dir: string, sessionId: string) => path.join(dir, `${sessionId}.flush.json`);
+const lockFile = (dir: string, sessionId: string) => path.join(dir, `${sessionId}.flush.lock`);
+export const noteFile = (env: Env = process.env) => path.join(hooksHome(env), 'note.json');
+
+function readWords(dir: string, sessionId: string): WordsLine[] {
+    try {
+        return readFileSync(wordsFile(dir, sessionId), 'utf8')
+            .split('\n')
+            .filter(Boolean)
+            .map((l) => {
+                try {
+                    return JSON.parse(l) as WordsLine;
+                } catch {
+                    return null;
+                }
+            })
+            .filter((l): l is WordsLine => !!l);
+    } catch {
+        return [];
+    }
+}
+
+const appendWords = (dir: string, sessionId: string, line: WordsLine) => appendFileSync(wordsFile(dir, sessionId), `${JSON.stringify(line)}\n`);
+
+/** The lines not sent yet, as messages (a reply joins the words before it). */
+export function unsentMessages(lines: readonly WordsLine[], sent: number): Array<{ at: string; text: string; reply?: string }> {
+    const out: Array<{ at: string; text: string; reply?: string }> = [];
+    for (const l of lines.slice(sent)) {
+        if ('text' in l) out.push({ at: l.at, text: l.text });
+        else if (out.length && !out[out.length - 1]!.reply) out[out.length - 1]!.reply = l.reply.slice(0, REPLY_MAX);
+    }
+    return out;
+}
+
+/** A piece is due: 2,000 characters waiting, or words waiting for 30 minutes. */
+export function flushDue(lines: readonly WordsLine[], sent: number, now: Date): boolean {
+    const waiting = unsentMessages(lines, sent);
+    if (!waiting.length) return false;
+    const chars = waiting.reduce((n, m) => n + m.text.length, 0);
+    return chars >= FLUSH_CHARS || now.getTime() - Date.parse(waiting[0]!.at) >= FLUSH_AGE_MS;
+}
+
+/** One flush at a time per session (a lock file; a stale one is taken over). */
+function takeLock(dir: string, sessionId: string): boolean {
+    const file = lockFile(dir, sessionId);
+    try {
+        closeSync(openSync(file, 'wx'));
+        return true;
+    } catch {
+        try {
+            if (Date.now() - statSync(file).mtimeMs > LOCK_STALE_MS) {
+                writeFileSync(file, '');
+                return true;
+            }
+        } catch {
+            // Gone meanwhile: the other flush finished.
+        }
+        return false;
+    }
+}
+
+/**
+ * Send the session's waiting words (POST /api/buddy/words, 50 at most per piece), then fetch the
+ * buddy's note for his chats. Moves on only after a 2xx; a failure waits for the next flush.
+ */
+export async function flushWords(api: RecollectApi, dir: string, sessionId: string, env: Env): Promise<void> {
+    if (!takeLock(dir, sessionId)) return;
+    try {
+        const session = readJson<OpenSession>(path.join(dir, `${sessionId}.json`));
+        const state = readJson<FlushState>(flushFile(dir, sessionId)) ?? { sent: 0, seq: 0 };
+        const lines = readWords(dir, sessionId);
+        let { sent, seq } = state;
+        while (sent < lines.length) {
+            // The lines of one piece: up to 50 messages (their replies come along).
+            let end = sent;
+            let texts = 0;
+            while (end < lines.length && (texts < WORDS_PER_POST || !('text' in lines[end]!))) {
+                if ('text' in lines[end]!) texts++;
+                end++;
+            }
+            const messages = unsentMessages(lines.slice(0, end), sent);
+            if (messages.length) {
+                await api.post('/api/buddy/words', { sessionKey: session?.key ?? `cc_${sessionId}`, seq: seq + 1, project: session?.project ?? null, messages });
+                seq++;
+            }
+            sent = end;
+            writeFileSync(flushFile(dir, sessionId), JSON.stringify({ sent, seq }));
+        }
+        try {
+            const note = await api.get<BuddyNote | null>('/api/buddy/note');
+            if (note && typeof note.id === 'string' && typeof note.text === 'string') writeFileSync(noteFile(env), JSON.stringify(note));
+        } catch {
+            // No note (204) or no answer: the last note stays.
+        }
+    } catch (err) {
+        log(env, `flush ${sessionId}: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+        rmSync(lockFile(dir, sessionId), { force: true });
+    }
+}
+
+/** Starts a flush that outlives this hook (Claude Code never waits for the network). */
+function startFlush(api: RecollectApi, dir: string, sessionId: string, env: Env): Promise<void> | void {
+    if (env['RECOLLECT_HOOKS_FLUSH'] === 'inline') return flushWords(api, dir, sessionId, env);
+    try {
+        const child = spawn(process.execPath, [fileURLToPath(import.meta.url), 'flush', sessionId], { detached: true, stdio: 'ignore', windowsHide: true, env: process.env });
+        child.unref();
+    } catch (err) {
+        log(env, `flush ${sessionId} could not start: ${err instanceof Error ? err.message : String(err)}`);
+    }
+}
+
+/** The buddy's note for his chats, once per session, while it is fresh. */
+function noteToShow(session: OpenSession, env: Env, now: Date): BuddyNote | null {
+    const note = readJson<BuddyNote>(noteFile(env));
+    if (!note || typeof note.id !== 'string' || typeof note.text !== 'string' || !note.text.trim()) return null;
+    if (session.notesShown?.includes(note.id)) return null;
+    const at = Date.parse(`${note.day}T12:00:00Z`);
+    if (Number.isFinite(at) && now.getTime() - at > NOTE_FRESH_MS + 12 * 3600_000) return null;
+    return note;
+}
+
+function dropWords(dir: string, sessionId: string): void {
+    for (const f of [wordsFile(dir, sessionId), flushFile(dir, sessionId), lockFile(dir, sessionId)]) rmSync(f, { force: true });
+}
+
 function apiFor(config: HookConfig): RecollectApi {
     return new RecollectApi({ baseUrl: config.url, token: config.token, agentName: 'Claude Code hook', timeoutMs: NET_TIMEOUT_MS, retryDelayMs: 100, runningDelayMs: 300 });
 }
 
-/** Close a session: PUT it (when it is worth a line), then drop its file; keep the file if the PUT failed. */
+/** Close a session: send its last words, PUT it (when it is worth a line), then drop its files; keep them if the PUT failed. */
 async function close(api: RecollectApi, file: string, endedAt: string, env: Env): Promise<void> {
+    const dir = path.dirname(file);
+    const sessionId = path.basename(file, '.json');
+    if (existsSync(wordsFile(dir, sessionId))) {
+        await flushWords(api, dir, sessionId, env);
+        const left = unsentMessages(readWords(dir, sessionId), readJson<FlushState>(flushFile(dir, sessionId))?.sent ?? 0);
+        if (!left.length) dropWords(dir, sessionId);
+    }
     const s = readJson<OpenSession>(file);
     if (!s) {
         rmSync(file, { force: true });
@@ -209,7 +439,7 @@ async function close(api: RecollectApi, file: string, endedAt: string, env: Env)
 async function sweep(api: RecollectApi, dir: string, current: string, env: Env, now: Date): Promise<void> {
     let names: string[] = [];
     try {
-        names = readdirSync(dir).filter((n) => n.endsWith('.json'));
+        names = readdirSync(dir).filter((n) => n.endsWith('.json') && !n.endsWith('.flush.json'));
     } catch {
         return;
     }
@@ -227,7 +457,7 @@ async function sweep(api: RecollectApi, dir: string, current: string, env: Env, 
  * may already be logged gets a key of its own (`cc_<id>:r<time>`). `stamps`: 1 = the start counts as
  * the first stamp; 0 = the caller adds the first one (a prompt).
  */
-function newOpenSession(sessionId: string, cwd: string, allow: readonly string[], now: Date, resumed: boolean, stamps: 0 | 1): OpenSession {
+function newOpenSession(sessionId: string, cwd: string, allow: readonly AllowEntry[], now: Date, resumed: boolean, stamps: 0 | 1): OpenSession {
     const at = now.toISOString();
     const root = projectRoot(cwd, allow);
     return {
@@ -265,7 +495,8 @@ export async function runHook(event: string, input: Record<string, unknown>, env
     if (!config) return '';
     const cwd = typeof input['cwd'] === 'string' && input['cwd'] ? input['cwd'] : process.cwd();
     const sessionId = typeof input['session_id'] === 'string' ? input['session_id'].replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64) : '';
-    if (!sessionId || !isAllowed(cwd, config.allow)) return '';
+    const rule = folderRule(cwd, config.allow);
+    if (!sessionId || !rule || rule.mode === 'off') return '';
 
     const dir = path.join(hooksHome(env), 'open');
     mkdirSync(dir, { recursive: true });
@@ -279,20 +510,35 @@ export async function runHook(event: string, input: Record<string, unknown>, env
         // No open file on a prompt: the session was swept (idle over 30 minutes, then another session
         // started) or began before the hooks were installed. The rest of it is a session of its own.
         if (!s && event === 'prompt') s = newOpenSession(sessionId, cwd, config.allow, now, true, 0);
-        if (s) {
-            const firstPrompt = s.firstPrompt ?? (event === 'prompt' ? promptTitle(input['prompt']) ?? undefined : undefined);
-            writeFileSync(
-                file,
-                JSON.stringify({
-                    ...s,
-                    stamps: [...s.stamps, at],
-                    prompts: s.prompts + (event === 'prompt' ? 1 : 0),
-                    ...(firstPrompt ? { firstPrompt } : {}),
-                    ...(sessionTitle ? { sessionTitle } : {}),
-                })
-            );
+        if (!s) return '';
+        const firstPrompt = s.firstPrompt ?? (event === 'prompt' ? promptTitle(input['prompt']) ?? undefined : undefined);
+        // His words (a "full" folder): what he typed, and the start of the agent's answer to it.
+        if (rule.mode === 'full') {
+            if (event === 'prompt') {
+                const text = promptWords(input['prompt']);
+                if (text) appendWords(dir, sessionId, { at, text });
+            } else if (typeof input['last_assistant_message'] === 'string' && input['last_assistant_message'].trim()) {
+                appendWords(dir, sessionId, { at, reply: input['last_assistant_message'].replace(/\s+/g, ' ').trim().slice(0, REPLY_MAX) });
+            }
         }
-        return '';
+        // The buddy's note, once, where he gets his brief (never in a work folder).
+        const note = event === 'prompt' && rule.brief && config.brief ? noteToShow(s, env, now) : null;
+        writeFileSync(
+            file,
+            JSON.stringify({
+                ...s,
+                stamps: [...s.stamps, at],
+                prompts: s.prompts + (event === 'prompt' ? 1 : 0),
+                ...(firstPrompt ? { firstPrompt } : {}),
+                ...(sessionTitle ? { sessionTitle } : {}),
+                ...(note ? { notesShown: [...(s.notesShown ?? []), note.id].slice(-20) } : {}),
+            })
+        );
+        if (event === 'stop' && rule.mode === 'full') {
+            const lines = readWords(dir, sessionId);
+            if (flushDue(lines, readJson<FlushState>(flushFile(dir, sessionId))?.sent ?? 0, now)) await startFlush(api, dir, sessionId, env);
+        }
+        return note ? `Recollect, from Ramin's buddy (pass it on in one sentence at a natural pause; skip it if he is in the middle of something): ${note.text}` : '';
     }
     if (event === 'end') {
         if (existsSync(file)) await close(api, file, at, env);
@@ -308,7 +554,7 @@ export async function runHook(event: string, input: Record<string, unknown>, env
         session = { ...newOpenSession(sessionId, cwd, config.allow, now, resumed, 1), ...(sessionTitle ? { sessionTitle } : {}) };
         writeFileSync(file, JSON.stringify(session));
     }
-    if (!config.brief) return '';
+    if (!config.brief || !rule.brief) return '';
     try {
         const brief = await api.get<Brief>('/api/brief', { project: session.project, key: session.key });
         return [
@@ -325,6 +571,13 @@ export async function runHook(event: string, input: Record<string, unknown>, env
 
 async function main(): Promise<void> {
     const event = process.argv[2] ?? '';
+    if (event === 'flush') {
+        // A detached flush (started by the stop hook): its own process, no stdin, no output.
+        const sessionId = (process.argv[3] ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+        const config = loadHookConfig();
+        if (sessionId && config) await flushWords(apiFor(config), path.join(hooksHome(), 'open'), sessionId, process.env);
+        process.exit(0);
+    }
     try {
         const out = await runHook(event, await readStdin());
         if (out) process.stdout.write(`${out.slice(0, 9000)}\n`);

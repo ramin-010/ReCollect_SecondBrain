@@ -7,6 +7,7 @@ import { RecollectApi } from './api.js';
 import { loadConfig } from './config.js';
 import { stderrLogger as log } from './log.js';
 import { createRecollectServer, groupsFrom } from './server.js';
+import { folderRule, loadHookConfig } from './hook.js';
 
 async function main(): Promise<void> {
     const config = loadConfig();
@@ -18,7 +19,10 @@ async function main(): Promise<void> {
         log,
         debug: config.debug,
     });
-    const server = createRecollectServer({ api, agentName: config.agentName, problem: config.problem, groups: groupsFrom(config.tools) });
+    // A work folder (the hooks' config says brief: false for it): his brief stays personal here too.
+    const hooks = loadHookConfig();
+    const workMode = !!hooks && folderRule(process.cwd(), hooks.allow)?.brief === false;
+    const server = createRecollectServer({ api, agentName: config.agentName, problem: config.problem, groups: groupsFrom(config.tools), workMode });
 
     let closing = false;
     const shutdown = () => {

@@ -13,6 +13,8 @@ export interface ToolContext {
     problem: string | null;
     /** Every tool registered, by name (the server turns groups on and off with it). */
     registry?: Map<string, RegisteredTool>;
+    /** A work folder (hooks.json brief: false): the brief leaves out his goals, profile and the buddy. */
+    workMode?: boolean;
 }
 
 export interface ToolSpec<S extends z.ZodRawShape> {

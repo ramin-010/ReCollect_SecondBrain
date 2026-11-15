@@ -167,7 +167,7 @@ export function registerRecordTools(server: McpServer, ctx: ToolContext): void {
             },
             annotations: READ_ONLY,
         },
-        async ({ project, key }) => briefText(await api.get<Brief>('/api/brief', { project, key }))
+        async ({ project, key }) => briefText(await api.get<Brief>('/api/brief', { project, key, ...(ctx.workMode ? { work: '1' } : {}) }))
     );
 
     defineTool(
