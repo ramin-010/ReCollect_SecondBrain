@@ -41,7 +41,7 @@ The backend serves the same catalogue at `POST <api origin>/mcp` (MCP Streamable
 |---|---|
 | `read` | Every read tool, and the lookups the write tools make first (subjects, a doc's topic). |
 | `docs:write` | `create_doc`, `update_doc`, `append_to_doc`, `replace_section`, `add_canvas`, `update_canvas`, `trash_doc`, `restore_doc`, `insert_blocks`, `update_block`, `move_blocks`, `delete_blocks`. |
-| `sessions:write` | `checkpoint`, `update_project` (a Claude Code hook's token needs only this and `read`). |
+| `sessions:write` | `checkpoint`, `update_project`, `remember`, `forget` (a Claude Code hook's token needs only this and `read`). |
 | `tasks:write` | `add_task`, `update_task` (personal tasks only). Tokens that had `learning:write` got it with the migration. |
 | `learning:write` | `complete_revision`, `move_revision`, `update_settings`, `empty_trash`, `publish_doc`, `share_doc` (these three ask), `create_subject`, `schedule_revision`, `create_goal`, `update_goal`, `add_milestone`, `complete_milestone`, `update_milestone`, `remove_milestone`, `add_focus`, `update_focus`, `remove_focus`, `plan_topics`, `update_topic`, `add_pocket_note`, `add_week_target`, `update_week_target`, `suggest`, `log_decision`, and `create_subject_if_missing` on `create_doc`. |
 
@@ -49,12 +49,12 @@ A call without the scope it needs fails with the scope named, e.g. `The Recollec
 
 ## Tools
 
-66 tools (some rows below hold two or more), plus the `note_recipe` prompt and the `recollect-notes` skill (`npm run install:skill`). They come in groups: a chat lists **core, docs, plan and record** from the start (the 40,000-character budget holds for these) and the **manage** group when it calls `more_tools` or the server runs with `RECOLLECT_TOOLS=all` (or a list such as `core,docs,manage`); the in-app manager has them all. Each tool has a level (MANAGER_AND_DOCS_PLAN §3.2, `TOOL_LEVELS` in `src/server.ts`): 1 reads, 2 changes at once with an Undo, 3 only asks, and Ramin's tap on Home does it:
+69 tools (some rows below hold two or more), plus the `note_recipe` prompt and the `recollect-notes` skill (`npm run install:skill`). They come in groups: a chat lists **core, docs, plan and record** from the start (the 40,000-character budget holds for these) and the **manage** group when it calls `more_tools` or the server runs with `RECOLLECT_TOOLS=all` (or a list such as `core,docs,manage`); the in-app manager has them all. Each tool has a level (MANAGER_AND_DOCS_PLAN §3.2, `TOOL_LEVELS` in `src/server.ts`): 1 reads, 2 changes at once with an Undo, 3 only asks, and Ramin's tap on Home does it:
 
 | Tool | What it does | API |
 |---|---|---|
 | `get_brief` | Where Ramin stands, in one call: his profile (Settings → Agents), goals and pace, today, each path's next topic with its last session and open weak spots, recent sessions, Recall's weak topics, a project's next step (`project`), and a session key | `GET /api/brief` |
-| `checkpoint` | Write this chat's session under its key, again and again (the same key updates the same session): title, kind, topic, score, outcome, weak spots found or cleared, the topic's status, the next step; minutes are counted from the key | `PUT /api/sessions/by-key/:key` |
+| `checkpoint` | Write this chat's session under its key, again and again (the same key updates the same session): title, kind, topic, score, outcome, weak spots found or cleared, the topic's status, the next step, and up to 3 things it `learned` about Ramin (as `remember` takes them, tagged with the session's project and subject); minutes are counted from the key | `PUT /api/sessions/by-key/:key` |
 | `list_sessions` | Sessions day by day with minutes per kind | `GET /api/sessions` |
 | `get_week` | The week (Monday to Sunday): its targets, what is done (worked out: a target ticks itself when its topic, milestone or task is done, or its count is reached), last week in numbers, whether the weekly review waits | `GET /api/week` |
 | `add_week_target`, `update_week_target` | Add a target (at most 5 a week; a link to a topic, milestone or task, or a count: practice, minutes or topics finished, in a subject or project); change its text, tick it, drop it | `POST /api/week/targets`, `PATCH /api/week/targets/:id` |
@@ -80,7 +80,7 @@ A call without the scope it needs fails with the scope named, e.g. `The Recollec
 | `list_due` | Every due or overdue revision: today's plan first, then the ones waiting | `GET /api/today` |
 | `list_goals` | Goals with deadline, progress, forecast, why, subjects and milestones (with ids) | `GET /api/goals` |
 | `create_goal` | A goal with a deadline, optional why, subjects (names) and dated milestones | `POST /api/goals` |
-| `update_goal` | Change title, why, deadline, status or subjects | `PATCH /api/goals/:id` |
+| **manage:** `update_goal` | Change title, why, deadline, status or subjects (on `more_tools` since 2026-11-16, to make room for `remember`) | `PATCH /api/goals/:id` |
 | **manage:** `add_milestone` | Add a milestone to a goal | `POST /api/goals/:id/milestones` |
 | **manage:** `complete_milestone` | Mark a milestone done | `PATCH /api/goal-milestones/:id` |
 | **manage:** `update_milestone` / `remove_milestone` | Change a milestone (title, due day, `done: false` reopens it) or remove it; both undoable | `PATCH` / `DELETE /api/goal-milestones/:id` |
@@ -88,6 +88,9 @@ A call without the scope it needs fails with the scope named, e.g. `The Recollec
 | **manage:** `update_focus` / `remove_focus` | Change a focus line (text, done) or remove it; both undoable | `PATCH` / `DELETE /api/focus/:id` |
 | `add_pocket_note` | A pocket (quick) note, optionally pinned. Agents can add them, never read them | `PUT /api/quick-notes/:newUuid` |
 | `recent_agent_edits` | What agents wrote lately, and whether Ramin kept or undid it | `GET /api/agent/edits` |
+| `remember` | His buddy's memory (what Recollect learns about him across chats): one lasting thing he said about himself (text, a kind: fact, preference, value, aim, idea, decision, pattern, state, thread, win; private for health, money, people, fears…; a state is private by default). A repeat is "seen again", one he marked wrong is not saved, nothing is kept while he has paused the buddy; every text passes a secret scrub. Not an edit-log row: /you shows each memory with the agent that saved it | `POST /api/buddy/remember` |
+| **manage:** `recall_memory` | Search what his buddy knows (words or word starts), or list it by kind and status; private ones are marked | `GET /api/buddy/memories` |
+| **manage:** `forget` | Close a memory that is no longer true, undoable; memories he wrote or changed himself are his (403) | `POST /api/buddy/memories/:id/close` |
 | `more_tools` | Turns the manage group on for this chat (the client is told the tool list changed) | none |
 | **manage:** `trash_doc`, `restore_doc` | Move a doc of his to the trash (30 days, then gone) or take it out; both undoable | `POST /api/agent/docs/:id/trash`, `…/restore` |
 | **manage:** `empty_trash` (level 3) | Ask to delete the trash for good: a card under Suggested on Home with "Do it"; nothing happens until he taps it | `POST /api/actions` (`empty_trash`) |

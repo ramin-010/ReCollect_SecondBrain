@@ -105,7 +105,7 @@ describe('create_goal', () => {
 
 describe('update_goal', () => {
     it('PATCHes only what changes; an empty why clears it; subjects become ids', async () => {
-        h = await connect({ 'GET /api/subjects': ok(subjects()), 'PATCH /api/goals/goal1': ok(goal({ deadline: '2027-03-31', daysLeft: 137 })) });
+        h = await connect({ 'GET /api/subjects': ok(subjects()), 'PATCH /api/goals/goal1': ok(goal({ deadline: '2027-03-31', daysLeft: 137 })) }, { groups: TOOL_GROUP_NAMES });
         const res = await h.call('update_goal', { goalId: 'goal1', deadline: '2027-03-31', why: '', subjects: ['DSA'] });
         const patch = h.requests.find((r) => r.method === 'PATCH')!;
         expect(patch.path).toBe('/api/goals/goal1');
@@ -117,13 +117,13 @@ describe('update_goal', () => {
     });
 
     it('status only', async () => {
-        h = await connect({ 'PATCH /api/goals/goal1': ok(goal({ status: 'done' })) });
+        h = await connect({ 'PATCH /api/goals/goal1': ok(goal({ status: 'done' })) }, { groups: TOOL_GROUP_NAMES });
         await h.call('update_goal', { goalId: 'goal1', status: 'done' });
         expect(h.requests[0]!.body).toEqual({ status: 'done' });
     });
 
     it('nothing to change → an error, no call', async () => {
-        h = await connect({});
+        h = await connect({}, { groups: TOOL_GROUP_NAMES });
         const res = await h.call('update_goal', { goalId: 'goal1' });
         expect(res).toMatchObject({ isError: true });
         expect(res.text).toMatch(/^Nothing to change/);
@@ -131,7 +131,7 @@ describe('update_goal', () => {
     });
 
     it('an unknown goal id says which', async () => {
-        h = await connect({ 'PATCH /api/goals/nope': fail(404, 'Not found', 'NOT_FOUND') });
+        h = await connect({ 'PATCH /api/goals/nope': fail(404, 'Not found', 'NOT_FOUND') }, { groups: TOOL_GROUP_NAMES });
         expect(await h.call('update_goal', { goalId: 'nope', title: 'X' })).toEqual({ text: 'No goal with id nope (list_goals shows them).', isError: true });
     });
 });

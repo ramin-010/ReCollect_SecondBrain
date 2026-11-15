@@ -80,7 +80,7 @@ export function registerPathTools(server: McpServer, ctx: ToolContext): void {
             title: 'Plan topics on a path',
             description:
                 "Put topics on a subject's path as planned (not studied yet, no doc): a whole course at once, or one topic where it is needed (after: the topic it follows). " +
-                'Keep titles short; numbers are not needed (the order gives them). Ramin can undo it.',
+                'Keep titles short, without numbers (the order gives them). Ramin can undo it.',
             input: {
                 subject: zSubjectName.describe('The subject name.'),
                 titles: z.array(z.string().trim().min(1).max(200)).min(1).max(50).describe('The topic titles, in order.'),
@@ -102,8 +102,8 @@ export function registerPathTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Move a topic along its path',
             description:
-                'Change one topic on its path: status (in_progress when Ramin starts it, done when he has learned it, skipped, or back to planned), the next step to take on it (null clears it), ' +
-                'its place (after: the topic it follows; null puts it first), or the title of a planned topic. Ramin can undo it.',
+                'Change one topic on its path: status (in_progress when Ramin starts it, done when learned, skipped, or back to planned), its next step (null clears it), ' +
+                'its place (after), or a planned topic’s title. Ramin can undo it.',
             input: {
                 topicId: zId('topic').describe('The topic id (get_path shows them).'),
                 status: z.enum(['planned', 'in_progress', 'done', 'skipped']).optional(),

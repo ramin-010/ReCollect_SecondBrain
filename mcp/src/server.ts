@@ -21,13 +21,14 @@ import { registerRevisionTools } from './tools/revision.js';
 import { registerSubjectTools } from './tools/subjects.js';
 import { registerManageTools } from './tools/manage.js';
 import { registerBlockTools } from './tools/blocks.js';
+import { registerBuddyTools } from './tools/buddy.js';
 
 export const SERVER_NAME = 'recollect';
 export const SERVER_VERSION = '0.1.0';
 
 export const INSTRUCTIONS = [
     "Recollect is Ramin's personal learning app and the record of his work: Docs (his notes, in Markdown), subjects with paths (topics in course order), spaced revision (reviews 1, 3, 7 and 21 days after a doc is scheduled), goals with dated milestones, a week of up to 5 targets, up to 3 focus lines a day, personal tasks, and work sessions.",
-    'Start a working chat with get_brief (where he stands, and a session key), then checkpoint as you go: after each part, not only at the end. search_docs before writing a doc. Plan the week with get_week and add_week_target on his yes; when something is his call and he cannot say yes in the chat, suggest it instead.',
+    'Start a working chat with get_brief (where he stands, and a session key), then checkpoint as you go: after each part, not only at the end. When he says something lasting about himself (a preference, a worry, a plan, a promise, an idea), remember it (or send it as checkpoint’s learned). search_docs before writing a doc. Plan the week with get_week and add_week_target on his yes; when something is his call and he cannot say yes in the chat, suggest it instead.',
     'Every write is logged with your agent name and Ramin can undo it from Home → From your agent. Docs, goals and subjects are never deleted; a focus line or a milestone can be removed (and Undo brings it back). Answers are compact text with the ids the next call needs.',
     'Docs take GitHub Markdown plus callouts (> [!TIP]), <details> toggles for self-test questions, ```mermaid diagrams and ```canvas diagrams (Mermaid flowchart text that Recollect lays out as a board Ramin can edit; add_canvas draws one, update_canvas changes one in place, preview_diagram shows it): see create_doc.',
 ].join(' ');
@@ -103,6 +104,10 @@ export const TOOL_NAMES = [
     'update_block',
     'move_blocks',
     'delete_blocks',
+    // The buddy's memory (BUDDY_MEMORY_PLAN): remember is listed with the record; look up and forget on more_tools.
+    'remember',
+    'recall_memory',
+    'forget',
 ] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -182,6 +187,9 @@ export const TOOL_LEVELS: Readonly<Record<ToolName, 1 | 2 | 3>> = {
     update_block: 2,
     move_blocks: 2,
     delete_blocks: 2,
+    remember: 2,
+    recall_memory: 1,
+    forget: 2,
 };
 
 export const TOOL_GROUP_NAMES = ['core', 'docs', 'plan', 'record', 'manage'] as const;
@@ -224,7 +232,7 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     list_due: 'plan',
     list_goals: 'plan',
     create_goal: 'plan',
-    update_goal: 'plan',
+    update_goal: 'manage',
     add_milestone: 'manage',
     complete_milestone: 'manage',
     update_milestone: 'manage',
@@ -260,6 +268,10 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     update_block: 'docs',
     move_blocks: 'manage',
     delete_blocks: 'docs',
+    // The buddy (2026-11-16): remember is listed with the record; update_goal moved to manage to make room.
+    remember: 'record',
+    recall_memory: 'manage',
+    forget: 'manage',
 };
 
 /** RECOLLECT_TOOLS: "all", or groups separated by commas ("core,docs,manage"); else the default. */
@@ -301,6 +313,7 @@ export function createRecollectServer(options: ServerOptions): McpServer {
     registerMoreTools(server, ctx, registry);
     registerManageTools(server, ctx);
     registerBlockTools(server, ctx);
+    registerBuddyTools(server, ctx);
     registerPrompts(server);
     leanToolList(server);
     const listed = new Set(options.groups ?? DEFAULT_GROUPS);
@@ -316,7 +329,7 @@ function registerMoreTools(server: McpServer, ctx: ToolContext, registry: Map<st
         'more_tools',
         {
             title: 'More tools',
-            description: "Turn on the manage tools: the trash, mark a review done or move it, settings, projects, what waits for Ramin's tap.",
+            description: "Turn on the manage tools: the trash, mark a review done or move it, settings, projects, goal edits, his buddy's memory, what waits for Ramin's tap.",
             input: { group: z.enum(['manage']).optional() },
             annotations: READ_ONLY,
         },

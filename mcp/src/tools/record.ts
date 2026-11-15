@@ -9,6 +9,7 @@ import { zId, zSubjectName } from '../schemas.js';
 import { resolveSubject } from '../subjects.js';
 import { CHANGES, READ_ONLY, defineTool, type ToolContext } from '../tool.js';
 import { nextUpLine } from './paths.js';
+import { zNote } from './buddy.js';
 import type { NextUp, PathStatus } from '../types.js';
 
 type Kind = 'study' | 'practice' | 'build' | 'review';
@@ -44,6 +45,15 @@ export interface Brief {
     recent: BriefSession[];
     recall: { days: number; finished: number; weakTopics: Array<{ title: string; weak: number }> };
     project: { key: string; name: string; nextStep: string | null; lastSession: { day: string; minutes: number | null; title: string } | null } | null;
+    /** The buddy (BUDDY_MEMORY_PLAN §3.4): its portrait of him, the memories this chat starts with, a note. */
+    buddy?: {
+        who: string | null;
+        heading: string | null;
+        now: string | null;
+        memories: Array<{ kind: string; text: string; pinned: boolean }>;
+        note: string | null;
+        followUp: string | null;
+    };
     session: { key: string };
 }
 
@@ -69,6 +79,7 @@ interface SessionWrite {
     topic: { _id: string; title: string; status: PathStatus; position: number; nextStep: string | null } | null;
     weakSpots: Array<{ _id: string; text: string }>;
     topicEditId: string | null;
+    learned?: { saved: number; seen: number; skipped: number; paused: boolean } | null;
 }
 
 interface SessionList {
@@ -87,6 +98,13 @@ function sessionLine(s: BriefSession): string {
 export function briefText(b: Brief): string {
     const lines = [`Brief · ${b.now.weekday} ${b.now.day} ${b.now.time} (${b.now.timezone})`];
     if (b.profile) lines.push(`About Ramin: ${b.profile}`);
+    const buddy = b.buddy;
+    if (buddy?.who) lines.push(`Who he is: ${buddy.who}`);
+    if (buddy?.heading) lines.push(`Where he is heading: ${buddy.heading}`);
+    if (buddy?.now) lines.push(`Right now: ${buddy.now}`);
+    if (buddy?.memories.length) lines.push(`His buddy knows: ${buddy.memories.map((m) => `${m.text} (${m.kind})`).join('; ')}`);
+    if (buddy?.note) lines.push(`From his buddy (pass it on in a sentence at a natural pause): ${buddy.note}`);
+    if (buddy?.followUp) lines.push(`Ask him at a good moment: ${buddy.followUp}`);
     for (const g of b.goals) {
         const pace = g.forecast?.status ? ` · ${g.forecast.status.replace('_', ' ')}${g.forecast.behindDays ? ` by ${g.forecast.behindDays} days` : ''}` : '';
         const next = g.nextMilestone ? ` · next: ${quote(g.nextMilestone.title, 60)}${g.nextMilestone.dueDay ? ` (due ${g.nextMilestone.dueDay})` : ''}` : '';
@@ -177,6 +195,7 @@ export function registerRecordTools(server: McpServer, ctx: ToolContext): void {
                 cleared: z.array(z.string().trim().min(1).max(160)).max(20).optional().describe('Weak spots he now gets right (their text or id).'),
                 topicStatus: z.enum(['planned', 'in_progress', 'done', 'skipped']).optional(),
                 nextStep: z.string().trim().max(300).optional().describe('What to do next on the topic (or the project).'),
+                learned: z.array(zNote).max(3).optional().describe('What you learned about Ramin himself (see remember).'),
             },
             annotations: CHANGES,
         },
@@ -192,6 +211,7 @@ export function registerRecordTools(server: McpServer, ctx: ToolContext): void {
             ];
             if (w.topic) lines.push(`Topic: ${w.topic.position}. ${w.topic.title} · ${w.topic.status.replace('_', ' ')}${w.topic.nextStep ? ` · next step: ${w.topic.nextStep}` : ''}`);
             if (w.weakSpots.length) lines.push(`Open weak spots: ${w.weakSpots.map((x) => x.text).join('; ')}`);
+            if (w.learned) lines.push(w.learned.paused ? 'Learned: not kept (Ramin has paused his buddy).' : `Learned: ${plural(w.learned.saved, 'new memory', 'new memories')}${w.learned.seen ? `, ${w.learned.seen} already known` : ''}${w.learned.skipped ? `, ${w.learned.skipped} not kept` : ''}.`);
             const text = lines.join('\n');
             return w.topicEditId ? withUndo(text) : text;
         }

@@ -157,8 +157,8 @@ export function registerContextTools(server: McpServer, ctx: ToolContext): void 
         {
             title: 'Today',
             description:
-                "Ramin's day on Recollect Home: the revisions on today's plan (with the doc to open for each), his focus lines (up to 3), " +
-                'the next topic of each path (up to 3), and his active goals with deadline, days left, milestone progress, forecast and the next milestone. Start here to plan a day or a session.',
+                "Ramin's day on Home: today's planned revisions (with the doc to open), his focus lines, each path's next topic, " +
+                'and his active goals (deadline, days left, milestones, forecast, next milestone). Start here to plan a day.',
             input: {},
             annotations: READ_ONLY,
         },
@@ -172,8 +172,8 @@ export function registerContextTools(server: McpServer, ctx: ToolContext): void 
         {
             title: 'Learning overview',
             description:
-                'Per subject: how many topics (docs under revision) are due now, waiting for a later review, mastered (all 4 reviews done) or not scheduled, plus the daily revision budget. ' +
-                "With subject: that subject's topics, each with its next review date and doc id. Use it to plan a week or to find gaps.",
+                'Per subject: topics (docs under revision) due now, waiting, mastered (all 4 reviews done) or not scheduled, and the daily revision budget. ' +
+                'With subject: its topics, each with its next review and doc id. For planning a week or finding gaps.',
             input: {
                 subject: zSubjectName.optional().describe('A subject name to list its topics (case-insensitive).'),
             },

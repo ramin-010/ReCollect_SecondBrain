@@ -83,7 +83,7 @@ export function registerDayTools(server: McpServer, ctx: ToolContext, newId: () 
             title: 'Add a pocket note',
             description:
                 "Drop a quick note into Ramin's pocket (his private scratch notes on Home): a reminder, a link, an idea to come back to. " +
-                'Agents can add pocket notes but never read them. pinned: true keeps it at the top.',
+                'Agents can add pocket notes but never read them.',
             input: {
                 text: z.string().trim().min(1, 'The note is empty').max(100_000).describe('The note (plain text or simple Markdown).'),
                 pinned: z.boolean().optional().describe('Pin it to the top.'),
