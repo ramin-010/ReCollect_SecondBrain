@@ -48,11 +48,12 @@ describe('remember', () => {
 
 describe('recall_memory and forget (manage)', () => {
     it('searches, lists, and says when nothing is known', async () => {
-        h = await connect({ 'GET /api/buddy/memories': [ok([memory(), memory({ _id: 'mem2', text: 'Wants a backend offer', kind: 'aim', pinned: true, byUser: true })]), ok([])] }, { groups: TOOL_GROUP_NAMES });
+        h = await connect({ 'GET /api/buddy/memories': [ok([memory(), memory({ _id: 'mem2', text: 'Wants a backend offer', kind: 'aim', pinned: true, byUser: true })]), ok([])], 'GET /api/buddy/chapters': [ok([]), ok([{ period: '2026-03', text: 'March was Rust.' }])] }, { groups: TOOL_GROUP_NAMES });
         const res = await h.call('recall_memory', { query: 'study' });
         expect(h.requests[0]!.query).toEqual({ q: 'study', limit: '20' });
+        expect(h.requests[1]!.path).toBe('/api/buddy/chapters');
         expect(res.text).toBe('"Studies best after 9 pm" (fact) · id mem1\n"Wants a backend offer" (aim, pinned, his own) · id mem2');
-        expect((await h.call('recall_memory', { query: 'rust' })).text).toBe('Nothing about "rust" yet.');
+        expect((await h.call('recall_memory', { query: 'march' })).text).toBe('Month 2026-03: March was Rust.');
     });
 
     it('forget closes one, with Undo; his own are refused', async () => {

@@ -84,7 +84,10 @@ export function registerBuddyTools(server: McpServer, ctx: ToolContext): void {
         async ({ query, kind, status, limit }) => {
             if (ctx.workMode) return 'Not in a work folder: his buddy’s memory stays out of work chats.';
             const list = await api.get<Memory[]>('/api/buddy/memories', { q: query, kind, status, limit: limit ?? 20 });
-            return list.length ? list.map(memoryLine).join('\n') : query ? `Nothing about "${query}" yet.` : 'Nothing yet.';
+            // His months (the buddy's chapters) that hold the words: "what was I doing in March?".
+            const months = query && !kind ? await api.get<Array<{ period: string; text: string }>>('/api/buddy/chapters', { q: query }).catch(() => []) : [];
+            const lines = [...list.map(memoryLine), ...months.map((m) => `Month ${m.period}: ${m.text}`)];
+            return lines.length ? lines.join('\n') : query ? `Nothing about "${query}" yet.` : 'Nothing yet.';
         }
     );
 

@@ -89,7 +89,7 @@ A call without the scope it needs fails with the scope named, e.g. `The Recollec
 | `add_pocket_note` | A pocket (quick) note, optionally pinned. Agents can add them, never read them | `PUT /api/quick-notes/:newUuid` |
 | `recent_agent_edits` | What agents wrote lately, and whether Ramin kept or undid it | `GET /api/agent/edits` |
 | `remember` | His buddy's memory (what Recollect learns about him across chats): one lasting thing he said about himself (text, a kind: fact, preference, value, aim, idea, decision, pattern, state, thread, win; private for health, money, people, fears…; a state is private by default). A repeat is "seen again", one he marked wrong is not saved, nothing is kept while he has paused the buddy; every text passes a secret scrub. Not an edit-log row: /you shows each memory with the agent that saved it | `POST /api/buddy/remember` |
-| **manage:** `recall_memory` | Search what his buddy knows (words or word starts), or list it by kind and status; private ones are marked | `GET /api/buddy/memories` |
+| **manage:** `recall_memory` | Search what his buddy knows (words or word starts), or list it by kind and status; private ones are marked; a query also finds his months (the buddy's chapters, by a month's name or words in it) | `GET /api/buddy/memories`, `GET /api/buddy/chapters` |
 | **manage:** `forget` | Close a memory that is no longer true, undoable; memories he wrote or changed himself are his (403) | `POST /api/buddy/memories/:id/close` |
 | `more_tools` | Turns the manage group on for this chat (the client is told the tool list changed) | none |
 | **manage:** `trash_doc`, `restore_doc` | Move a doc of his to the trash (30 days, then gone) or take it out; both undoable | `POST /api/agent/docs/:id/trash`, `…/restore` |
