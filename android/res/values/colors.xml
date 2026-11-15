@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Theme v2 (recollect/DESIGN.md), light steps. values-night/colors.xml holds the dark steps. -->
+<resources>
+    <color name="page">#FFFFFF</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="surface_2">#F4F3F2</color>
+    <color name="card_ring">#ECEBE8</color>
+    <color name="line">#EFEEEC</color>
+    <color name="line_strong">#E3E2DF</color>
+    <color name="ink_1">#2C2C2B</color>
+    <color name="ink_2">#5F5E59</color>
+    <color name="ink_3">#73706B</color>
+    <color name="icon">#8E8B86</color>
+    <color name="accent">#1F6FD1</color>
+    <color name="accent_fill">#2383E2</color>
+    <color name="main">#2C2C2B</color>
+    <color name="on_main">#FFFFFF</color>
+    <color name="danger">#B5443B</color>
+    <color name="attention">#8A4F1C</color>
+    <color name="attention_tint">#FBEBDE</color>
+    <color name="good">#2A6B47</color>
+    <color name="switch_off">#D4D3CF</color>
+    <!-- Pressed fills: ink at 8.5 %; on the main button, white. -->
+    <color name="press">#162C2C2B</color>
+    <color name="press_on_main">#2EFFFFFF</color>
+
+    <!-- The widget's own steps, light and dark (DayWidget sets them when the theme is not "System"). -->
+    <color name="w_light_ground">#FFFFFF</color>
+    <color name="w_light_ring">#E3E2DF</color>
+    <color name="w_light_ink_1">#2C2C2B</color>
+    <color name="w_light_ink_2">#5F5E59</color>
+    <color name="w_light_ink_3">#73706B</color>
+    <color name="w_dark_ground">#202020</color>
+    <color name="w_dark_ring">#383836</color>
+    <color name="w_dark_ink_1">#F0EFED</color>
+    <color name="w_dark_ink_2">#ADA9A3</color>
+    <color name="w_dark_ink_3">#8E8B86</color>
+    <!-- "System": follows the phone (values-night swaps these). -->
+    <color name="w_ground">@color/w_light_ground</color>
+    <color name="w_ring">@color/w_light_ring</color>
+    <color name="w_ink_1">@color/w_light_ink_1</color>
+    <color name="w_ink_2">@color/w_light_ink_2</color>
+    <color name="w_ink_3">@color/w_light_ink_3</color>
+
+    <!-- The launcher icon: the mark in white on ink, so it reads apart from the web app's (ink on white). -->
+    <color name="icon_ground">#2C2C2B</color>
+    <color name="icon_ink">#FFFFFF</color>
+</resources>

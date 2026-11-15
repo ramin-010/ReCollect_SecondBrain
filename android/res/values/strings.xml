@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Words as in the web app: plain, sentence case; a button says what happens. -->
+<resources>
+    <!-- "Your day", like the widget: the web app installed on the phone is "Recollect". -->
+    <string name="app_name">Your day</string>
+    <string name="widget_name">Your day</string>
+    <string name="widget_description">The day\'s lines from Recollect: what today holds, the focus, what\'s next.</string>
+    <string name="subtitle">Recollect\'s picture of your day, on this phone.</string>
+
+    <!-- Not connected -->
+    <string name="connect_title">Connect this phone</string>
+    <string name="connect_body">On your computer, open Recollect → Settings → Phone app and make the connect code. Point this phone\'s camera at it, open the link, then tap Open the phone app.</string>
+    <string name="connect_paste">Paste a connect link</string>
+    <string name="connect_paste_none">There\'s no connect link on the clipboard. Copy it in Settings → Phone app first.</string>
+    <string name="connect_scope">The code lets this app read only the picture of your day and its lines.</string>
+
+    <!-- Connecting (a link arrived) -->
+    <string name="confirm_title">Connect to Recollect?</string>
+    <string name="confirm_body">This phone will show the picture of your day from %1$s.</string>
+    <string name="confirm_keep">Keep a copy of my wallpaper to put back if I disconnect</string>
+    <string name="confirm_keep_note">Android asks once to let the app read your current wallpaper.</string>
+    <string name="confirm_go">Connect</string>
+    <string name="confirm_busy">Connecting…</string>
+    <string name="confirm_cancel">Not now</string>
+    <string name="connected_toast">Connected. Your lock screen shows the day.</string>
+    <string name="connected_toast_off">Connected.</string>
+
+    <!-- Problems: what went wrong and what to do next -->
+    <string name="bad_link">This link isn\'t a Recollect connect link. Make a new code in Settings → Phone app.</string>
+    <string name="bad_link_http">For an address on the internet, Recollect needs https. Check the address in Settings → Phone app.</string>
+    <string name="fail_unreachable">Couldn\'t reach Recollect at %1$s. Until Recollect is online, the phone needs your computer on and the same Wi-Fi or hotspot, or the USB cable.</string>
+    <string name="fail_revoked">This phone\'s code was ended. Make a new one on your computer in Settings → Phone app.</string>
+    <string name="fail_forbidden">This code can\'t read the picture. Make a new one in Settings → Phone app.</string>
+    <string name="fail_server">Recollect answered with an error (%1$d). The app tries again in half an hour.</string>
+    <string name="fail_data">Recollect sent something this app can\'t read. Build and install the latest app.</string>
+    <string name="fail_wallpaper">The phone didn\'t accept the wallpaper. Try Refresh now.</string>
+
+    <!-- Settings -->
+    <string name="status_updated">Updated %1$s</string>
+    <string name="status_never">Not updated yet</string>
+    <string name="status_quiet">Quiet hours: the wallpaper changes again at %1$s.</string>
+    <string name="done_today">Done for today</string>
+    <string name="refresh">Refresh now</string>
+    <string name="refreshing">Refreshing…</string>
+    <string name="refreshed">Up to date</string>
+
+    <string name="show_on">Show it on</string>
+    <string name="lock_screen">Lock screen</string>
+    <string name="home_screen">Home screen</string>
+    <string name="show_on_note">The widget can show the same lines on the home screen: touch and hold an empty spot, tap Widgets, then Recollect.</string>
+    <string name="show_on_note_pin">The home screen can also show the same lines as a widget.</string>
+    <string name="add_widget">Add the widget</string>
+    <string name="home_kept">The home screen keeps the last picture. Pick another wallpaper in the phone\'s settings.</string>
+    <string name="lock_kept">The lock screen keeps the last picture. Pick another wallpaper in the phone\'s settings.</string>
+    <string name="put_back">Your wallpaper is back.</string>
+    <string name="home_built_in">The home screen shows the phone\'s own wallpaper again.</string>
+    <string name="lock_shows_home">The lock screen shows your home wallpaper again.</string>
+
+    <string name="theme">Theme</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_system">System</string>
+    <string name="theme_note">For the wallpaper and the widget. System follows the phone\'s dark mode.</string>
+
+    <string name="at_night">At night</string>
+    <string name="quiet_hours">Quiet hours</string>
+    <string name="quiet_from">From</string>
+    <string name="quiet_to">to</string>
+    <string name="quiet_note">No wallpaper changes between these times.</string>
+
+    <string name="privacy">Privacy</string>
+    <string name="hide_titles">Hide titles</string>
+    <string name="hide_titles_note">Counts instead of topic and focus names, for a lock screen anyone can see.</string>
+
+    <string name="connection">Connection</string>
+    <string name="connected_to">Connected to %1$s</string>
+    <string name="open_recollect">Open Recollect</string>
+    <string name="open_recollect_none">Recollect\'s web address isn\'t known yet.</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="disconnect_title">Disconnect this phone?</string>
+    <string name="disconnect_body_back">The app stops changing the wallpaper, ends its code and puts your old wallpaper back.</string>
+    <string name="disconnect_body_kept">The app stops changing the wallpaper and ends its code. The lock screen shows your home wallpaper again.</string>
+    <string name="disconnect_go">Disconnect</string>
+    <string name="cancel">Cancel</string>
+    <string name="disconnected">Disconnected.</string>
+
+    <string name="realme_title">On this phone</string>
+    <string name="realme_magazine">If the lock screen shows other pictures, turn off Glance: Settings → Home screen, Lock screen &amp; Always-On Display → Glance for realme → Activate on Lockscreen.</string>
+    <string name="realme_battery">For the picture to change on its own, let this app run in the background: App info → Battery usage → Allow background activity, and Allow auto-launch.</string>
+    <string name="open_app_info">Open App info</string>
+
+    <string name="version">Version %1$s</string>
+
+    <!-- The widget before it is connected -->
+    <string name="widget_connect">Connect Recollect</string>
+    <string name="widget_connect_line">Open the app to connect this phone.</string>
+    <string name="widget_stale">Updated %1$s</string>
+    <string name="preview_label">The picture of your day</string>
+</resources>

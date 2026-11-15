@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Theme v2 (recollect/DESIGN.md), dark steps. -->
+<resources>
+    <color name="page">#191919</color>
+    <color name="surface">#202020</color>
+    <color name="surface_2">#262626</color>
+    <color name="card_ring">#2C2C2B</color>
+    <color name="line">#2C2C2B</color>
+    <color name="line_strong">#383836</color>
+    <color name="ink_1">#F0EFED</color>
+    <color name="ink_2">#ADA9A3</color>
+    <color name="ink_3">#8E8B86</color>
+    <color name="icon">#8E8B86</color>
+    <color name="accent">#5B9BEA</color>
+    <color name="accent_fill">#2383E2</color>
+    <color name="main">#E6E5E3</color>
+    <color name="on_main">#191919</color>
+    <color name="danger">#E5786F</color>
+    <color name="attention">#E09A52</color>
+    <color name="attention_tint">#53361F</color>
+    <color name="good">#6FB38C</color>
+    <color name="switch_off">#4A4947</color>
+    <color name="press">#16FFFFFF</color>
+    <color name="press_on_main">#1A000000</color>
+
+    <color name="w_ground">@color/w_dark_ground</color>
+    <color name="w_ring">@color/w_dark_ring</color>
+    <color name="w_ink_1">@color/w_dark_ink_1</color>
+    <color name="w_ink_2">@color/w_dark_ink_2</color>
+    <color name="w_ink_3">@color/w_dark_ink_3</color>
+</resources>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A 14 dp white knob inset 3 dp in the track, with a breath of shadow under it. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:width="20dp" android:height="20dp">
+        <shape android:shape="oval"><solid android:color="@android:color/transparent" /></shape>
+    </item>
+    <item android:left="3dp" android:top="3.6dp" android:right="3dp" android:bottom="2.4dp">
+        <shape android:shape="oval"><solid android:color="#30000000" /></shape>
+    </item>
+    <item android:left="3dp" android:top="3dp" android:right="3dp" android:bottom="3dp">
+        <shape android:shape="oval"><solid android:color="#FFFFFF" /></shape>
+    </item>
+</layer-list>

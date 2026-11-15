@@ -22,6 +22,10 @@
 /android/.toolchain/
 /android/build/
 /android/keys/
+# editor help that names this computer's SDK path
+/android/.classpath
+/android/.project
+/android/.settings/
 *.keystore
 *.jks
 *.apk

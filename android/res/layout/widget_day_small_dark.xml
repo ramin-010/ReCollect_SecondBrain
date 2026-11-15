@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Made from widget_day_small.xml with the dark steps (DayWidget: a fixed theme needs its own layout, since a re-applied update keeps old colours). Edit widget_day_small.xml, then copy. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg_dark"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp">
+
+    <TextView
+        android:id="@+id/w_date"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:singleLine="true"
+        android:ellipsize="none"
+        android:requiresFadingEdge="horizontal"
+        android:fadingEdgeLength="24dp"
+        android:textColor="@color/w_dark_ink_3"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/w_headline"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:singleLine="true"
+        android:ellipsize="none"
+        android:requiresFadingEdge="horizontal"
+        android:fadingEdgeLength="24dp"
+        android:fontFamily="sans-serif-medium"
+        android:textColor="@color/w_dark_ink_1"
+        android:textSize="16sp" />
+</LinearLayout>

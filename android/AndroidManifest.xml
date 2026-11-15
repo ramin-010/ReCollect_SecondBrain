@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Recollect's phone app (context/specs/ANDROID_APP_SPEC.md): the picture of the day as the home and
+  lock screen wallpaper, a home-screen widget with the same lines, and one settings screen. It reads
+  two things from the server with its own narrow token (the `ambient` scope) and nothing else.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="app.recollect.phone">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <!-- Persisted refresh jobs come back after a restart. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Only to keep a copy of the wallpaper he had, so Disconnect can put it back (Android 12 and older; asked when he ticks it). -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+
+    <!-- usesCleartextTraffic: before the deploy the server is this computer over USB or the hotspot (http);
+         ConnectLink refuses plain http for anything but a local address. -->
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:theme="@style/Theme.Recollect"
+        android:allowBackup="false"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- recollect://connect?server=…&token=… (the server's /phone/connect page opens it) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="recollect" android:host="connect" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".RefreshJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <receiver
+            android:name=".DayWidget"
+            android:exported="false"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/day_widget" />
+        </receiver>
+
+        <receiver
+            android:name=".Wake"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

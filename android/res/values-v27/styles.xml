@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 8.1+: dark navigation-bar icons on the light page too. -->
+    <style name="Theme.Recollect" parent="Base.Recollect">
+        <item name="android:windowLightNavigationBar">@bool/light_bars</item>
+    </style>
+</resources>

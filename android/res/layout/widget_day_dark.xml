@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Made from widget_day.xml with the dark steps (DayWidget: a fixed theme needs its own layout, since a re-applied update keeps old colours). Edit widget_day.xml, then copy. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg_dark"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:paddingStart="16dp"
+    android:paddingTop="14dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="12dp">
+
+    <TextView
+        android:id="@+id/w_date"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:singleLine="true"
+        android:ellipsize="none"
+        android:requiresFadingEdge="horizontal"
+        android:fadingEdgeLength="24dp"
+        android:textColor="@color/w_dark_ink_3"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/w_headline"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:maxLines="2"
+        android:lineSpacingMultiplier="1.1"
+        android:fontFamily="sans-serif-medium"
+        android:textColor="@color/w_dark_ink_1"
+        android:textSize="17sp" />
+
+    <TextView
+        android:id="@+id/w_line1"
+        style="@style/WidgetLine"
+        android:textColor="@color/w_dark_ink_2"
+        android:layout_marginTop="6dp" />
+
+    <TextView
+        android:id="@+id/w_line2"
+        style="@style/WidgetLine"
+        android:textColor="@color/w_dark_ink_2" />
+
+    <TextView
+        android:id="@+id/w_line3"
+        style="@style/WidgetLine"
+        android:textColor="@color/w_dark_ink_2" />
+
+    <TextView
+        android:id="@+id/w_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:singleLine="true"
+        android:textColor="@color/w_dark_ink_3"
+        android:textSize="12sp"
+        android:visibility="gone" />
+</LinearLayout>

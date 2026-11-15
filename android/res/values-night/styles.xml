@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <bool name="light_bars">false</bool>
+
+    <style name="Base.Recollect" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/page</item>
+        <item name="android:statusBarColor">@color/page</item>
+        <item name="android:navigationBarColor">@color/page</item>
+        <item name="android:windowLightStatusBar">@bool/light_bars</item>
+        <item name="android:colorPrimary">@color/page</item>
+        <item name="android:colorPrimaryDark">@color/page</item>
+        <item name="android:colorAccent">@color/accent_fill</item>
+        <item name="android:colorControlNormal">@color/icon</item>
+        <item name="android:colorControlActivated">@color/accent_fill</item>
+        <item name="android:colorControlHighlight">@color/press</item>
+        <item name="android:textColorPrimary">@color/ink_1</item>
+        <item name="android:textColorSecondary">@color/ink_2</item>
+        <item name="android:textColorHint">@color/ink_3</item>
+        <item name="android:alertDialogTheme">@style/Dialog.Recollect</item>
+        <item name="android:timePickerDialogTheme">@style/Dialog.Recollect</item>
+    </style>
+
+    <style name="Dialog.Recollect" parent="android:Theme.Material.Dialog.Alert">
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:buttonBarButtonStyle">@style/DialogButton</item>
+        <item name="android:textColorPrimary">@color/ink_1</item>
+        <item name="android:textColorSecondary">@color/ink_2</item>
+    </style>
+</resources>
