@@ -22,8 +22,10 @@ final class Ambient {
     final String appUrl;
     final String accountName;
     final String accountEmail;
+    /** The server's fingerprint of both pictures (`key`), or null from an older server. */
+    final String serverKey;
 
-    private Ambient(String state, String date, String headline, List<String> lines, String appUrl, String accountName, String accountEmail) {
+    private Ambient(String state, String date, String headline, List<String> lines, String appUrl, String accountName, String accountEmail, String serverKey) {
         this.state = state;
         this.date = date;
         this.headline = headline;
@@ -31,6 +33,7 @@ final class Ambient {
         this.appUrl = appUrl;
         this.accountName = accountName;
         this.accountEmail = accountEmail;
+        this.serverKey = serverKey;
     }
 
     static Ambient parse(JSONObject d) throws JSONException {
@@ -42,6 +45,7 @@ final class Ambient {
         }
         JSONObject account = d.optJSONObject("account");
         String appUrl = d.isNull("appUrl") ? null : d.optString("appUrl", null);
+        String key = d.isNull("key") ? null : d.optString("key", null);
         return new Ambient(
                 d.getString("state"),
                 d.optString("date", ""),
@@ -49,15 +53,20 @@ final class Ambient {
                 Collections.unmodifiableList(lines),
                 appUrl == null || appUrl.isEmpty() ? null : appUrl,
                 account == null ? null : account.optString("name", null),
-                account == null ? null : account.optString("email", null));
+                account == null ? null : account.optString("email", null),
+                key == null || key.isEmpty() ? null : key);
     }
 
     boolean done() {
         return "done".equals(state);
     }
 
-    /** What the picture shows: the same key means the same picture, so nothing is fetched again. */
+    /**
+     * What the pictures show: the same key means the same pictures, so nothing is fetched again. The
+     * server sends one (`key`) that covers the list and the dial too; an older server, the words only.
+     */
     String pictureKey() {
+        if (serverKey != null) return "v2|" + serverKey;
         StringBuilder b = new StringBuilder(state).append('|').append(date).append('|').append(headline);
         for (String l : lines) b.append('|').append(l);
         return b.toString();

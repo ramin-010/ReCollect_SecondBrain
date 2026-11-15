@@ -52,9 +52,12 @@ final class Api {
         }
     }
 
-    /** GET /api/ambient/wallpaper.png at the screen's exact size. */
-    byte[] wallpaper(int width, int height, String theme, boolean titles) throws Failure {
-        String q = "?w=" + width + "&h=" + height + "&theme=" + theme + (titles ? "" : "&titles=0");
+    /**
+     * GET /api/ambient/wallpaper.png at the screen's exact size, for one screen: "home" (the sky of
+     * the day and its list) or "lock" (the dial). Each screen has its own picture.
+     */
+    byte[] wallpaper(int width, int height, String theme, boolean titles, String screen) throws Failure {
+        String q = "?w=" + width + "&h=" + height + "&theme=" + theme + (titles ? "" : "&titles=0") + "&screen=" + screen;
         return call("GET", "/api/ambient/wallpaper.png" + q, "image/png");
     }
 

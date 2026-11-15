@@ -58,13 +58,23 @@ final class Refresher {
                 int[] size = Wallpapers.screenSize(ctx);
                 String key = a.pictureKey() + "|" + theme + "|" + size[0] + "x" + size[1] + "|" + titles + "|" + p.home() + "|" + p.lock();
                 if (force || !key.equals(p.pictureKey())) {
-                    byte[] png = api.wallpaper(size[0], size[1], theme, titles);
-                    Bitmap picture = BitmapFactory.decodeByteArray(png, 0, png.length);
-                    if (picture == null) throw new Api.Failure(Api.Failure.BAD_DATA, 200, null);
+                    // Each screen its own picture: the lock screen the dial, the home screen the sky and its list.
+                    byte[] lockPng = p.lock() ? api.wallpaper(size[0], size[1], theme, titles, "lock") : null;
+                    byte[] homePng = p.home() ? api.wallpaper(size[0], size[1], theme, titles, "home") : null;
+                    Bitmap lockPicture = lockPng == null ? null : BitmapFactory.decodeByteArray(lockPng, 0, lockPng.length);
+                    Bitmap homePicture = homePng == null ? null : BitmapFactory.decodeByteArray(homePng, 0, homePng.length);
+                    if ((lockPng != null && lockPicture == null) || (homePng != null && homePicture == null)) throw new Api.Failure(Api.Failure.BAD_DATA, 200, null);
                     Wallpapers.beforeFirstPicture(ctx, p.keepCopy());
-                    Wallpapers.set(ctx, picture, p.home(), p.lock());
-                    picture.recycle();
-                    Wallpapers.savePreview(ctx, png);
+                    if (homePicture != null) {
+                        Wallpapers.set(ctx, homePicture, true, false);
+                        homePicture.recycle();
+                    }
+                    if (lockPicture != null) {
+                        Wallpapers.set(ctx, lockPicture, false, true);
+                        lockPicture.recycle();
+                    }
+                    // The app's own preview shows the lock picture when it is on (he sees it most).
+                    Wallpapers.savePreview(ctx, lockPng != null ? lockPng : homePng);
                     p.setPictureKey(key);
                 }
             }
