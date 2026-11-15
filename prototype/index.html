@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recollect · Prototype</title>
+  <meta name="description" content="Clickable prototype of Recollect: personal revision system plus team workspace with AI-agent integration. Dummy data only.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=3">
+</head>
+<body>
+  <div class="app" id="app">
+    <aside class="sidebar" id="sidebar" aria-label="Main navigation"></aside>
+    <div class="main-wrap">
+      <header class="topbar" id="topbar"></header>
+      <main class="main" id="main"></main>
+    </div>
+  </div>
+  <div id="overlay-root"></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/lucide@0.553.0/dist/umd/lucide.min.js"></script>
+  <script src="data.js?v=3"></script>
+  <script src="app.js?v=3"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+# ReCollect_SecondBrain: the MCP server and agent skills, the design specs, and the Android companion.
+# The apps are their own repos (recollect/ = ReCollect, backend/ = ReCollect_Backend) and stay out of this one.
+# Everything at the root is ignored unless it is listed here.
+/*
+!/.gitignore
+!/README.md
+!/LICENSE
+!/context/
+!/mcp/
+!/prototype/
+!/android/
+
+# Kept on this PC only: personal planning, research and notes (the history before 2026-11-15 is in
+# .private/ as a git bundle, never pushed).
+/context/HISTORY.md
+/context/research/
+/context/archive/
+/context/specs/BUDDY_PLAN.md
+/context/specs/HOME_DOCS_AGENT_PLAN.md
+
+# The Android app's build tools, outputs and signing key
+/android/.toolchain/
+/android/build/
+/android/keys/
+*.keystore
+*.jks
+*.apk
+
+node_modules/
+dist/
+*.stackdump
+.env
+.env.*
+*.log

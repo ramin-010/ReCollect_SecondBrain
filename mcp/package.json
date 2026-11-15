@@ -1,0 +1,36 @@
+{
+  "name": "recollect-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Recollect for agents: a local stdio MCP server that reads and writes Recollect docs and learning data through the Recollect REST API.",
+  "type": "module",
+  "bin": {
+    "recollect-mcp": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "vitest run",
+    "test:smoke": "npm run build && vitest run --config vitest.smoke.config.ts",
+    "start": "node dist/index.js",
+    "install:skill": "node scripts/install-skill.mjs",
+    "install:hooks": "node scripts/install-hooks.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}
