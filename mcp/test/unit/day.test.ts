@@ -91,7 +91,7 @@ describe('recent_agent_edits', () => {
                 edit({ id: 'e2', kind: 'focus_add', summary: 'Added focus "Graphs"', docId: null, agentName: 'Cursor', seenAt: '2026-11-14T10:00:00Z', createdAt: '2026-11-13T18:00:00Z' }),
                 edit({ id: 'e3', kind: 'doc_append', summary: 'Appended 2 blocks to "MVCC"', docId: 'docB', undoneAt: '2026-11-13T12:00:00Z', seenAt: '2026-11-13T12:00:00Z', createdAt: '2026-11-13T11:00:00Z' }),
             ]),
-        });
+        }, { groups: TOOL_GROUP_NAMES });
         const res = await h.call('recent_agent_edits');
         expect(h.requests.find((r) => r.path === '/api/agent/edits')).toMatchObject({ method: 'GET', query: { limit: '10' } });
         expect(res.text).toBe(
@@ -105,13 +105,13 @@ describe('recent_agent_edits', () => {
     });
 
     it('passes a limit; none yet', async () => {
-        h = await connect({ 'GET /api/agent/edits': ok([]) });
+        h = await connect({ 'GET /api/agent/edits': ok([]) }, { groups: TOOL_GROUP_NAMES });
         expect((await h.call('recent_agent_edits', { limit: 3 })).text).toBe('No agent edits yet.');
         expect(h.requests[0]!.query).toEqual({ limit: '3' });
     });
 
     it('cannot reach the API: a clear message', async () => {
-        h = await connect({ 'GET /api/agent/edits': refused() });
+        h = await connect({ 'GET /api/agent/edits': refused() }, { groups: TOOL_GROUP_NAMES });
         const res = await h.call('recent_agent_edits');
         expect(res.isError).toBe(true);
         expect(res.text).toMatch(/^Can't reach Recollect at http:\/\/recollect\.test \(connection refused\)\. Is the backend running\?/);

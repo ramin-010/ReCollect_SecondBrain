@@ -4,7 +4,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { ToolError } from '../errors.js';
-import { plural, quote, withUndo } from '../format.js';
+import { plural, quietly, quote, withUndo } from '../format.js';
 import { zDay, zDocId, zId } from '../schemas.js';
 import { ADDS, CHANGES, READ_ONLY, defineTool, type ToolContext } from '../tool.js';
 
@@ -276,7 +276,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         async ({ at, taskId, title }) => {
             if (!taskId === !title) throw new ToolError('Give taskId (an existing task) or title (a new task), one of them.');
             const r = await api.post<Reminder>('/api/reminders', { at, ...(taskId ? { taskId } : { title }) });
-            return withUndo(`Reminder set: ${quote(r.task)} at ${r.when}${r.createdTask ? ' (a new task)' : ''} · id ${r._id}.`);
+            return quietly(ctx.workMode, withUndo(`Reminder set: ${quote(r.task)} at ${r.when}${r.createdTask ? ' (a new task)' : ''} · id ${r._id}.`));
         }
     );
 

@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { quote, withUndo } from '../format.js';
+import { quietly, quote, withUndo } from '../format.js';
 import { ToolError, orNotFound } from '../errors.js';
 import { ADDS, CHANGES, defineTool, type ToolContext } from '../tool.js';
 import type { FocusItem, QuickNote } from '../types.js';
@@ -94,7 +94,7 @@ export function registerDayTools(server: McpServer, ctx: ToolContext, newId: () 
             // A new id per note: the API creates a note under the id we pick (PUT), and our own
             // retry reuses this URL and its Idempotency-Key, so it can never add the note twice.
             const note = await api.put<QuickNote>(`/api/quick-notes/${newId()}`, { content: text, category: 'PRIMARY', ...(pinned ? { isPinned: true } : {}) });
-            return withUndo(`Added a pocket note${note.isPinned || pinned ? ' (pinned)' : ''}.`);
+            return quietly(ctx.workMode, withUndo(`Added a pocket note${note.isPinned || pinned ? ' (pinned)' : ''}.`));
         }
     );
 }

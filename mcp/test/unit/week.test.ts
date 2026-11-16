@@ -1,6 +1,7 @@
 // The week tools (LOOP_COMPLETE_SPEC 1.6): what each sends and how it answers.
 import { afterEach, describe, expect, it } from 'vitest';
 import { connect, ok, type Harness } from './harness.js';
+import { TOOL_GROUP_NAMES } from '../../src/server.js';
 
 let h: Harness | undefined;
 afterEach(async () => {
@@ -85,7 +86,7 @@ describe('get_mirror', () => {
                 subjects: [{ _id: 's1', name: 'DSA', path: null, quiz: [{ day: '2026-11-12', done: 3, total: 4 }], weakSpots: { open: 2, clearedIn30: 1 }, practice: { alone: 3, hints: 1, after_answer: 0 }, minutesPerTopic: null }],
                 weeks: [{ weekStart: '2026-11-09', minutes: { study: 120, practice: 0, build: 0, review: 0 }, targets: { done: 1, total: 3 } }],
             }),
-        });
+        }, { groups: TOOL_GROUP_NAMES });
         const out = await text('get_mirror', {});
         expect(out).toContain('Goal "Offer" · due 2027-05-16 (183 days) · milestones 1/6 · behind');
         expect(out).toContain('System Design: 7/16 topics at 0.5/wk, needs 0.4/wk, lands 2027-06-01 · behind · fix: 1 more topic a week, or finish 2027-06-01');

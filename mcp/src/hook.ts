@@ -24,7 +24,7 @@
 // RECOLLECT_HOOKS_MIN_MINUTES (default 2), RECOLLECT_HOOKS_MIN_PROMPTS (default 2),
 // RECOLLECT_HOOKS_FLUSH=inline (the stop hook flushes in its own process: tests).
 import { execFileSync, spawn } from 'node:child_process';
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -33,7 +33,12 @@ import { briefText, type Brief } from './tools/record.js';
 
 export type FolderMode = 'full' | 'light' | 'off';
 /** A folder (logged, briefed, words not read) or a rule. */
-export type AllowEntry = string | { path: string; mode?: FolderMode; brief?: boolean };
+/**
+ * `nudge` (B10): each prompt reminds the agent, with the clock, to save quietly what Ramin would want
+ * later (a work folder: nothing else leaves the PC). `commits: false`: the session goes without its
+ * branch and commit subjects (office repos: company text).
+ */
+export type AllowEntry = string | { path: string; mode?: FolderMode; brief?: boolean; nudge?: boolean; commits?: boolean };
 
 export interface HookConfig {
     url: string;
@@ -47,6 +52,10 @@ export interface FolderRule {
     path: string;
     mode: FolderMode;
     brief: boolean;
+    /** B10: the per-prompt reminder to save (with the clock). */
+    nudge: boolean;
+    /** The branch and commit subjects go with the session (default true). */
+    commits: boolean;
 }
 
 /** One Claude Code session while it is open (a file per session). */
@@ -109,10 +118,10 @@ export const configPath = (env: Env = process.env): string => env['RECOLLECT_HOO
 export const normalizePath = (p: string): string => `${p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()}/`;
 
 const ruleOf = (e: AllowEntry): FolderRule | null => {
-    if (typeof e === 'string') return e.trim() ? { path: e, mode: 'light', brief: true } : null;
+    if (typeof e === 'string') return e.trim() ? { path: e, mode: 'light', brief: true, nudge: false, commits: true } : null;
     if (!e || typeof e.path !== 'string' || !e.path.trim()) return null;
     const mode: FolderMode = e.mode === 'full' || e.mode === 'off' ? e.mode : 'light';
-    return { path: e.path, mode, brief: e.brief !== false };
+    return { path: e.path, mode, brief: e.brief !== false, nudge: e.nudge === true, commits: e.commits !== false };
 };
 
 /** The rule for a folder: the longest matching entry ("*" matches any folder, last); null = none. */
@@ -262,6 +271,194 @@ export function loadHookConfig(env: Env = process.env): HookConfig | null {
     return { url: c.url, token: c.token, allow: Array.isArray(c.allow) ? c.allow : [], brief: c.brief !== false };
 }
 
+// ─── The day's clock (B10, BUDDY_MEMORY_PLAN §12.4) ───────────────────────────
+// ~/.recollect/times/<project>/<YYYY-MM-DD>.jsonl, by the PC's local day: a line per prompt
+// { at, sid, head } (head: its first 60 characters, so a time can be matched to its turn after a
+// compaction) and per reply's end { at, sid, end: true }. Local only: no code path sends it. log_work
+// reads it for the turn times; <day>.logged marks a day logged; <day>.asked-evening and
+// <day>.asked-morning keep the reminders to log to once a day.
+
+export interface ClockLine {
+    at: string;
+    sid: string;
+    head?: string;
+    end?: true;
+}
+
+const CLOCK_KEEP_DAYS = 14;
+/** Stamps no further apart than this are one stretch of work. */
+const SPAN_GAP_MS = 30 * 60_000;
+/** The evening reminder to log: after 17:30 local, with an hour of work today. */
+const EVENING_AT_MIN = 17 * 60 + 30;
+const EVENING_WORK_MIN = 60;
+/** The next morning's reminder: the last day with work, within 3 days, with half an hour of it. */
+const MORNING_DAYS = 3;
+const MORNING_WORK_MIN = 30;
+const HEAD_MAX = 60;
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+/** The PC's local day of a moment (YYYY-MM-DD). */
+export const localDay = (d: Date): string => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+/** The PC's local time (HH:mm). */
+export const localTime = (d: Date): string => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+/** "Mon 16 Nov" (the PC's zone). */
+export const dayLabel = (d: Date): string => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+const safeName = (project: string) => project.toLowerCase().replace(/[^a-z0-9._-]+/g, '_').slice(0, 80) || 'home';
+export const clockDir = (project: string, env: Env = process.env): string => path.join(hooksHome(env), 'times', safeName(project));
+export const clockFile = (project: string, day: string, env: Env = process.env): string => path.join(clockDir(project, env), `${day}.jsonl`);
+type Mark = 'logged' | 'asked-evening' | 'asked-morning';
+const markFile = (project: string, day: string, what: Mark, env: Env) => path.join(clockDir(project, env), `${day}.${what}`);
+const hasMark = (project: string, day: string, what: Mark, env: Env) => existsSync(markFile(project, day, what, env));
+function setMark(project: string, day: string, what: Mark, env: Env): void {
+    mkdirSync(clockDir(project, env), { recursive: true });
+    writeFileSync(markFile(project, day, what, env), new Date().toISOString());
+}
+/** log_work marks a day logged (the reminders to log stop for it). */
+export const markLogged = (project: string, day: string, env: Env = process.env): void => setMark(project, day, 'logged', env);
+export const isLogged = (project: string, day: string, env: Env = process.env): boolean => hasMark(project, day, 'logged', env);
+
+function appendClock(project: string, day: string, line: ClockLine, env: Env): void {
+    mkdirSync(clockDir(project, env), { recursive: true });
+    appendFileSync(clockFile(project, day, env), `${JSON.stringify(line)}\n`);
+}
+
+export function readClock(project: string, day: string, env: Env = process.env): ClockLine[] {
+    let text = '';
+    try {
+        text = readFileSync(clockFile(project, day, env), 'utf8');
+    } catch {
+        return [];
+    }
+    return text.split('\n').flatMap((l) => {
+        if (!l.trim()) return [];
+        try {
+            const v = JSON.parse(l) as ClockLine;
+            return typeof v.at === 'string' && Number.isFinite(Date.parse(v.at)) ? [v] : [];
+        } catch {
+            return [];
+        }
+    });
+}
+
+/** A prompt's first words for the clock: the first real line, tags and pasted blocks left out. */
+export function promptHead(prompt: unknown): string | undefined {
+    if (typeof prompt !== 'string') return undefined;
+    const t = prompt
+        .replace(/<(system-reminder|ide_selection|ide_opened_file|ide_diagnostics|command-[a-z-]+|local-command-[a-z-]+|pasted_content)\b[^>]*>[\s\S]*?<\/\1[^>]*>/g, ' ')
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .find((l) => l.length > 0);
+    if (!t) return undefined;
+    return t.length > HEAD_MAX ? `${t.slice(0, HEAD_MAX - 1)}…` : t;
+}
+
+/**
+ * The day's stretches of work: each turn runs from his prompt to the agent's last stop (however long
+ * the agent worked), and turns no more than 30 minutes apart form one stretch.
+ */
+export function clockSpans(lines: readonly ClockLine[]): Array<{ from: Date; to: Date; minutes: number }> {
+    const turns = clockTurns(lines)
+        .map((t) => ({ from: t.at.getTime(), to: (t.end ?? t.at).getTime() }))
+        .sort((a, b) => a.from - b.from);
+    const spans: Array<{ from: number; to: number }> = [];
+    for (const t of turns) {
+        const last = spans[spans.length - 1];
+        if (last && t.from - last.to <= SPAN_GAP_MS) last.to = Math.max(last.to, t.to);
+        else spans.push({ ...t });
+    }
+    return spans.map((s) => ({ from: new Date(s.from), to: new Date(s.to), minutes: Math.round((s.to - s.from) / 60_000) }));
+}
+
+const workMinutes = (lines: readonly ClockLine[]) => clockSpans(lines).reduce((a, s) => a + s.minutes, 0);
+const hoursText = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`);
+
+/** The day's turns: when he wrote, its first words, and when the agent last stopped before his next prompt in that chat. */
+export function clockTurns(lines: readonly ClockLine[]): Array<{ at: Date; head?: string; end?: Date }> {
+    const sorted = [...lines].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+    const turns: Array<{ at: Date; head?: string; end?: Date }> = [];
+    const open = new Map<string, number>();
+    for (const l of sorted) {
+        if (l.end) {
+            const i = open.get(l.sid);
+            if (i !== undefined) turns[i]!.end = new Date(l.at);
+        } else {
+            open.set(l.sid, turns.length);
+            turns.push({ at: new Date(l.at), ...(l.head ? { head: l.head } : {}) });
+        }
+    }
+    return turns;
+}
+
+/** The day's clock as log_work answers it (the PC's time). */
+export function clockText(project: string, day: string, lines: readonly ClockLine[]): string {
+    const turns = clockTurns(lines);
+    const shown = turns.slice(-60);
+    const spans = clockSpans(lines);
+    return [
+        `${project}, ${dayLabel(new Date(`${day}T12:00:00`))} (the hook's clock, this PC's time; each turn: when he wrote → when the reply ended):`,
+        ...(turns.length > shown.length ? [`(${turns.length - shown.length} earlier turns left out)`] : []),
+        ...shown.map((t) => `${localTime(t.at)}${t.head ? ` "${t.head}"` : ''}${t.end ? ` → ${localTime(t.end)}` : ''}`),
+        spans.length ? `Worked ${spans.map((s) => `${localTime(s.from)}–${localTime(s.to)} (${hoursText(s.minutes)})`).join(', ')}.` : '',
+    ]
+        .filter(Boolean)
+        .join('\n');
+}
+
+/** Deletes clock files older than two weeks (at a session's start). */
+function pruneClocks(env: Env, now: Date): void {
+    const root = path.join(hooksHome(env), 'times');
+    const oldest = new Date(now);
+    oldest.setDate(oldest.getDate() - CLOCK_KEEP_DAYS);
+    const cut = localDay(oldest);
+    try {
+        for (const project of readdirSync(root)) {
+            const dir = path.join(root, project);
+            for (const name of readdirSync(dir)) if (/^\d{4}-\d{2}-\d{2}\./.test(name) && name.slice(0, 10) < cut) rmSync(path.join(dir, name), { force: true });
+        }
+    } catch {
+        // No clock yet.
+    }
+}
+
+/** The reminder to save, with the clock (a `nudge` folder's every prompt). */
+export function nudgeText(now: Date): string {
+    return (
+        `Recollect [${dayLabel(now)}, ${localTime(now)}]: before you finish this turn, if his message or your answer holds something Ramin would want later ` +
+        "(something about him, a reminder or dated to-do, an idea or insight), save it quietly with the recollect tools and say nothing about it in your reply. " +
+        'Most turns have nothing. Never save company code, data or client names.'
+    );
+}
+
+/**
+ * The reminders to log the day, each at most once a day per project: the day's first prompt, when the
+ * last earlier day with work here (within 3 days, half an hour or more) has no log; after 17:30, with
+ * an hour of work today and no log yet. `firstToday`: no prompt was stamped here today before this one.
+ */
+export function logReminders(project: string, now: Date, firstToday: boolean, env: Env = process.env): string[] {
+    const out: string[] = [];
+    const today = localDay(now);
+    if (firstToday && !hasMark(project, today, 'asked-morning', env)) {
+        for (let back = 1; back <= MORNING_DAYS; back++) {
+            const d = new Date(now);
+            d.setDate(d.getDate() - back);
+            const day = localDay(d);
+            const lines = readClock(project, day, env);
+            if (!lines.length) continue;
+            if (!isLogged(project, day, env) && workMinutes(lines) >= MORNING_WORK_MIN) {
+                out.push(`Work here on ${dayLabel(d)} was not logged: if this chat still holds it, offer once to log it for that day (log_work with day ${day}).`);
+                setMark(project, today, 'asked-morning', env);
+            }
+            break;
+        }
+    }
+    const minuteOfDay = now.getHours() * 60 + now.getMinutes();
+    if (minuteOfDay >= EVENING_AT_MIN && !isLogged(project, today, env) && !hasMark(project, today, 'asked-evening', env) && workMinutes(readClock(project, today, env)) >= EVENING_WORK_MIN) {
+        out.push("It is past 5:30 pm and today's work here is not logged: at a natural pause, ask him once if he wants it logged (/log-work).");
+        setMark(project, today, 'asked-evening', env);
+    }
+    return out;
+}
+
 // ─── His words for the buddy (BUDDY_MEMORY_PLAN §3.1) ─────────────────────────
 
 const wordsFile = (dir: string, sessionId: string) => path.join(dir, `${sessionId}.words.jsonl`);
@@ -398,17 +595,40 @@ function apiFor(config: HookConfig): RecollectApi {
     return new RecollectApi({ baseUrl: config.url, token: config.token, agentName: 'Claude Code hook', timeoutMs: NET_TIMEOUT_MS, retryDelayMs: 100, runningDelayMs: 300 });
 }
 
-/** Close a session: send its last words, PUT it (when it is worth a line), then drop its files; keep them if the PUT failed. */
+/**
+ * A folder no longer read in full (B10: a rule changed while a session was open): its waiting words
+ * are moved to ~/.recollect/held/, never sent; one line in hook.log.
+ */
+function holdWords(dir: string, sessionId: string, env: Env): void {
+    if (!existsSync(wordsFile(dir, sessionId))) return;
+    const held = path.join(hooksHome(env), 'held');
+    mkdirSync(held, { recursive: true });
+    for (const f of [wordsFile(dir, sessionId), flushFile(dir, sessionId)]) if (existsSync(f)) renameSync(f, path.join(held, path.basename(f)));
+    log(env, `held the waiting words of ${sessionId}: its folder is no longer read in full`);
+}
+
+/**
+ * Close a session: send its last words (a folder still read in full), PUT it (when it is worth a
+ * line), then drop its files; keep them if the PUT failed. The folder's rule is read now, so a rule
+ * changed mid-session holds: a work folder (`brief: false`) is titled by its project, never his
+ * words; `commits: false` sends no branch or commit subjects; a folder no longer allowed sends nothing.
+ */
 async function close(api: RecollectApi, file: string, endedAt: string, env: Env): Promise<void> {
     const dir = path.dirname(file);
     const sessionId = path.basename(file, '.json');
+    const opened = readJson<OpenSession>(file);
+    const config = loadHookConfig(env);
+    const rule = opened && config ? folderRule(opened.cwd, config.allow) : null;
     if (existsSync(wordsFile(dir, sessionId))) {
-        await flushWords(api, dir, sessionId, env);
-        const left = unsentMessages(readWords(dir, sessionId), readJson<FlushState>(flushFile(dir, sessionId))?.sent ?? 0);
-        if (!left.length) dropWords(dir, sessionId);
+        if (!rule || rule.mode !== 'full') holdWords(dir, sessionId, env);
+        else {
+            await flushWords(api, dir, sessionId, env);
+            const left = unsentMessages(readWords(dir, sessionId), readJson<FlushState>(flushFile(dir, sessionId))?.sent ?? 0);
+            if (!left.length) dropWords(dir, sessionId);
+        }
     }
     const s = readJson<OpenSession>(file);
-    if (!s) {
+    if (!s || (opened && (!rule || rule.mode === 'off'))) {
         rmSync(file, { force: true });
         return;
     }
@@ -418,8 +638,9 @@ async function close(api: RecollectApi, file: string, endedAt: string, env: Env)
         rmSync(file, { force: true });
         return;
     }
-    const { branch, commits } = commitsSince(s.heads);
-    const titleIfNew = s.sessionTitle ?? s.firstPrompt;
+    const withCommits = rule?.commits !== false;
+    const { branch, commits } = withCommits ? commitsSince(s.heads) : { branch: null, commits: [] as string[] };
+    const titleIfNew = rule && !rule.brief ? s.project : (s.sessionTitle ?? s.firstPrompt);
     try {
         await api.put(`/api/sessions/by-key/${encodeURIComponent(s.key)}`, {
             kindIfNew: 'build',
@@ -429,7 +650,7 @@ async function close(api: RecollectApi, file: string, endedAt: string, env: Env)
             endedAt: end,
             minutes,
             ...(titleIfNew ? { titleIfNew } : {}),
-            details: { ...(branch ? { branch } : {}), commits },
+            details: withCommits ? { ...(branch ? { branch } : {}), commits } : {},
         });
         rmSync(file, { force: true });
     } catch (err) {
@@ -509,6 +730,18 @@ export async function runHook(event: string, input: Record<string, unknown>, env
     const sessionTitle = typeof input['session_title'] === 'string' && input['session_title'].trim() ? input['session_title'].trim().slice(0, FIRST_PROMPT_MAX) : undefined;
 
     if (event === 'prompt' || event === 'stop') {
+        // The day's clock (B10): every folder the hooks act in; local only, never sent.
+        const clockProject = projectOf(cwd, config.allow);
+        const today = localDay(now);
+        const firstToday = event === 'prompt' && !readClock(clockProject, today, env).some((l) => !l.end);
+        try {
+            const head = event === 'prompt' ? promptHead(input['prompt']) : undefined;
+            appendClock(clockProject, today, event === 'prompt' ? { at, sid: sessionId, ...(head ? { head } : {}) } : { at, sid: sessionId, end: true }, env);
+        } catch (err) {
+            log(env, `clock: ${err instanceof Error ? err.message : String(err)}`);
+        }
+        // A folder no longer read in full (its rule changed mid-session): whatever words wait are held, never sent.
+        if (rule.mode !== 'full') holdWords(dir, sessionId, env);
         let s = readJson<OpenSession>(file);
         // No open file on a prompt: the session was swept (idle over 30 minutes, then another session
         // started) or began before the hooks were installed. The rest of it is a session of its own.
@@ -541,7 +774,11 @@ export async function runHook(event: string, input: Record<string, unknown>, env
             const lines = readWords(dir, sessionId);
             if (flushDue(lines, readJson<FlushState>(flushFile(dir, sessionId))?.sent ?? 0, now)) await startFlush(api, dir, sessionId, env);
         }
-        return note ? `Recollect, from Ramin's buddy (pass it on in one sentence at a natural pause; skip it if he is in the middle of something): ${note.text}` : '';
+        // B10: in a `nudge` folder every prompt reminds the agent to save quietly (with the clock), and once a day to offer to log the work.
+        const nudge = event === 'prompt' && rule.nudge ? [nudgeText(now), ...logReminders(clockProject, now, firstToday, env)] : [];
+        return [note ? `Recollect, from Ramin's buddy (pass it on in one sentence at a natural pause; skip it if he is in the middle of something): ${note.text}` : '', ...nudge]
+            .filter(Boolean)
+            .join('\n');
     }
     if (event === 'end') {
         if (existsSync(file)) await close(api, file, at, env);
@@ -550,6 +787,7 @@ export async function runHook(event: string, input: Record<string, unknown>, env
     if (event !== 'start') return '';
 
     await sweep(api, dir, file, env, now);
+    pruneClocks(env, now);
     let session = readJson<OpenSession>(file);
     if (!session) {
         // A resumed session whose first part was already logged gets a key of its own.

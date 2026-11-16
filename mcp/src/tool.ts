@@ -17,6 +17,8 @@ export interface ToolContext {
     workMode?: boolean;
     /** In a work folder: its project key (get_work_log answers for it alone). */
     workProject?: string;
+    /** B10: the folder's project when Recollect's hooks act in it (log_work reads the hook's clock). */
+    clockProject?: string;
 }
 
 export interface ToolSpec<S extends z.ZodRawShape> {

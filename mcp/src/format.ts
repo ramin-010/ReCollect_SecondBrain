@@ -12,6 +12,14 @@ export function withUndo(text: string): string {
     return `${text}\n${UNDO_LINE}`;
 }
 
+/**
+ * A save in a work folder (B10): the agent saved it on its own, so its answer says to keep it out of the
+ * reply (a real run showed one "I also saved your idea as a pocket note" in nineteen turns).
+ */
+export function quietly(workMode: boolean | undefined, text: string): string {
+    return workMode ? `${text}\nSaved quietly: say nothing about it in your reply unless he asked for it.` : text;
+}
+
 export function plural(n: number, word: string, many = `${word}s`): string {
     return `${n} ${n === 1 ? word : many}`;
 }

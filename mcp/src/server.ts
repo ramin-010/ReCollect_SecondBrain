@@ -28,10 +28,23 @@ export const SERVER_VERSION = '0.1.0';
 
 export const INSTRUCTIONS = [
     "Recollect is Ramin's personal learning app and the record of his work: Docs (his notes, in Markdown), subjects with paths (topics in course order), spaced revision (reviews 1, 3, 7 and 21 days after a doc is scheduled), goals with dated milestones, a week of up to 5 targets, up to 3 focus lines a day, personal tasks, and work sessions.",
-    'Start a working chat with get_brief (where he stands, and a session key), then checkpoint as you go: after each part, not only at the end. When he says something lasting about himself (a preference, a worry, a plan, a promise, an idea), remember it (or send it as checkpoint’s learned). search_docs before writing a doc. Plan the week with get_week and add_week_target on his yes; when something is his call and he cannot say yes in the chat, suggest it instead.',
+    'Start a working chat with get_brief (where he stands, and a session key), then checkpoint as you go: after each part, not only at the end. Save quietly, without asking or mentioning it, what he would want later: something lasting about himself (remember, or checkpoint’s learned), a reminder or a dated to-do of his own (set_reminder, add_task), an idea or insight (add_pocket_note); most turns have nothing. When he asks to log the day’s work, use log_work. search_docs before writing a doc. Plan the week with get_week and add_week_target on his yes; when something is his call and he cannot say yes in the chat, suggest it instead.',
     'Every write is logged with your agent name and Ramin can undo it from Home → From your agent. Docs, goals and subjects are never deleted; a focus line or a milestone can be removed (and Undo brings it back). Answers are compact text with the ids the next call needs.',
     'Docs take GitHub Markdown plus callouts (> [!TIP]), <details> toggles for self-test questions, ```mermaid diagrams and ```canvas diagrams (Mermaid flowchart text that Recollect lays out as a board Ramin can edit; add_canvas draws one, update_canvas changes one in place, preview_diagram shows it): see create_doc.',
 ].join(' ');
+
+/**
+ * A work folder's instructions (B10, BUDDY_MEMORY_PLAN §12.5): nothing from an office chat reaches
+ * Recollect unless the agent saves it; it saves his own things quietly and never the company's.
+ */
+export const OFFICE_INSTRUCTIONS = [
+    "Recollect is Ramin's own notebook, not this company's. This is a work folder: nothing from this chat reaches Recollect unless you save it.",
+    'Save quietly what he would want later: something about himself (remember), a reminder or a dated to-do of his own (set_reminder, add_task), an idea or insight (add_pocket_note). Don’t ask first, and say nothing about it in your reply unless he asked for it. One thing a call; most turns have nothing. Never save company code, data, clients or colleagues’ names.',
+    'When he asks to log the day’s work ("log today’s work", /log-work), use log_work. Call get_brief or get_work_log only when he asks what was done here before.',
+].join(' ');
+
+/** What a work folder lists (B10): the saving tools and this project's work log, nothing else. */
+export const OFFICE_TOOLS = ['get_brief', 'remember', 'add_task', 'set_reminder', 'add_pocket_note', 'log_work', 'get_work_log'] as const;
 
 /** Every tool, in the order they are listed. */
 export const TOOL_NAMES = [
@@ -107,8 +120,9 @@ export const TOOL_NAMES = [
     // The buddy's memory (BUDDY_MEMORY_PLAN): remember is listed with the record; look up and forget on more_tools.
     'remember',
     'recall_memory',
-    // The work log (BUDDY_MEMORY_PLAN §11.2, B9): what he did, per project and day.
+    // The work log (BUDDY_MEMORY_PLAN §11.2, B9): what he did, per project and day; B10: an agent logs it on his word.
     'get_work_log',
+    'log_work',
     'forget',
 ] as const;
 
@@ -193,6 +207,7 @@ export const TOOL_LEVELS: Readonly<Record<ToolName, 1 | 2 | 3>> = {
     recall_memory: 1,
     forget: 2,
     get_work_log: 1,
+    log_work: 2,
 };
 
 export const TOOL_GROUP_NAMES = ['core', 'docs', 'plan', 'record', 'manage'] as const;
@@ -209,7 +224,7 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     get_today: 'core',
     get_learning_overview: 'core',
     add_pocket_note: 'core',
-    recent_agent_edits: 'core',
+    recent_agent_edits: 'manage',
     more_tools: 'core',
     search_docs: 'docs',
     read_doc: 'docs',
@@ -243,9 +258,10 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     add_focus: 'plan',
     update_focus: 'manage',
     remove_focus: 'manage',
-    get_mirror: 'record',
+    // B10: moved to manage to make room for set_reminder and log_work (the manager has every group).
+    get_mirror: 'manage',
     log_decision: 'record',
-    list_decisions: 'record',
+    list_decisions: 'manage',
     trash_doc: 'manage',
     restore_doc: 'manage',
     empty_trash: 'manage',
@@ -255,7 +271,8 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     update_settings: 'manage',
     update_project: 'manage',
     list_suggestions: 'manage',
-    set_reminder: 'manage',
+    // B10 (2026-11-16): every chat can set a reminder without more_tools.
+    set_reminder: 'record',
     list_reminders: 'manage',
     cancel_reminder: 'manage',
     get_recall: 'manage',
@@ -277,6 +294,8 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     forget: 'manage',
     // B9 (2026-11-16): the default groups are at their 40,000 characters; the manager has every group.
     get_work_log: 'manage',
+    // B10: every chat can log the day's work when he asks (recent_agent_edits and list_decisions moved to manage to make room).
+    log_work: 'record',
 };
 
 /** RECOLLECT_TOOLS: "all", or groups separated by commas ("core,docs,manage"); else the default. */
@@ -300,12 +319,21 @@ export interface ServerOptions {
     workMode?: boolean;
     /** The work folder's project key (get_work_log answers for it alone). */
     workProject?: string;
+    /** B10: the folder's project when Recollect's hooks act in it (log_work reads the hook's clock for it). */
+    clockProject?: string;
 }
 
 export function createRecollectServer(options: ServerOptions): McpServer {
-    const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: INSTRUCTIONS });
+    const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: options.workMode ? OFFICE_INSTRUCTIONS : INSTRUCTIONS });
     const registry = new Map<string, RegisteredTool>();
-    const ctx: ToolContext = { api: options.api, problem: options.problem ?? null, registry, ...(options.workMode ? { workMode: true } : {}), ...(options.workProject ? { workProject: options.workProject } : {}) };
+    const ctx: ToolContext = {
+        api: options.api,
+        problem: options.problem ?? null,
+        registry,
+        ...(options.workMode ? { workMode: true } : {}),
+        ...(options.workProject ? { workProject: options.workProject } : {}),
+        ...(options.clockProject ? { clockProject: options.clockProject } : {}),
+    };
     registerRecordTools(server, ctx);
     registerWeekTools(server, ctx);
     registerMirrorTools(server, ctx);
@@ -325,6 +353,12 @@ export function createRecollectServer(options: ServerOptions): McpServer {
     registerBuddyTools(server, ctx);
     registerPrompts(server);
     leanToolList(server);
+    if (options.workMode) {
+        // A work folder lists the saving tools and its own work log only (no more_tools).
+        const office = new Set<string>(OFFICE_TOOLS);
+        for (const [name, tool] of registry) if (!office.has(name)) tool.disable();
+        return server;
+    }
     const listed = new Set(options.groups ?? DEFAULT_GROUPS);
     for (const [name, tool] of registry) if (!listed.has(TOOL_GROUPS[name as ToolName])) tool.disable();
     return server;
@@ -338,7 +372,7 @@ function registerMoreTools(server: McpServer, ctx: ToolContext, registry: Map<st
         'more_tools',
         {
             title: 'More tools',
-            description: "Turn on the manage tools: the trash, mark a review done or move it, settings, projects, goal edits, his buddy's memory, what waits for Ramin's tap.",
+            description: "Turn on the manage tools: the trash, mark a review done or move it, settings, projects, goal edits, the mirror, decisions, agents' edits, his buddy's memory, what waits for Ramin's tap.",
             input: { group: z.enum(['manage']).optional() },
             annotations: READ_ONLY,
         },

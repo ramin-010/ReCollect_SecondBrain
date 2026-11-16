@@ -45,7 +45,8 @@ describe('the server', () => {
         expect(await listed()).toEqual(TOOL_NAMES.filter((n) => DEFAULT_GROUPS.includes(TOOL_GROUPS[n])));
         const changed = new Promise<void>((resolve) => h!.client.setNotificationHandler(ToolListChangedNotificationSchema, () => resolve()));
         const res = await h.call('more_tools', {});
-        expect(res.text).toBe('Turned on: update_goal, add_milestone, complete_milestone, update_milestone, remove_milestone, update_focus, remove_focus, trash_doc, restore_doc, empty_trash, complete_revision, move_revision, get_settings, update_settings, update_project, list_suggestions, set_reminder, list_reminders, cancel_reminder, get_recall, get_sharing, publish_doc, share_doc, spread_backlog, move_blocks, recall_memory, get_work_log, forget. They are in your tool list now.');
+        expect(res.text).toMatch(/^Turned on: .*get_mirror.*list_decisions.*recent_agent_edits.*get_work_log, forget\. They are in your tool list now\.$/);
+        expect(res.text).not.toContain('set_reminder');
         await changed;
         expect(await listed()).toEqual([...TOOL_NAMES]);
     });

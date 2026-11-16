@@ -2,7 +2,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { ToolError } from '../errors.js';
-import { quote, withUndo } from '../format.js';
+import { quietly, quote, withUndo } from '../format.js';
 import { zId } from '../schemas.js';
 import { ADDS, CHANGES, READ_ONLY, defineTool, type ToolContext } from '../tool.js';
 
@@ -50,7 +50,7 @@ export function registerTaskTools(server: McpServer, ctx: ToolContext): void {
             input: { title: z.string().trim().min(1).max(200), due: zDue.optional(), priority: z.enum(['low', 'normal', 'high', 'urgent']).optional() },
             annotations: ADDS,
         },
-        async ({ title, due, priority }) => withUndo(`Added: ${taskLine(await api.post<Task>('/api/tasks', { title, due, priority }))}`)
+        async ({ title, due, priority }) => quietly(ctx.workMode, withUndo(`Added: ${taskLine(await api.post<Task>('/api/tasks', { title, due, priority }))}`))
     );
 
     defineTool(

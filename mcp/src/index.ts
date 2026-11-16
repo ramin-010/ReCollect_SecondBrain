@@ -7,7 +7,7 @@ import { RecollectApi } from './api.js';
 import { loadConfig } from './config.js';
 import { stderrLogger as log } from './log.js';
 import { createRecollectServer, groupsFrom } from './server.js';
-import { folderRule, loadHookConfig, projectOf } from './hook.js';
+import { folderRule, isAllowed, loadHookConfig, projectOf } from './hook.js';
 
 async function main(): Promise<void> {
     const config = loadConfig();
@@ -23,7 +23,17 @@ async function main(): Promise<void> {
     const hooks = loadHookConfig();
     const workMode = !!hooks && folderRule(process.cwd(), hooks.allow)?.brief === false;
     const workProject = workMode && hooks ? projectOf(process.cwd(), hooks.allow) : undefined;
-    const server = createRecollectServer({ api, agentName: config.agentName, problem: config.problem, groups: groupsFrom(config.tools), workMode, ...(workProject ? { workProject } : {}) });
+    // B10: where the hooks act, log_work reads their clock for this folder's project.
+    const clockProject = hooks && isAllowed(process.cwd(), hooks.allow) ? projectOf(process.cwd(), hooks.allow) : undefined;
+    const server = createRecollectServer({
+        api,
+        agentName: config.agentName,
+        problem: config.problem,
+        groups: groupsFrom(config.tools),
+        workMode,
+        ...(workProject ? { workProject } : {}),
+        ...(clockProject ? { clockProject } : {}),
+    });
 
     let closing = false;
     const shutdown = () => {
