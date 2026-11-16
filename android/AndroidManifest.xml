@@ -17,6 +17,14 @@
     <!-- Only to keep a copy of the wallpaper he had, so Disconnect can put it back (Android 12 and older; asked when he ticks it). -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
+    <!-- The live lock screen (0.4.1) draws each app's own icon: Android 11+ lets the app see the launchable apps' icons. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <!-- usesCleartextTraffic: before the deploy the server is this computer over USB or the hotspot (http);
          ConnectLink refuses plain http for anything but a local address. -->
     <application

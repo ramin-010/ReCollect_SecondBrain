@@ -51,7 +51,9 @@ final class Live {
     private static final Handler main = new Handler(Looper.getMainLooper());
     private static final Map<String, Bitmap> cache = new HashMap<>();
     private static final Map<String, Long> cachedAt = new HashMap<>();
+    /** Each app's icon, and whether it is the app's own (in colour) or its notification symbol (tinted). */
     private static final Map<String, Drawable> iconCache = new HashMap<>();
+    private static final Map<String, Boolean> iconIsApp = new HashMap<>();
 
     private Live() {}
 
@@ -188,11 +190,16 @@ final class Live {
         drawIcons(ctx, c, icons, w / 2f, dy + slot.cy * scale, slot.size * scale, slot.ink);
     }
 
-    /** The icons in a row centred on (cx, cy): each app once, newest first, "+n" past ICONS_MAX. */
-    static void drawIcons(Context ctx, Canvas c, List<NotifIcons.Item> icons, float cx, float cy, float size, int ink) {
+    /**
+     * The icons in a row centred on (cx, cy): each app once, newest first, "+n" past ICONS_MAX. Each app's
+     * own icon in colour (0.4.1, Ramin: the notification symbols looked like placeholders), a little larger
+     * than the band's symbol size; an app without one shows its notification symbol in the picture's ink.
+     */
+    static void drawIcons(Context ctx, Canvas c, List<NotifIcons.Item> icons, float cx, float cy, float band, int ink) {
         int n = Math.min(icons.size(), ICONS_MAX);
         int more = icons.size() - n;
-        float gap = size * 0.62f;
+        float size = band * 1.3f;
+        float gap = size * 0.42f;
         String moreText = more > 0 ? "+" + more : null;
         textPaint.setColor(ink);
         textPaint.setTextSize(size * 0.62f);
@@ -201,10 +208,20 @@ final class Live {
         float total = n * size + (n - 1) * gap + (moreText == null ? 0 : gap + moreW);
         float x = cx - total / 2f;
         for (int i = 0; i < n; i++) {
-            Drawable d = icon(ctx, icons.get(i));
+            NotifIcons.Item item = icons.get(i);
+            Drawable d = icon(ctx, item);
             if (d != null) {
-                d.setTint(ink);
-                d.setBounds(Math.round(x), Math.round(cy - size / 2f), Math.round(x + size), Math.round(cy + size / 2f));
+                boolean app = Boolean.TRUE.equals(iconIsApp.get(iconKey(item)));
+                if (app) {
+                    d.setTintList(null);
+                    d.setBounds(Math.round(x), Math.round(cy - size / 2f), Math.round(x + size), Math.round(cy + size / 2f));
+                } else {
+                    // A notification symbol: drawn at the band's size, centred in the app icon's place.
+                    float s = band;
+                    float ox = x + (size - s) / 2f;
+                    d.setTint(ink);
+                    d.setBounds(Math.round(ox), Math.round(cy - s / 2f), Math.round(ox + s), Math.round(cy + s / 2f));
+                }
                 d.draw(c);
             }
             x += size + gap;
@@ -212,21 +229,39 @@ final class Live {
         if (moreText != null) c.drawText(moreText, x, cy + textPaint.getTextSize() * 0.36f, textPaint);
     }
 
+    private static String iconKey(NotifIcons.Item item) {
+        return item.pkg + "|" + item.icon.hashCode();
+    }
+
+    /** The app's own icon (the one on the home screen), else its notification's symbol. */
     private static Drawable icon(Context ctx, NotifIcons.Item item) {
-        String key = item.pkg + "|" + item.icon.hashCode();
+        String key = iconKey(item);
         synchronized (iconCache) {
             Drawable d = iconCache.get(key);
             if (d != null) return d;
+            boolean app = false;
             try {
-                d = item.icon.loadDrawable(ctx);
-            } catch (RuntimeException e) {
-                Log.w(TAG, "an icon could not be loaded");
+                d = ctx.getPackageManager().getApplicationIcon(item.pkg);
+                app = d != null;
+            } catch (android.content.pm.PackageManager.NameNotFoundException | RuntimeException e) {
                 d = null;
+            }
+            if (d == null) {
+                try {
+                    d = item.icon.loadDrawable(ctx);
+                } catch (RuntimeException e) {
+                    Log.w(TAG, "an icon could not be loaded");
+                    d = null;
+                }
             }
             if (d != null) {
                 d = d.mutate();
-                if (iconCache.size() > 64) iconCache.clear();
+                if (iconCache.size() > 64) {
+                    iconCache.clear();
+                    iconIsApp.clear();
+                }
                 iconCache.put(key, d);
+                iconIsApp.put(key, app);
             }
             return d;
         }
