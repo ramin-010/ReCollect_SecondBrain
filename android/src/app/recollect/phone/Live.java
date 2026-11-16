@@ -213,8 +213,31 @@ final class Live {
             if (d != null) {
                 boolean app = Boolean.TRUE.equals(iconIsApp.get(iconKey(item)));
                 if (app) {
+                    // Round (0.4.2, Ramin: "more rounded, less like default icons"): an adaptive icon's own
+                    // layers drawn full bleed inside a circle; any other icon cut to the circle.
                     d.setTintList(null);
-                    d.setBounds(Math.round(x), Math.round(cy - size / 2f), Math.round(x + size), Math.round(cy + size / 2f));
+                    c.save();
+                    android.graphics.Path circle = new android.graphics.Path();
+                    circle.addCircle(x + size / 2f, cy, size / 2f, android.graphics.Path.Direction.CW);
+                    c.clipPath(circle);
+                    if (d instanceof android.graphics.drawable.AdaptiveIconDrawable) {
+                        android.graphics.drawable.AdaptiveIconDrawable ad = (android.graphics.drawable.AdaptiveIconDrawable) d;
+                        // The layers are 108 units with the visible 72 in the middle: draw them 1.5 times the circle.
+                        float full = size * 1.5f;
+                        int l = Math.round(x + size / 2f - full / 2f);
+                        int t = Math.round(cy - full / 2f);
+                        for (Drawable layer : new Drawable[] {ad.getBackground(), ad.getForeground()}) {
+                            if (layer == null) continue;
+                            layer.setBounds(l, t, l + Math.round(full), t + Math.round(full));
+                            layer.draw(c);
+                        }
+                    } else {
+                        float grow = size * 0.08f;
+                        d.setBounds(Math.round(x - grow), Math.round(cy - size / 2f - grow), Math.round(x + size + grow), Math.round(cy + size / 2f + grow));
+                        d.draw(c);
+                    }
+                    c.restore();
+                    d = null;
                 } else {
                     // A notification symbol: drawn at the band's size, centred in the app icon's place.
                     float s = band;
@@ -222,7 +245,7 @@ final class Live {
                     d.setTint(ink);
                     d.setBounds(Math.round(ox), Math.round(cy - s / 2f), Math.round(ox + s), Math.round(cy + s / 2f));
                 }
-                d.draw(c);
+                if (d != null) d.draw(c);
             }
             x += size + gap;
         }
