@@ -68,6 +68,15 @@ final class Prefs {
         sp.edit().putBoolean("home", on).remove("picture_key").apply();
     }
 
+    /** The live lock screen (0.4.0): the app's own live wallpaper, with the notification icons. Off by default. */
+    boolean live() {
+        return sp.getBoolean("live", false);
+    }
+
+    void setLive(boolean on) {
+        sp.edit().putBoolean("live", on).remove("picture_key").apply();
+    }
+
     String theme() {
         return sp.getString("theme", THEME_SYSTEM);
     }

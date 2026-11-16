@@ -74,7 +74,11 @@ public final class MainActivity extends Activity {
     private TextView buddyTitle, buddyLine, buddyEmpty, buddyNote;
     private ImageButton lineMore, lineLess, noteMore, noteLess;
     private EditText tell;
-    private Button tellGo;
+    private View tellGo;
+    /** The live lock screen (0.4.0). */
+    private Switch swLive;
+    private TextView liveNote;
+    private View liveGroup, liveActions, liveAccess, liveSet;
     private LinearLayout lately;
     /** The styles' small pictures, by style, colour and theme (filled in the background). */
     private final java.util.Map<String, Bitmap> styleThumbs = new java.util.concurrent.ConcurrentHashMap<>();
@@ -106,6 +110,7 @@ public final class MainActivity extends Activity {
         super.onResume();
         inFront = true;
         if (pending == null && !busy) show();
+        if (prefs.server() != null && prefs.lock() && prefs.live() && NotifIcons.allowed(this) && Live.active(this) && !Live.hasPictures(this)) refreshNow(false);
     }
 
     @Override
@@ -168,6 +173,14 @@ public final class MainActivity extends Activity {
         latelyTitle = findViewById(R.id.lately_title);
         lately = findViewById(R.id.lately);
         tellGo.setOnClickListener(v -> tell());
+        swLive = findViewById(R.id.sw_live);
+        liveNote = findViewById(R.id.live_note);
+        liveGroup = findViewById(R.id.live_group);
+        liveActions = findViewById(R.id.live_actions);
+        liveAccess = findViewById(R.id.live_access);
+        liveSet = findViewById(R.id.live_set);
+        liveAccess.setOnClickListener(v -> openListenerAccess());
+        liveSet.setOnClickListener(v -> openLivePicker());
         tell.setOnEditorActionListener((v, action, event) -> {
             if (action != EditorInfo.IME_ACTION_SEND) return false;
             tell();
@@ -394,6 +407,8 @@ public final class MainActivity extends Activity {
 
         toggle(swLock, prefs.lock(), this::setLock);
         toggle(swHome, prefs.home(), this::setHome);
+        toggle(swLive, prefs.live(), this::setLive);
+        showLive();
         toggle(swQuiet, prefs.quiet(), on -> {
             prefs.setQuiet(on);
             Schedule.next(this);
@@ -447,7 +462,7 @@ public final class MainActivity extends Activity {
             if (l == now || shown == LATELY_MAX) continue;
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.VERTICAL);
-            row.setPadding(0, dp(12), 0, 0);
+            row.setPadding(0, dp(16), 0, 0);
             TextView when = new TextView(this, null, 0, R.style.Text_Meta);
             when.setText(l.when);
             TextView text = new TextView(this, null, 0, R.style.Text_Body);
@@ -511,18 +526,19 @@ public final class MainActivity extends Activity {
             img.setOutlineProvider(new android.view.ViewOutlineProvider() {
                 @Override
                 public void getOutline(View v, android.graphics.Outline o) {
-                    o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(9));
+                    o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(13));
                 }
             });
             img.setClipToOutline(true);
             Bitmap b = styleThumbs.get(thumbKey(id, on ? prefs.color() : null, theme));
             if (b != null) img.setImageBitmap(b);
             else img.setBackgroundColor(getColor(R.color.surface_2));
-            frame.addView(img, new android.widget.FrameLayout.LayoutParams(dp(72), dp(156)));
+            frame.addView(img, new android.widget.FrameLayout.LayoutParams(dp(82), dp(178)));
             cell.addView(frame);
             TextView name = new TextView(this, null, 0, R.style.Text_Meta);
             name.setText(st.optString("name", id));
             name.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+            name.setPadding(0, dp(8), 0, 0);
             name.setTextColor(getColor(on ? R.color.ink_1 : R.color.ink_3));
             cell.addView(name, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
             cell.setContentDescription(st.optString("name", id));
@@ -548,7 +564,7 @@ public final class MainActivity extends Activity {
             g.setStroke(dp(on ? 3 : 1), getColor(on ? R.color.accent_fill : R.color.line_strong));
             dot.setBackground(g);
             dot.setContentDescription(c.optString("name", id));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(30), dp(30));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(32), dp(32));
             lp.setMarginEnd(dp(12));
             final String styleId = chosen;
             dot.setOnClickListener(v -> choose(styleId, id));
@@ -638,6 +654,23 @@ public final class MainActivity extends Activity {
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(small ? 72 : 168));
             lp.topMargin = dp(10);
             box.addView(w, lp);
+        }
+        java.util.List<NotifIcons.Item> sample = new java.util.ArrayList<>();
+        int[] res = {android.R.drawable.stat_notify_chat, android.R.drawable.sym_action_email, android.R.drawable.stat_sys_download_done, android.R.drawable.stat_notify_more};
+        for (int i = 0; i < res.length; i++) sample.add(new NotifIcons.Item("android", android.graphics.drawable.Icon.createWithResource("android", res[i]), 1, i));
+        Bitmap live = Live.preview(this, dp(150) * 2, sample);
+        if (live != null) {
+            TextView t2 = new TextView(this, null, 0, R.style.Text_Section);
+            t2.setText(R.string.live_preview_title);
+            t2.setPadding(0, dp(20), 0, 0);
+            box.addView(t2);
+            ImageView img = new ImageView(this);
+            img.setImageBitmap(live);
+            img.setAdjustViewBounds(true);
+            img.setScaleType(ImageView.ScaleType.FIT_START);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(150), LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.topMargin = dp(10);
+            box.addView(img, lp);
         }
     }
 
@@ -732,8 +765,84 @@ public final class MainActivity extends Activity {
 
     private void setLock(boolean on) {
         prefs.setLock(on);
+        // The live lock screen lives on the lock screen: off with it.
+        if (!on && prefs.live()) prefs.setLive(false);
         if (on) refreshNow(false);
         else takeOff(false, true);
+    }
+
+    // ── The live lock screen (0.4.0) ──────────────────────────────────────────────────
+
+    /**
+     * On: two steps of Android's own (notification access; the live wallpaper set in its picker), one
+     * at a time, then the pictures come as files. Off: the pictures are set as plain wallpapers again.
+     */
+    private void setLive(boolean on) {
+        prefs.setLive(on);
+        showLive();
+        if (!on) {
+            // Plain pictures again; with the home screen off, his own home wallpaper comes back in place of the live one.
+            refreshNow(false);
+            if (!prefs.home()) takeOff(true, false);
+            return;
+        }
+        if (!NotifIcons.allowed(this)) openListenerAccess();
+        else if (!Live.active(this)) openLivePicker();
+        else refreshNow(false);
+    }
+
+    /** The row's words and buttons say what is left to do. */
+    private void showLive() {
+        // The QA app shows the row with its lock screen off too (it never sets a wallpaper unless asked).
+        liveGroup.setVisibility(prefs.lock() || BuildConfig.QA ? View.VISIBLE : View.GONE);
+        if (!prefs.live()) {
+            liveNote.setText(R.string.live_note_off);
+            liveActions.setVisibility(View.GONE);
+            return;
+        }
+        boolean allowed = NotifIcons.allowed(this);
+        boolean active = Live.active(this);
+        liveAccess.setVisibility(allowed ? View.GONE : View.VISIBLE);
+        liveSet.setVisibility(active ? View.GONE : View.VISIBLE);
+        liveActions.setVisibility(allowed && active ? View.GONE : View.VISIBLE);
+        if (!allowed && !active) liveNote.setText(R.string.live_note_access_and_set);
+        else if (!allowed) liveNote.setText(R.string.live_note_access);
+        else if (!active) liveNote.setText(R.string.live_note_set);
+        else liveNote.setText(lockScreenCardsHidden() ? R.string.live_note_on_hidden : R.string.live_note_on);
+    }
+
+    /** Are the phone's own notification cards off on the lock screen? (Readable on Android 11; else unknown: false.) */
+    private boolean lockScreenCardsHidden() {
+        try {
+            return android.provider.Settings.Secure.getInt(getContentResolver(), "lock_screen_show_notifications", 1) == 0;
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    private void openListenerAccess() {
+        Intent i;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            i = new Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS);
+            i.putExtra(android.provider.Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, new ComponentName(this, NotifIcons.class).flattenToString());
+        } else {
+            i = new Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
+        }
+        try {
+            startActivity(i);
+        } catch (android.content.ActivityNotFoundException e) {
+            startActivity(new Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
+        }
+    }
+
+    private void openLivePicker() {
+        Intent i = new Intent(android.app.WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
+        i.putExtra(android.app.WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, new ComponentName(this, DayWallpaper.class));
+        try {
+            startActivity(i);
+        } catch (android.content.ActivityNotFoundException e) {
+            startActivity(new Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER));
+        }
     }
 
     private void setHome(boolean on) {

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Rows are inset pills (6 dp) that fill when pressed; no dividers inside a list. -->
+<!-- A row inside a card: no fill of its own, a press ripple to the card's edge. -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="@color/press">
     <item android:id="@android:id/mask">
-        <shape android:shape="rectangle"><corners android:radius="6dp" /><solid android:color="#FFFFFFFF" /></shape>
+        <shape android:shape="rectangle"><solid android:color="#FFFFFFFF" /></shape>
     </item>
 </ripple>

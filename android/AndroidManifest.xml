@@ -64,6 +64,31 @@
                 android:resource="@xml/day_widget" />
         </receiver>
 
+        <!-- 0.4.0, the live lock screen: the pictures drawn by the app, with the notification icons. -->
+        <service
+            android:name=".DayWallpaper"
+            android:exported="true"
+            android:label="@string/live_name"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper" />
+        </service>
+
+        <!-- Which apps have notifications waiting (their icons only), once he allows it. -->
+        <service
+            android:name=".NotifIcons"
+            android:exported="true"
+            android:label="@string/notif_icons_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".Wake"
             android:exported="false">

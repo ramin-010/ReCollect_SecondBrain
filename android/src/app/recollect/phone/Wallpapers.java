@@ -62,6 +62,19 @@ final class Wallpapers {
         }
     }
 
+    /**
+     * The live lock screen (0.4.0): the lock screen's own picture comes off, so it shows the system
+     * wallpaper, which is the app's live one.
+     */
+    static void clearLock(Context ctx) {
+        WallpaperManager wm = WallpaperManager.getInstance(ctx);
+        try {
+            if (wm.getWallpaperId(WallpaperManager.FLAG_LOCK) >= 0) wm.clear(WallpaperManager.FLAG_LOCK);
+        } catch (IOException | RuntimeException ignored) {
+            // the lock screen keeps its picture; the live one still shows on home
+        }
+    }
+
     static void set(Context ctx, Bitmap picture, boolean home, boolean lock) throws IOException {
         int which = (home ? WallpaperManager.FLAG_SYSTEM : 0) | (lock ? WallpaperManager.FLAG_LOCK : 0);
         if (which == 0) return;

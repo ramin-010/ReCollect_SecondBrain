@@ -61,12 +61,25 @@ final class Refresher {
             if ((anywhere || previewOnly) && (force || !p.inQuietHours(Calendar.getInstance()))) {
                 String theme = pictureTheme(ctx, p.theme());
                 int[] size = Wallpapers.screenSize(ctx);
+                // The live lock screen (0.4.0): the app's live wallpaper draws both pictures itself (no
+                // system zoom), with a band under the lock picture's words for the notification icons.
+                boolean live = p.lock() && p.live() && Live.active(ctx);
                 // The home screen shows its wallpaper zoomed (Android 11+); the lock screen doesn't (checked on his phone 11-16).
-                float zoom = Wallpapers.homeZoom();
-                String key = a.pictureKey() + "|" + theme + "|" + size[0] + "x" + size[1] + "|" + titles + "|" + p.home() + "|" + p.lock() + "|" + p.style() + "|" + p.color() + "|" + zoom;
-                if (force || !key.equals(p.pictureKey())) {
+                float zoom = live ? 1f : Wallpapers.homeZoom();
+                String key = a.pictureKey() + "|" + theme + "|" + size[0] + "x" + size[1] + "|" + titles + "|" + p.home() + "|" + p.lock() + "|" + p.style() + "|" + p.color() + "|" + zoom + "|" + live;
+                if (live && (force || !key.equals(p.pictureKey()))) {
+                    byte[] lockPng = api.wallpaper(size[0], size[1], theme, titles, "lock", p.style(), p.color(), 1f, true);
+                    String slot = api.lastIcons;
+                    byte[] homePng = api.wallpaper(size[0], size[1], theme, titles, "home", p.style(), p.color(), 1f, false);
+                    Live.save(ctx, lockPng, slot, homePng);
+                    Wallpapers.clearLock(ctx);
+                    Wallpapers.savePreview(ctx, lockPng);
+                    p.setPictureKey(key);
+                } else if (force || !key.equals(p.pictureKey())) {
                     // Each screen its own picture: the lock screen the ring and the buddy's line, the home screen the day in numbers.
-                    byte[] lockPng = p.lock() ? api.wallpaper(size[0], size[1], theme, titles, "lock", p.style(), p.color()) : null;
+                    // The QA app also keeps the live lock picture (with its band) for its preview.
+                    byte[] lockPng = p.lock() || previewOnly ? api.wallpaper(size[0], size[1], theme, titles, "lock", p.style(), p.color(), 1f, previewOnly) : null;
+                    if (previewOnly && lockPng != null) Live.save(ctx, lockPng, api.lastIcons, null);
                     byte[] homePng = p.home() || previewOnly ? api.wallpaper(size[0], size[1], theme, titles, "home", p.style(), p.color(), zoom) : null;
                     Bitmap lockPicture = lockPng == null ? null : BitmapFactory.decodeByteArray(lockPng, 0, lockPng.length);
                     Bitmap homePicture = homePng == null ? null : BitmapFactory.decodeByteArray(homePng, 0, homePng.length);
@@ -76,14 +89,12 @@ final class Refresher {
                         Wallpapers.set(ctx, homePicture, true, false);
                         homePicture.recycle();
                     }
-                    if (lockPicture != null) {
-                        Wallpapers.set(ctx, lockPicture, false, true);
-                        lockPicture.recycle();
-                    }
+                    if (lockPicture != null && !previewOnly) Wallpapers.set(ctx, lockPicture, false, true);
+                    if (lockPicture != null) lockPicture.recycle();
                     if (homePicture != null && previewOnly) homePicture.recycle();
                     // The app's own preview shows the lock picture when it is on (he sees it most); a home
                     // picture as the home screen shows it (its zoom).
-                    if (lockPng != null) Wallpapers.savePreview(ctx, lockPng);
+                    if (lockPng != null && !previewOnly) Wallpapers.savePreview(ctx, lockPng);
                     else Wallpapers.savePreview(ctx, homePng, zoom);
                     p.setPictureKey(key);
                 }

@@ -45,3 +45,8 @@ If the server can't be reached, nothing on the phone changes: no error picture; 
 **realme / OPPO phones:** turn off Glance (Settings → Home screen, Lock screen & Always-On Display → Glance for realme → Activate on Lockscreen), or it shows its own pictures on the lock screen. Also allow the app in the background (App info → Battery usage → Allow background activity, and Allow auto-launch) so the picture changes on its own. The app's screen says both on these phones.
 
 Licence: as the rest of this repository. Inter, the picture's typeface (bundled with the backend), is under the SIL Open Font License 1.1.
+
+## 0.4.0
+
+- The look: Inter (SIL OFL 1.1; `res/font/`, licence `res/raw/inter_ofl.txt`), the app's own tokens in `res/values*/colors.xml`, styles in `res/values/styles.xml`.
+- The live lock screen: `DayWallpaper` (a live wallpaper) and `NotifIcons` (a notification listener: app icons and counts only). Turn it on in the app (Show it on › Notification icons): allow notification access, set it as the wallpaper in Android's picker, then turn off notifications on the lock screen in the phone's settings. Draws are logged as counts: `adb logcat -s RecollectLive`.

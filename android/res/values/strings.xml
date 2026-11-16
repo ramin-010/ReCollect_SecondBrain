@@ -99,7 +99,7 @@
     <string name="more_like_this">More like this</string>
     <string name="not_this">Not this</string>
     <string name="thumb_failed">That didn\'t save. Try again.</string>
-    <string name="tell_hint">Tell your buddy something…</string>
+    <string name="tell_hint">Tell your buddy…</string>
     <string name="tell">Tell</string>
     <string name="told">Got it. It thinks about it tonight.</string>
     <string name="tell_failed">It wasn\'t sent. Try again.</string>
@@ -123,4 +123,19 @@
     <string name="widget_connect_line">Open the app to connect this phone.</string>
     <string name="widget_stale">Updated %1$s</string>
     <string name="preview_label">The picture of your day</string>
+    <!-- 0.4.0: the screen's sections, and the live lock screen (the picture drawn by the app, with the phone's notification icons). -->
+    <string name="your_picture">Your picture</string>
+    <string name="live_switch">Notification icons</string>
+    <string name="live_name">Your day (live)</string>
+    <string name="live_description">The picture of your day, with small icons for your notifications on the lock screen.</string>
+    <string name="notif_icons_name">Your day: notification icons</string>
+    <string name="live_note_off">The lock screen picture becomes live: small icons for your notifications sit under the words, instead of cards over them. Only the apps\' icons are read, never what they say, and nothing leaves this phone.</string>
+    <string name="live_note_access">One step left: let Your day see which apps have notifications (Android asks once).</string>
+    <string name="live_note_set">One step left: set it as your wallpaper (Android shows it first; tap Set wallpaper).</string>
+    <string name="live_note_access_and_set">Two steps: let Your day see which apps have notifications, then set it as your wallpaper.</string>
+    <string name="live_note_on">Live on your lock screen. To keep notification cards from covering it, turn off notifications on the lock screen in your phone\'s settings (Notifications › Lock screen).</string>
+    <string name="live_note_on_hidden">Live on your lock screen: your notifications show as icons under the words.</string>
+    <string name="live_allow">Allow access</string>
+    <string name="live_set">Set as wallpaper</string>
+    <string name="live_preview_title">Live lock screen (QA app)</string>
 </resources>
