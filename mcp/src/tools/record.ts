@@ -53,6 +53,9 @@ export interface Brief {
         memories: Array<{ kind: string; text: string; pinned: boolean }>;
         note: string | null;
         followUp: string | null;
+        /** The note's id as GET /api/buddy/note gives it, and its day (the hooks mark it shown). */
+        noteId?: string | null;
+        noteDay?: string | null;
     };
     session: { key: string };
 }

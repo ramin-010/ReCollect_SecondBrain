@@ -135,6 +135,16 @@
         <item name="android:textSize">14sp</item>
     </style>
 
+    <!-- A thumb (the web card's small icon button): 40 dp to touch, the icon 20 dp; the given one filled on the selected fill. -->
+    <style name="Thumb">
+        <item name="android:layout_width">40dp</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="android:padding">10dp</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:background">@drawable/bg_thumb</item>
+        <item name="android:tint">@color/thumb_tint</item>
+    </style>
+
     <style name="Chip.Time">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">36dp</item>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A thumb's icon: quiet until given, then ink 1. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true" android:color="@color/ink_1" />
+    <item android:color="@color/ink_3" />
+</selector>

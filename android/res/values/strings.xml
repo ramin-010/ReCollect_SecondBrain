@@ -66,7 +66,7 @@
     <string name="quiet_hours">Quiet hours</string>
     <string name="quiet_from">From</string>
     <string name="quiet_to">to</string>
-    <string name="quiet_note">No wallpaper changes between these times.</string>
+    <string name="quiet_note">No wallpaper changes or notifications between these times.</string>
 
     <string name="privacy">Privacy</string>
     <string name="hide_titles">Hide titles</string>
@@ -90,6 +90,33 @@
     <string name="open_app_info">Open App info</string>
 
     <string name="version">Version %1$s</string>
+
+    <!-- The buddy (0.3.0): the web card's words -->
+    <string name="buddy_title">From your buddy</string>
+    <string name="buddy_title_named">From %1$s</string>
+    <string name="buddy_first">It writes its first lines after it thinks tonight.</string>
+    <string name="buddy_nothing">Nothing more to say for now.</string>
+    <string name="more_like_this">More like this</string>
+    <string name="not_this">Not this</string>
+    <string name="thumb_failed">That didn\'t save. Try again.</string>
+    <string name="tell_hint">Tell your buddy something…</string>
+    <string name="tell">Tell</string>
+    <string name="told">Got it. It thinks about it tonight.</string>
+    <string name="tell_failed">It wasn\'t sent. Try again.</string>
+    <string name="tell_paused">Your buddy is paused. Turn it on again in Recollect → About you.</string>
+    <string name="lately">Lately</string>
+    <string name="notify_section">Notes from your buddy</string>
+    <string name="notify">Tell me when it leaves a note</string>
+    <string name="notify_note">At most two a day, never in quiet hours. A note that touches something private shows only as \"a new note\" on the lock screen.</string>
+    <string name="notify_denied">Notifications are off for this app. Turn them on in App info.</string>
+    <string name="note_private">Your buddy left you a note. Open the app to read it.</string>
+    <string name="channel_name">Notes from your buddy</string>
+    <string name="channel_description">When your buddy leaves you a new note: at most two a day, never in quiet hours.</string>
+
+    <!-- The pictures' style -->
+    <string name="style">Style</string>
+    <string name="style_note">%1$s: %2$s.</string>
+    <string name="style_loading">Loading the styles…</string>
 
     <!-- The widget before it is connected -->
     <string name="widget_connect">Connect Recollect</string>

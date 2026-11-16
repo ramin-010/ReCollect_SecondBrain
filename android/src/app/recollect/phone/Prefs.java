@@ -50,9 +50,9 @@ final class Prefs {
 
     // ── His choices ───────────────────────────────────────────────────────────────────
 
-    /** The lock screen is where the picture helps most (no icons over it): on by default. */
+    /** The lock screen is where the picture helps most (no icons over it): on by default (off in the QA app). */
     boolean lock() {
-        return sp.getBoolean("lock", true);
+        return sp.getBoolean("lock", !BuildConfig.QA);
     }
 
     /** The home screen has the widget for the same lines: off by default. */
@@ -70,6 +70,28 @@ final class Prefs {
 
     String theme() {
         return sp.getString("theme", THEME_SYSTEM);
+    }
+
+    /** The pictures' style (the server's list; "sky" by default) and its colour (null: the style's first). */
+    String style() {
+        return sp.getString("style", "sky");
+    }
+
+    String color() {
+        return sp.getString("color", null);
+    }
+
+    void setLook(String style, String color) {
+        sp.edit().putString("style", style).putString("color", color).remove("picture_key").apply();
+    }
+
+    /** The styles the server offers (GET /api/ambient/styles), as it sent them. */
+    String stylesJson() {
+        return sp.getString("styles", null);
+    }
+
+    void saveStyles(String json) {
+        sp.edit().putString("styles", json).apply();
     }
 
     void setTheme(String theme) {
@@ -114,6 +136,42 @@ final class Prefs {
         sp.edit().putBoolean("keep_copy", on).apply();
     }
 
+    /** A notification when the buddy leaves a new note (0.3.0): on by default. */
+    boolean notesOn() {
+        return sp.getBoolean("notify", true);
+    }
+
+    void setNotesOn(boolean on) {
+        sp.edit().putBoolean("notify", on).apply();
+    }
+
+    /** Android 13+: the app asked for notifications once already. */
+    boolean askedNotify() {
+        return sp.getBoolean("asked_notify", false);
+    }
+
+    void setAskedNotify() {
+        sp.edit().putBoolean("asked_notify", true).apply();
+    }
+
+    /** The last note he was told about (a notification) or saw on the app's screen. */
+    String seenNote() {
+        return sp.getString("seen_note", null);
+    }
+
+    void setSeenNote(String id) {
+        sp.edit().putString("seen_note", id).apply();
+    }
+
+    /** Notifications sent on `day` ("2026-11-16"): at most two a day. */
+    int notifiedOn(String day) {
+        return day.equals(sp.getString("notified_day", "")) ? sp.getInt("notified_count", 0) : 0;
+    }
+
+    void countNotified(String day) {
+        sp.edit().putString("notified_day", day).putInt("notified_count", notifiedOn(day) + 1).apply();
+    }
+
     boolean inQuietHours(Calendar now) {
         return quiet() && Schedule.inQuiet(now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE), quietFrom(), quietTo());
     }
@@ -122,6 +180,22 @@ final class Prefs {
 
     void saveAmbient(JSONObject data, long at) {
         sp.edit().putString("ambient", data.toString()).putLong("ok_at", at).remove("failure").remove("failure_at").apply();
+    }
+
+    /** The last day it read as the server sent it (to write a new thumb into), or null. */
+    JSONObject ambientJson() {
+        String raw = sp.getString("ambient", null);
+        if (raw == null) return null;
+        try {
+            return new JSONObject(raw);
+        } catch (JSONException e) {
+            return null;
+        }
+    }
+
+    /** The same day with a change of his own (a thumb): the time of the last refresh stays. */
+    void replaceAmbient(JSONObject data) {
+        sp.edit().putString("ambient", data.toString()).apply();
     }
 
     /** The last day it read, or null. */

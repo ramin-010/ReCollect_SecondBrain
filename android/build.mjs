@@ -5,6 +5,9 @@
 //
 //   node build.mjs             -> build/recollect.apk
 //   node build.mjs --install   -> and installs it on the phone over USB (adb install -r)
+//   node build.mjs --qa        -> build/recollect-qa.apk: "Your day QA" (app.recollect.phone.qa), a second
+//                                 app beside his for tests with the QA account; it never sets a wallpaper
+//                                 unless switched on, so his own app, connection and screens stay as they are
 //
 // The signing key is made on the first build in keys/ (never in git). Keep it: an update signed with
 // another key can't install over the app (Android asks to uninstall it first).
@@ -17,12 +20,14 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const BUILD = path.join(ROOT, 'build');
 const KEYS = path.join(ROOT, 'keys');
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 const MIN_SDK = 26;
 const TARGET_SDK = 34;
 /** Grows with every build (minutes since 2026-01-01), so `adb install -r` always takes the new one. */
 /** --debug: a test build Android lets adb look inside (run-as); never for daily use. */
 const DEBUG = process.argv.includes('--debug');
+/** --qa: the test app beside his (its own package, label and data). */
+const QA = process.argv.includes('--qa');
 const VERSION_CODE = Math.floor((Date.now() - Date.UTC(2026, 0, 1)) / 60000);
 
 const win = process.platform === 'win32';
@@ -108,19 +113,32 @@ const { tools, androidJar } = findSdk();
 const jdk = findJdk();
 console.log(`SDK build tools: ${tools}\nPlatform: ${androidJar}\nJDK: ${jdk}`);
 
+// Start clean, but keep the other variant's APK (his app's and the QA app's sit side by side).
+const keep = path.join(BUILD, QA ? 'recollect.apk' : 'recollect-qa.apk');
+const kept = fs.existsSync(keep) ? fs.readFileSync(keep) : null;
 fs.rmSync(BUILD, { recursive: true, force: true });
 for (const d of ['gen', 'classes', 'dex']) fs.mkdirSync(path.join(BUILD, d), { recursive: true });
+if (kept) fs.writeFileSync(keep, kept);
 
 // 1. BuildConfig
 const pkgDir = path.join(BUILD, 'gen', 'app', 'recollect', 'phone');
 fs.mkdirSync(pkgDir, { recursive: true });
-fs.writeFileSync(path.join(pkgDir, 'BuildConfig.java'), `package app.recollect.phone;\n\n/** Made by build.mjs. */\npublic final class BuildConfig {\n    public static final String VERSION = "${VERSION}";\n    public static final int VERSION_CODE = ${VERSION_CODE};\n\n    private BuildConfig() {}\n}\n`);
+fs.writeFileSync(path.join(pkgDir, 'BuildConfig.java'), `package app.recollect.phone;\n\n/** Made by build.mjs. */\npublic final class BuildConfig {\n    public static final String VERSION = "${VERSION}${QA ? '-qa' : ''}";\n    public static final int VERSION_CODE = ${VERSION_CODE};\n    /** The test app beside his (build.mjs --qa): no wallpaper unless switched on. */\n    public static final boolean QA = ${QA};\n\n    private BuildConfig() {}\n}\n`);
 
 // 2. Resources: compile, then link with the manifest (writes R.java)
 const aapt2 = path.join(tools, exe('aapt2'));
 run(aapt2, ['compile', '--dir', path.join(ROOT, 'res'), '-o', path.join(BUILD, 'res.zip')]);
-run(aapt2, ['link', '-o', path.join(BUILD, 'base.apk'), '-I', androidJar, '--manifest', path.join(ROOT, 'AndroidManifest.xml'), '--java', path.join(BUILD, 'gen'),
-    '--min-sdk-version', String(MIN_SDK), '--target-sdk-version', String(TARGET_SDK), '--version-code', String(VERSION_CODE), '--version-name', VERSION, ...(DEBUG ? ['--debug-mode'] : []), path.join(BUILD, 'res.zip')]);
+// The QA app: its own package and name, laid over the same resources (R stays app.recollect.phone).
+const qaRes = [];
+if (QA) {
+    const dir = path.join(BUILD, 'qa-res', 'values');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'strings.xml'), '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="app_name">Your day QA</string>\n    <string name="widget_name">Your day QA</string>\n</resources>\n');
+    run(aapt2, ['compile', '--dir', path.join(BUILD, 'qa-res'), '-o', path.join(BUILD, 'qa.zip')]);
+    qaRes.push('--rename-manifest-package', 'app.recollect.phone.qa', '-R', path.join(BUILD, 'qa.zip'));
+}
+run(aapt2, ['link', '-o', path.join(BUILD, 'base.apk'), '-I', androidJar, '--manifest', path.join(ROOT, 'AndroidManifest.xml'), '--java', path.join(BUILD, 'gen'), '--custom-package', 'app.recollect.phone',
+    '--min-sdk-version', String(MIN_SDK), '--target-sdk-version', String(TARGET_SDK), '--version-code', String(VERSION_CODE), '--version-name', VERSION, ...(DEBUG ? ['--debug-mode'] : []), path.join(BUILD, 'res.zip'), ...qaRes]);
 
 // 3. Java → classes (Java 11 class files; string concatenation without invokedynamic, for d8)
 const sources = [...javaFiles(path.join(ROOT, 'src')), ...javaFiles(path.join(BUILD, 'gen'))];
@@ -137,10 +155,11 @@ run(path.join(tools, exe('aapt')), ['add', path.join(BUILD, 'unaligned.apk'), 'c
 run(path.join(tools, exe('zipalign')), ['-f', '4', path.join(BUILD, 'unaligned.apk'), path.join(BUILD, 'aligned.apk')]);
 const key = signingKey(jdk);
 const apksigner = path.join(tools, 'lib', 'apksigner.jar');
-const apk = path.join(BUILD, 'recollect.apk');
+const apk = path.join(BUILD, QA ? 'recollect-qa.apk' : 'recollect.apk');
 run(path.join(jdk, exe('java')), ['-jar', apksigner, 'sign', '--ks', key.store, '--ks-key-alias', 'recollect', '--ks-pass', `file:${key.pass}`, '--out', apk, path.join(BUILD, 'aligned.apk')]);
 run(path.join(jdk, exe('java')), ['-jar', apksigner, 'verify', apk]);
-for (const f of ['base.apk', 'unaligned.apk', 'aligned.apk', 'res.zip', 'classes.jar', 'sources.txt']) fs.rmSync(path.join(BUILD, f), { force: true });
+for (const f of ['base.apk', 'unaligned.apk', 'aligned.apk', 'res.zip', 'qa.zip', 'classes.jar', 'sources.txt']) fs.rmSync(path.join(BUILD, f), { force: true });
+fs.rmSync(path.join(BUILD, 'qa-res'), { recursive: true, force: true });
 
 console.log(`\nBuilt ${path.relative(process.cwd(), apk)}: ${(fs.statSync(apk).size / 1024).toFixed(0)} KB, version ${VERSION} (${VERSION_CODE}), in ${((Date.now() - started) / 1000).toFixed(1)} s`);
 

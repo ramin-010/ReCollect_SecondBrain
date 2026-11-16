@@ -557,6 +557,13 @@ export async function runHook(event: string, input: Record<string, unknown>, env
     if (!config.brief || !rule.brief) return '';
     try {
         const brief = await api.get<Brief>('/api/brief', { project: session.project, key: session.key });
+        // The brief carries the buddy's newest note: it counts as shown in this session, and it is the
+        // note file's note from now on (so a prompt never repeats it, or brings back an older one).
+        const b = brief.buddy;
+        if (b?.note && b.noteId) {
+            writeFileSync(noteFile(env), JSON.stringify({ id: b.noteId, text: b.note, day: b.noteDay ?? '' } satisfies BuddyNote));
+            writeFileSync(file, JSON.stringify({ ...session, notesShown: [...(session.notesShown ?? []), b.noteId].slice(-20) }));
+        }
         return [
             `Recollect (session-start hook): where Ramin stands. This Claude Code session is logged by the hook (key ${session.key}, project "${session.project}"). ` +
                 `When you finish a piece of work here, call checkpoint once with that key, project "${session.project}", a short title and the nextStep, so the project's next step stays current. ` +

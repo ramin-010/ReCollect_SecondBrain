@@ -12,6 +12,8 @@
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <!-- Persisted refresh jobs come back after a restart. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- The buddy's notes (0.3.0); asked on Android 13 and newer when he turns them on. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Only to keep a copy of the wallpaper he had, so Disconnect can put it back (Android 12 and older; asked when he ticks it). -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 

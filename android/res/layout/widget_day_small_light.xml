@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Made from widget_day_small.xml with the light steps (DayWidget: a fixed theme needs its own layout, since a re-applied update keeps old colours). Edit widget_day_small.xml, then copy. -->
+<!-- Made from widget_day_small.xml with the light steps by widget-themes.py: edit widget_day_small.xml, then run it. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@android:id/background"
     android:layout_width="match_parent"

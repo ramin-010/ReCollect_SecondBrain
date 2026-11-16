@@ -14,6 +14,8 @@ You need a JDK (17 or newer) and the Android SDK's **build tools** and **one pla
 node build.mjs             # build/recollect.apk
 node build.mjs --install   # and install it on the phone over USB (adb install -r)
 node build.mjs --debug     # a test build adb can look inside (run-as); never for daily use
+node build.mjs --qa        # build/recollect-qa.apk: "Your day QA", a second app beside the real one for tests
+                           # (its own package and data, no wallpaper unless switched on, a widget preview)
 ```
 
 The first build creates the signing key in `keys/` (git-ignored). **Back up `keys/`**: Android installs an update over the app only when the same key signed it.

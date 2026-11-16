@@ -20,15 +20,21 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.format.DateFormat;
 import android.util.Log;
+import android.content.pm.PackageManager;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
+import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -37,11 +43,17 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * The one screen: connect (from the server's page, or a pasted link), then see the picture of the
- * day and choose where it shows, its theme, quiet hours and titles; Refresh now; Disconnect.
+ * The one screen: connect (from the server's page, or a pasted link), then the buddy's line and note
+ * (0.3.0: thumbs, "Tell your buddy", what it said lately), the picture of the day, and where it shows,
+ * its theme, quiet hours, titles and the notes' notifications; Refresh now; Disconnect.
  */
 public final class MainActivity extends Activity {
     private static final int ASK_READ = 7;
+    private static final int ASK_NOTIFY = 8;
+    /** Lines under "Lately" (with the line for now: the last seven). */
+    private static final int LATELY_MAX = 6;
+    /** The screen is open: it shows a new note itself, so no notification for it. */
+    static volatile boolean inFront;
     private static final String TAG = "Recollect";
 
     private final ExecutorService work = Executors.newSingleThreadExecutor();
@@ -57,7 +69,17 @@ public final class MainActivity extends Activity {
     private CheckBox keepCopy;
     private Button confirmGo, refresh;
     private ImageView preview;
-    private Switch swLock, swHome, swQuiet, swTitles;
+    private Switch swLock, swHome, swQuiet, swTitles, swNotify;
+    private View buddy, lineRow, noteRow, latelyTitle;
+    private TextView buddyTitle, buddyLine, buddyEmpty, buddyNote;
+    private ImageButton lineMore, lineLess, noteMore, noteLess;
+    private EditText tell;
+    private Button tellGo;
+    private LinearLayout lately;
+    /** The styles' small pictures, by style, colour and theme (filled in the background). */
+    private final java.util.Map<String, Bitmap> styleThumbs = new java.util.concurrent.ConcurrentHashMap<>();
+    /** The picture theme the thumbnails were last fetched for (once per theme while the screen is open). */
+    private String thumbsFor;
     private TextView themeLight, themeDark, themeSystem;
     private View quietTimes;
     private long previewShown;
@@ -82,7 +104,14 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        inFront = true;
         if (pending == null && !busy) show();
+    }
+
+    @Override
+    protected void onPause() {
+        inFront = false;
+        super.onPause();
     }
 
     @Override
@@ -122,6 +151,28 @@ public final class MainActivity extends Activity {
         quietTo = findViewById(R.id.quiet_to);
         connServer = findViewById(R.id.conn_server);
         connAccount = findViewById(R.id.conn_account);
+        swNotify = findViewById(R.id.sw_notify);
+        buddy = findViewById(R.id.buddy);
+        buddyTitle = findViewById(R.id.buddy_title);
+        lineRow = findViewById(R.id.line_row);
+        buddyLine = findViewById(R.id.buddy_line);
+        lineMore = findViewById(R.id.line_more);
+        lineLess = findViewById(R.id.line_less);
+        buddyEmpty = findViewById(R.id.buddy_empty);
+        noteRow = findViewById(R.id.note_row);
+        buddyNote = findViewById(R.id.buddy_note);
+        noteMore = findViewById(R.id.note_more);
+        noteLess = findViewById(R.id.note_less);
+        tell = findViewById(R.id.tell);
+        tellGo = findViewById(R.id.tell_go);
+        latelyTitle = findViewById(R.id.lately_title);
+        lately = findViewById(R.id.lately);
+        tellGo.setOnClickListener(v -> tell());
+        tell.setOnEditorActionListener((v, action, event) -> {
+            if (action != EditorInfo.IME_ACTION_SEND) return false;
+            tell();
+            return true;
+        });
 
         findViewById(R.id.preview_frame).setClipToOutline(true);
         findViewById(R.id.paste).setOnClickListener(v -> paste());
@@ -245,6 +296,23 @@ public final class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         if (code == ASK_READ && pending != null) connect();
+        if (code == ASK_NOTIFY) {
+            boolean granted = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
+            if (!granted) {
+                prefs.setNotesOn(false);
+                toast(R.string.notify_denied);
+            }
+            if (prefs.connected()) showSettings();
+        }
+    }
+
+    /** Android 13 and newer ask for notifications; once on his first visit, and when he turns them on. */
+    private boolean mayNotify() {
+        return Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void askNotify() {
+        if (Build.VERSION.SDK_INT >= 33) requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, ASK_NOTIFY);
     }
 
     private void connect() {
@@ -294,7 +362,8 @@ public final class MainActivity extends Activity {
         Ambient a = prefs.ambient();
         dayDate.setText(a == null ? "" : a.date);
         dayHeadline.setText(a == null ? getString(R.string.status_never) : (a.headline.isEmpty() && a.done() ? getString(R.string.done_today) : a.headline));
-        String lines = a == null ? "" : String.join("\n", a.lines);
+        // The day in numbers (0.3.0: no list, his verdict 11-16); an older server, its quieter lines.
+        String lines = a == null ? "" : a.numbers != null ? a.numbers : String.join("\n", a.lines);
         dayLines.setText(lines);
         dayLines.setVisibility(lines.isEmpty() ? View.GONE : View.VISIBLE);
         long at = prefs.okAt();
@@ -306,6 +375,17 @@ public final class MainActivity extends Activity {
         }
         showPreview();
         notice(problem, prefs.failure());
+        showBuddy(a == null ? null : a.buddy);
+        showStyles();
+        if (BuildConfig.QA) showWidgetPreview();
+        toggle(swNotify, prefs.notesOn(), on -> {
+            prefs.setNotesOn(on);
+            if (on && !mayNotify()) askNotify();
+        });
+        if (prefs.notesOn() && !mayNotify() && !prefs.askedNotify()) {
+            prefs.setAskedNotify();
+            askNotify();
+        }
 
         toggle(swLock, prefs.lock(), this::setLock);
         toggle(swHome, prefs.home(), this::setHome);
@@ -333,6 +413,285 @@ public final class MainActivity extends Activity {
         String who = a == null ? null : (a.accountName != null && a.accountEmail != null ? a.accountName + " · " + a.accountEmail : a.accountEmail);
         connAccount.setText(who == null ? "" : who);
         connAccount.setVisibility(who == null ? View.GONE : View.VISIBLE);
+    }
+
+    // ── The buddy (0.3.0) ─────────────────────────────────────────────────────────────
+
+    /** Its line for now and its note (each with thumbs), what it said lately; hidden while it is off. */
+    private void showBuddy(Ambient.Buddy b) {
+        buddy.setVisibility(b == null ? View.GONE : View.VISIBLE);
+        if (b == null) return;
+        buddyTitle.setText(b.title(this));
+        Ambient.Line now = !b.lines.isEmpty() && b.lines.get(0).current ? b.lines.get(0) : null;
+        lineRow.setVisibility(now == null ? View.GONE : View.VISIBLE);
+        if (now != null) {
+            buddyLine.setText(now.text);
+            thumbs(lineMore, lineLess, b, now.dayId, now.slot);
+        }
+        buddyEmpty.setVisibility(now == null ? View.VISIBLE : View.GONE);
+        buddyEmpty.setText(b.lines.isEmpty() && b.note == null ? R.string.buddy_first : R.string.buddy_nothing);
+        noteRow.setVisibility(b.note == null ? View.GONE : View.VISIBLE);
+        if (b.note != null) {
+            buddyNote.setText(b.note.text);
+            thumbs(noteMore, noteLess, b, b.note.dayId, "note");
+            Notes.seen(this, b.note); // read here: no notification for it
+        }
+        lately.removeAllViews();
+        int shown = 0;
+        for (Ambient.Line l : b.lines) {
+            if (l == now || shown == LATELY_MAX) continue;
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(0, dp(12), 0, 0);
+            TextView when = new TextView(this, null, 0, R.style.Text_Meta);
+            when.setText(l.when);
+            TextView text = new TextView(this, null, 0, R.style.Text_Body);
+            text.setText(l.text);
+            text.setTextIsSelectable(true);
+            row.addView(when);
+            row.addView(text);
+            lately.addView(row);
+            shown++;
+        }
+        latelyTitle.setVisibility(shown > 0 ? View.VISIBLE : View.GONE);
+        lately.setVisibility(shown > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    // ── The pictures' style (0.3.0) ───────────────────────────────────────────────────
+
+    private static JSONArray parseStyles(String json) {
+        if (json == null) return null;
+        try {
+            return new JSONArray(json);
+        } catch (org.json.JSONException e) {
+            return null;
+        }
+    }
+
+    private static String thumbKey(String style, String color, String theme) {
+        return style + "|" + color + "|" + theme;
+    }
+
+    /** The styles as small lock pictures (the server draws them), the chosen one ringed, then its colours. */
+    private void showStyles() {
+        LinearLayout list = findViewById(R.id.style_list);
+        LinearLayout colors = findViewById(R.id.color_list);
+        TextView note = findViewById(R.id.style_note);
+        String theme = Refresher.pictureTheme(this, prefs.theme());
+        if (!theme.equals(thumbsFor)) loadStyles(theme);
+        JSONArray arr = parseStyles(prefs.stylesJson());
+        list.removeAllViews();
+        colors.removeAllViews();
+        if (arr == null) {
+            note.setText(R.string.style_loading);
+            return;
+        }
+        String chosen = prefs.style();
+        JSONObject chosenStyle = null;
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject st = arr.optJSONObject(i);
+            if (st == null) continue;
+            String id = st.optString("id");
+            boolean on = id.equals(chosen);
+            if (on) chosenStyle = st;
+            LinearLayout cell = new LinearLayout(this);
+            cell.setOrientation(LinearLayout.VERTICAL);
+            cell.setPadding(dp(4), 0, dp(6), 0);
+            android.widget.FrameLayout frame = new android.widget.FrameLayout(this);
+            frame.setBackgroundResource(R.drawable.bg_style);
+            frame.setPadding(dp(3), dp(3), dp(3), dp(3));
+            frame.setSelected(on);
+            ImageView img = new ImageView(this);
+            img.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            img.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override
+                public void getOutline(View v, android.graphics.Outline o) {
+                    o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(9));
+                }
+            });
+            img.setClipToOutline(true);
+            Bitmap b = styleThumbs.get(thumbKey(id, on ? prefs.color() : null, theme));
+            if (b != null) img.setImageBitmap(b);
+            else img.setBackgroundColor(getColor(R.color.surface_2));
+            frame.addView(img, new android.widget.FrameLayout.LayoutParams(dp(72), dp(156)));
+            cell.addView(frame);
+            TextView name = new TextView(this, null, 0, R.style.Text_Meta);
+            name.setText(st.optString("name", id));
+            name.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+            name.setTextColor(getColor(on ? R.color.ink_1 : R.color.ink_3));
+            cell.addView(name, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            cell.setContentDescription(st.optString("name", id));
+            cell.setOnClickListener(v -> choose(id, null));
+            list.addView(cell);
+        }
+        // The chosen style's colours: round swatches, the chosen one ringed (the sky follows the hour).
+        JSONArray cs = chosenStyle == null ? null : chosenStyle.optJSONArray("colors");
+        String color = prefs.color();
+        for (int i = 0; cs != null && cs.length() > 1 && i < cs.length(); i++) {
+            JSONObject c = cs.optJSONObject(i);
+            if (c == null) continue;
+            String id = c.optString("id");
+            boolean on = id.equals(color) || (color == null && i == 0);
+            View dot = new View(this);
+            android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+            g.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            try {
+                g.setColor(android.graphics.Color.parseColor(c.optString("swatch", "#888888")));
+            } catch (IllegalArgumentException e) {
+                g.setColor(0xFF888888);
+            }
+            g.setStroke(dp(on ? 3 : 1), getColor(on ? R.color.accent_fill : R.color.line_strong));
+            dot.setBackground(g);
+            dot.setContentDescription(c.optString("name", id));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(30), dp(30));
+            lp.setMarginEnd(dp(12));
+            final String styleId = chosen;
+            dot.setOnClickListener(v -> choose(styleId, id));
+            colors.addView(dot, lp);
+        }
+        colors.setVisibility(colors.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+        String colorName = null;
+        for (int i = 0; cs != null && i < cs.length(); i++) {
+            JSONObject c = cs.optJSONObject(i);
+            if (c != null && (c.optString("id").equals(color) || (color == null && i == 0))) colorName = c.optString("name");
+        }
+        note.setText(chosenStyle == null ? "" : getString(R.string.style_note, chosenStyle.optString("name"), chosenStyle.optString("blurb") + (colorName != null && cs.length() > 1 ? " · " + colorName : "")));
+    }
+
+    /** The styles from the server and their small pictures, in the background (once per theme while open). */
+    private void loadStyles(String theme) {
+        thumbsFor = theme;
+        final String server = prefs.server();
+        final String token = prefs.token();
+        if (server == null || token == null) return;
+        final boolean titles = !prefs.hideTitles();
+        final String chosen = prefs.style();
+        final String chosenColor = prefs.color();
+        work.execute(() -> {
+            Api api = new Api(server, token);
+            try {
+                prefs.saveStyles(api.styles());
+            } catch (Api.Failure f) {
+                return; // an older server or none: the section says it is loading, the sky stays
+            }
+            main.post(this::showStylesIfOpen);
+            JSONArray arr = parseStyles(prefs.stylesJson());
+            for (int i = 0; arr != null && i < arr.length(); i++) {
+                String id = arr.optJSONObject(i) == null ? null : arr.optJSONObject(i).optString("id");
+                if (id == null) continue;
+                String color = id.equals(chosen) ? chosenColor : null;
+                if (styleThumbs.containsKey(thumbKey(id, color, theme))) continue;
+                try {
+                    byte[] png = api.wallpaper(216, 468, theme, titles, "lock", id, color);
+                    Bitmap b = BitmapFactory.decodeByteArray(png, 0, png.length);
+                    if (b != null) styleThumbs.put(thumbKey(id, color, theme), b);
+                } catch (Api.Failure f) {
+                    break;
+                }
+                main.post(this::showStylesIfOpen);
+            }
+        });
+    }
+
+    private void showStylesIfOpen() {
+        if (!isDestroyed() && paneSettings.getVisibility() == View.VISIBLE) showStyles();
+    }
+
+    /** His pick: the style (its first colour) or a colour of the chosen style; the pictures change now. */
+    private void choose(String style, String color) {
+        if (style.equals(prefs.style()) && java.util.Objects.equals(color, prefs.color())) return;
+        prefs.setLook(style, color);
+        String theme = Refresher.pictureTheme(this, prefs.theme());
+        if (!styleThumbs.containsKey(thumbKey(style, color, theme))) {
+            final String server = prefs.server();
+            final String token = prefs.token();
+            final boolean titles = !prefs.hideTitles();
+            if (server != null && token != null) work.execute(() -> {
+                try {
+                    byte[] png = new Api(server, token).wallpaper(216, 468, theme, titles, "lock", style, color);
+                    Bitmap b = BitmapFactory.decodeByteArray(png, 0, png.length);
+                    if (b != null) styleThumbs.put(thumbKey(style, color, theme), b);
+                    main.post(this::showStylesIfOpen);
+                } catch (Api.Failure ignored) {
+                    // the thumbnail stays empty; the picture itself still changes below
+                }
+            });
+        }
+        refreshNow(false);
+    }
+
+    /** The QA app: the widget's two sizes, inflated from the same views the launcher gets. */
+    private void showWidgetPreview() {
+        LinearLayout box = findViewById(R.id.widget_preview);
+        box.setVisibility(View.VISIBLE);
+        box.removeAllViews();
+        TextView title = new TextView(this, null, 0, R.style.Text_Section);
+        title.setText("Widget preview (QA app)");
+        box.addView(title);
+        for (boolean small : new boolean[] {false, true}) {
+            View w = DayWidget.views(this, small).apply(this, box);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(small ? 72 : 168));
+            lp.topMargin = dp(10);
+            box.addView(w, lp);
+        }
+    }
+
+    private int dp(int v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+
+    /** Two thumbs for one line or the note: the one he gave filled, on the selected fill. */
+    private void thumbs(ImageButton more, ImageButton less, Ambient.Buddy b, String dayId, String target) {
+        String given = b.thumb(dayId, target);
+        more.setSelected("more".equals(given));
+        less.setSelected("less".equals(given));
+        more.setImageResource("more".equals(given) ? R.drawable.ic_thumb_up_on : R.drawable.ic_thumb_up);
+        less.setImageResource("less".equals(given) ? R.drawable.ic_thumb_down_on : R.drawable.ic_thumb_down);
+        more.setOnClickListener(v -> thumb(dayId, target, "more"));
+        less.setOnClickListener(v -> thumb(dayId, target, "less"));
+    }
+
+    private void thumb(String dayId, String target, String verdict) {
+        final Context app = getApplicationContext();
+        work.execute(() -> {
+            String problem = Thumbs.give(app, dayId, target, verdict, () -> main.post(() -> {
+                if (isDestroyed()) return;
+                showSettings();
+                DayWidget.updateAll(app);
+            }));
+            if (problem != null) main.post(() -> Toast.makeText(app, problem, Toast.LENGTH_SHORT).show());
+        });
+    }
+
+    /** "Tell your buddy": his words go in as a private note for tonight. */
+    private void tell() {
+        String text = tell.getText().toString().replaceAll("\\s+", " ").trim();
+        if (text.isEmpty() || !tellGo.isEnabled()) return;
+        String server = prefs.server();
+        String token = prefs.token();
+        if (server == null || token == null) return;
+        tellGo.setEnabled(false);
+        tellGo.setAlpha(0.6f);
+        // Sent: the keyboard goes, so the screen is his again.
+        android.view.inputmethod.InputMethodManager ime = getSystemService(android.view.inputmethod.InputMethodManager.class);
+        if (ime != null) ime.hideSoftInputFromWindow(tell.getWindowToken(), 0);
+        tell.clearFocus();
+        work.execute(() -> {
+            int said;
+            try {
+                said = new Api(server, token).tell(text) ? R.string.told : R.string.tell_paused;
+            } catch (Api.Failure f) {
+                said = R.string.tell_failed;
+            }
+            final int result = said;
+            main.post(() -> {
+                if (isDestroyed()) return;
+                tellGo.setEnabled(true);
+                tellGo.setAlpha(1f);
+                if (result == R.string.told) tell.setText("");
+                toast(result);
+            });
+        });
     }
 
     private interface OnToggle {

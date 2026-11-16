@@ -52,15 +52,17 @@ final class Refresher {
             p.saveAmbient(data, now);
             DayWidget.updateAll(ctx);
             Ambient a = Ambient.parse(data);
+            // A new note from the buddy: one notification (quiet hours and the day's limit allowing).
+            if (!MainActivity.inFront) Notes.maybeNotify(ctx, a);
             boolean anywhere = p.home() || p.lock();
             if (anywhere && (force || !p.inQuietHours(Calendar.getInstance()))) {
                 String theme = pictureTheme(ctx, p.theme());
                 int[] size = Wallpapers.screenSize(ctx);
-                String key = a.pictureKey() + "|" + theme + "|" + size[0] + "x" + size[1] + "|" + titles + "|" + p.home() + "|" + p.lock();
+                String key = a.pictureKey() + "|" + theme + "|" + size[0] + "x" + size[1] + "|" + titles + "|" + p.home() + "|" + p.lock() + "|" + p.style() + "|" + p.color();
                 if (force || !key.equals(p.pictureKey())) {
                     // Each screen its own picture: the lock screen the dial, the home screen the sky and its list.
-                    byte[] lockPng = p.lock() ? api.wallpaper(size[0], size[1], theme, titles, "lock") : null;
-                    byte[] homePng = p.home() ? api.wallpaper(size[0], size[1], theme, titles, "home") : null;
+                    byte[] lockPng = p.lock() ? api.wallpaper(size[0], size[1], theme, titles, "lock", p.style(), p.color()) : null;
+                    byte[] homePng = p.home() ? api.wallpaper(size[0], size[1], theme, titles, "home", p.style(), p.color()) : null;
                     Bitmap lockPicture = lockPng == null ? null : BitmapFactory.decodeByteArray(lockPng, 0, lockPng.length);
                     Bitmap homePicture = homePng == null ? null : BitmapFactory.decodeByteArray(homePng, 0, homePng.length);
                     if ((lockPng != null && lockPicture == null) || (homePng != null && homePicture == null)) throw new Api.Failure(Api.Failure.BAD_DATA, 200, null);

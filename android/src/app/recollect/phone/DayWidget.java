@@ -14,15 +14,15 @@ import android.text.format.DateUtils;
 import android.view.View;
 import android.widget.RemoteViews;
 
-import java.util.List;
-
 /**
- * "Your day" on the home screen: the same lines as the picture, from the last refresh (it never
- * fetches by itself). 4 x 2 shows the date, the headline and up to three lines; 4 x 1 the date and
- * the headline. A tap opens Recollect.
+ * "Your day" on the home screen, from the last refresh (it never fetches by itself). 4 x 2 (0.3.0): the
+ * date, the buddy's line for now (only one its lock check passed; else the day's one line), the day in
+ * numbers, and two thumbs for the line ("more like this", "not this") that reach the server without
+ * opening anything. 4 x 1: the date and the line. A tap elsewhere opens Recollect.
  */
 public final class DayWidget extends AppWidgetProvider {
-    private static final int[] LINES = {R.id.w_line1, R.id.w_line2, R.id.w_line3};
+    /** A thumb tapped on the widget (an explicit broadcast to this receiver). */
+    static final String ACTION_THUMB = "app.recollect.phone.THUMB";
     /** Below this height (dp) the one-row layout fits. */
     private static final int SMALL_BELOW_DP = 100;
     /** Older than this, the widget says when it was last updated. */
@@ -39,6 +39,28 @@ public final class DayWidget extends AppWidgetProvider {
         render(ctx, manager, id);
     }
 
+    @Override
+    public void onReceive(Context ctx, Intent intent) {
+        if (!ACTION_THUMB.equals(intent.getAction())) {
+            super.onReceive(ctx, intent);
+            return;
+        }
+        final String dayId = intent.getStringExtra("dayId");
+        final String target = intent.getStringExtra("target");
+        final String verdict = intent.getStringExtra("verdict");
+        if (dayId == null || target == null || verdict == null) return;
+        final Context app = ctx.getApplicationContext();
+        final PendingResult done = goAsync();
+        new Thread(() -> {
+            try {
+                // Shown at once; taken back if the server didn't take it.
+                Thumbs.give(app, dayId, target, verdict, () -> updateAll(app));
+            } finally {
+                done.finish();
+            }
+        }, "thumb").start();
+    }
+
     static void updateAll(Context ctx) {
         AppWidgetManager manager = AppWidgetManager.getInstance(ctx);
         if (manager == null) return;
@@ -53,7 +75,11 @@ public final class DayWidget extends AppWidgetProvider {
     }
 
     static void render(Context ctx, AppWidgetManager manager, int id) {
-        boolean small = small(ctx, manager, id);
+        manager.updateAppWidget(id, views(ctx, small(ctx, manager, id)));
+    }
+
+    /** The widget's views at one size (also the QA app's preview of it). */
+    static RemoteViews views(Context ctx, boolean small) {
         Prefs p = Prefs.of(ctx);
         RemoteViews v = new RemoteViews(ctx.getPackageName(), layout(small, p.theme()));
         Ambient a = p.connected() ? p.ambient() : null;
@@ -63,16 +89,19 @@ public final class DayWidget extends AppWidgetProvider {
             v.setViewVisibility(R.id.w_date, View.GONE);
             v.setTextViewText(R.id.w_headline, ctx.getString(R.string.widget_connect));
             if (!small) {
-                showLines(v, java.util.Collections.singletonList(ctx.getString(R.string.widget_connect_line)));
+                v.setTextViewText(R.id.w_numbers, ctx.getString(R.string.widget_connect_line));
+                thumbs(ctx, v, null, null);
                 v.setViewVisibility(R.id.w_status, View.GONE);
             }
         } else {
             v.setViewVisibility(R.id.w_date, View.VISIBLE);
             v.setTextViewText(R.id.w_date, a.date);
-            String headline = a.headline.isEmpty() && a.done() ? ctx.getString(R.string.done_today) : a.headline;
-            v.setTextViewText(R.id.w_headline, headline);
+            String day = a.headline.isEmpty() && a.done() ? ctx.getString(R.string.done_today) : a.headline;
+            v.setTextViewText(R.id.w_headline, a.line != null ? a.line.text : day);
             if (!small) {
-                showLines(v, a.lines);
+                String numbers = a.numbers != null ? a.numbers : (a.lines.isEmpty() ? "" : a.lines.get(0));
+                v.setTextViewText(R.id.w_numbers, numbers);
+                thumbs(ctx, v, a.line, a.buddy);
                 long at = p.okAt();
                 boolean stale = at > 0 && System.currentTimeMillis() - at > STALE_MS;
                 v.setViewVisibility(R.id.w_status, stale ? View.VISIBLE : View.GONE);
@@ -80,15 +109,26 @@ public final class DayWidget extends AppWidgetProvider {
             }
         }
         v.setOnClickPendingIntent(android.R.id.background, tap(ctx, p, a));
-        manager.updateAppWidget(id, v);
+        return v;
     }
 
-    private static void showLines(RemoteViews v, List<String> lines) {
-        for (int i = 0; i < LINES.length; i++) {
-            boolean has = i < lines.size();
-            v.setViewVisibility(LINES[i], has ? View.VISIBLE : View.GONE);
-            v.setTextViewText(LINES[i], has ? lines.get(i) : "");
-        }
+    /** The line's two thumbs: shown with a line from the buddy, the one he gave filled. */
+    private static void thumbs(Context ctx, RemoteViews v, Ambient.Line line, Ambient.Buddy buddy) {
+        boolean show = line != null && buddy != null && !line.dayId.isEmpty() && !line.slot.isEmpty();
+        v.setViewVisibility(R.id.w_more, show ? View.VISIBLE : View.GONE);
+        v.setViewVisibility(R.id.w_less, show ? View.VISIBLE : View.GONE);
+        if (!show) return;
+        String given = buddy.thumb(line.dayId, line.slot);
+        v.setImageViewResource(R.id.w_more, "more".equals(given) ? R.drawable.ic_thumb_up_on : R.drawable.ic_thumb_up);
+        v.setImageViewResource(R.id.w_less, "less".equals(given) ? R.drawable.ic_thumb_down_on : R.drawable.ic_thumb_down);
+        v.setOnClickPendingIntent(R.id.w_more, thumbIntent(ctx, line, "more", 11));
+        v.setOnClickPendingIntent(R.id.w_less, thumbIntent(ctx, line, "less", 12));
+    }
+
+    private static PendingIntent thumbIntent(Context ctx, Ambient.Line line, String verdict, int code) {
+        Intent i = new Intent(ctx, DayWidget.class).setAction(ACTION_THUMB)
+                .putExtra("dayId", line.dayId).putExtra("target", line.slot).putExtra("verdict", verdict);
+        return PendingIntent.getBroadcast(ctx, code, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
     /**

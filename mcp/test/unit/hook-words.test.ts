@@ -45,7 +45,7 @@ describe('the flow with words', () => {
         if (home) rmSync(home, { recursive: true, force: true });
     });
 
-    function setup(opts: { failWords?: number } = {}) {
+    function setup(opts: { failWords?: number; briefNote?: boolean } = {}) {
         home = mkdtempSync(path.join(os.tmpdir(), 'recollect-words-'));
         const allow = [{ path: 'E:/PERSONAL_PROJECTS/', mode: 'full', brief: true }, { path: '*', mode: 'full', brief: false }];
         writeFileSync(path.join(home, 'hooks.json'), JSON.stringify({ url: 'http://recollect.test', token: `rcl_${'a'.repeat(43)}`, allow, brief: true }));
@@ -73,6 +73,7 @@ describe('the flow with words', () => {
                     recent: [],
                     recall: { days: 7, finished: 0, weakTopics: [] },
                     project: null,
+                    ...(opts.briefNote ? { buddy: { who: null, heading: null, now: null, memories: [], note: 'Write down what launched means first.', followUp: null, noteId: 'n2:note', noteDay: '2026-11-16' } } : {}),
                     session: { key: 'cc_s1' },
                 });
             }
@@ -112,6 +113,16 @@ describe('the flow with words', () => {
         expect(after).toHaveLength(2);
         expect(after[1]!.body).toMatchObject({ seq: 2, messages: [{ text: 'ok next part of the plan please' }, { text: 'and the part after that one' }] });
         expect(readdirSync(path.join(home, 'open'))).toEqual([]);
+    });
+
+    it("the brief's note counts as shown: no prompt repeats it, nor brings back an older one", async () => {
+        const { env } = setup({ briefNote: true });
+        // An older note waits in the file (from an earlier flush).
+        writeFileSync(path.join(home, 'note.json'), JSON.stringify({ id: 'n1:note', text: 'An older note', day: '2026-11-16' }));
+        expect(await runHook('start', input(), env, t(0))).toContain('Write down what launched means first.');
+        expect(JSON.parse(readFileSync(path.join(home, 'note.json'), 'utf8')).id).toBe('n2:note');
+        expect(await runHook('prompt', input({ prompt: 'ok let us start' }), env, t(1))).toBe('');
+        expect(await runHook('prompt', input({ prompt: 'next' }), env, t(2))).toBe('');
     });
 
     it('a failed POST keeps the words for the next flush, as the same piece', async () => {
