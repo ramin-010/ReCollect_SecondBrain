@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const BUILD = path.join(ROOT, 'build');
 const KEYS = path.join(ROOT, 'keys');
-const VERSION = '0.4.2';
+const VERSION = '0.5.0';
 const MIN_SDK = 26;
 const TARGET_SDK = 34;
 /** Grows with every build (minutes since 2026-01-01), so `adb install -r` always takes the new one. */

@@ -10,5 +10,7 @@ public final class Wake extends BroadcastReceiver {
     public void onReceive(Context ctx, Intent intent) {
         Schedule.ensure(ctx);
         DayWidget.updateAll(ctx);
+        // Alarms don't survive a restart: the reminders' alarms again, from the saved list (0.5.0).
+        Reminders.rearm(ctx);
     }
 }

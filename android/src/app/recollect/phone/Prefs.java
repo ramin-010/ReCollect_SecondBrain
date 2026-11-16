@@ -154,6 +154,33 @@ final class Prefs {
         sp.edit().putBoolean("notify", on).apply();
     }
 
+    /** Reminders ring on this phone (0.5.0): on by default. */
+    boolean remindersOn() {
+        return sp.getBoolean("reminders", true);
+    }
+
+    void setRemindersOn(boolean on) {
+        sp.edit().putBoolean("reminders", on).apply();
+    }
+
+    /** The alarms set for reminders ([{ id, at, text }]), so they can be cancelled and set again after a reboot. */
+    String alarmsJson() {
+        return sp.getString("alarms", "[]");
+    }
+
+    void saveAlarms(String json) {
+        sp.edit().putString("alarms", json).apply();
+    }
+
+    /** The ids last told to the server as held by this phone (sorted, joined): only a change is sent again. */
+    String alarmsAcked() {
+        return sp.getString("alarms_acked", "");
+    }
+
+    void setAlarmsAcked(String ids) {
+        sp.edit().putString("alarms_acked", ids).apply();
+    }
+
     /** Android 13+: the app asked for notifications once already. */
     boolean askedNotify() {
         return sp.getBoolean("asked_notify", false);

@@ -111,6 +111,15 @@ final class Api {
         }
     }
 
+    /** POST /api/ambient/reminders/scheduled: the reminders this phone will ring for (no email goes for them). */
+    void remindersScheduled(java.util.List<String> ids) throws Failure {
+        try {
+            post("/api/ambient/reminders/scheduled", new JSONObject().put("ids", new org.json.JSONArray(ids)));
+        } catch (JSONException e) {
+            throw new Failure(Failure.BAD_DATA, 0, e);
+        }
+    }
+
     /** POST /api/buddy/tell: his words, a private note for tonight. False when the buddy is paused. */
     boolean tell(String text) throws Failure {
         try {

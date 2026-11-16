@@ -587,6 +587,19 @@
                     android:id="@+id/notify_note"
                     style="@style/Text.RowNote"
                     android:text="@string/notify_note" />
+
+                <View style="@style/Row.Rule" />
+
+                <!-- 0.5.0: reminders ring on this phone. -->
+                <Switch
+                    android:id="@+id/sw_reminders"
+                    style="@style/Row.Switch"
+                    android:saveEnabled="false"
+                    android:text="@string/reminders_ring" />
+
+                <TextView
+                    style="@style/Text.RowNote"
+                    android:text="@string/reminders_ring_note" />
             </LinearLayout>
 
             <!-- The look: theme, and the night. -->

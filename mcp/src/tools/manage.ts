@@ -265,7 +265,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Set a reminder',
             description:
-                'Remind him at a time (an email then): on a task (taskId from list_tasks), or with a title, which makes that task. at = "HH:mm" (next such time), "YYYY-MM-DDTHH:mm" (his zone) or ISO.',
+                'Remind him at a time (his phone rings then): on a task (taskId from list_tasks), or with a title, which makes that task. at = "HH:mm" (next such time), "YYYY-MM-DDTHH:mm" (his zone) or ISO.',
             input: {
                 at: z.string().trim().min(4).max(40),
                 taskId: zId('task').optional(),

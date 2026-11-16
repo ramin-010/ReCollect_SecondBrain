@@ -97,6 +97,11 @@
             </intent-filter>
         </service>
 
+        <!-- 0.5.0: a reminder's alarm (set by the app itself; nothing outside may send it). -->
+        <receiver
+            android:name=".ReminderAlarm"
+            android:exported="false" />
+
         <receiver
             android:name=".Wake"
             android:exported="false">

@@ -69,7 +69,7 @@ public final class MainActivity extends Activity {
     private CheckBox keepCopy;
     private Button confirmGo, refresh;
     private ImageView preview;
-    private Switch swLock, swHome, swQuiet, swTitles, swNotify;
+    private Switch swLock, swHome, swQuiet, swTitles, swNotify, swReminders;
     private View buddy, lineRow, noteRow, latelyTitle;
     private TextView buddyTitle, buddyLine, buddyEmpty, buddyNote;
     private ImageButton lineMore, lineLess, noteMore, noteLess;
@@ -157,6 +157,7 @@ public final class MainActivity extends Activity {
         connServer = findViewById(R.id.conn_server);
         connAccount = findViewById(R.id.conn_account);
         swNotify = findViewById(R.id.sw_notify);
+        swReminders = findViewById(R.id.sw_reminders);
         buddy = findViewById(R.id.buddy);
         buddyTitle = findViewById(R.id.buddy_title);
         lineRow = findViewById(R.id.line_row);
@@ -399,6 +400,14 @@ public final class MainActivity extends Activity {
         toggle(swNotify, prefs.notesOn(), on -> {
             prefs.setNotesOn(on);
             if (on && !mayNotify()) askNotify();
+        });
+        // 0.5.0: reminders ring on this phone; off cancels every alarm (the email then covers them).
+        toggle(swReminders, prefs.remindersOn(), on -> {
+            prefs.setRemindersOn(on);
+            if (on) {
+                if (!mayNotify()) askNotify();
+                refreshNow(false);
+            } else Reminders.cancelAll(this);
         });
         if (prefs.notesOn() && !mayNotify() && !prefs.askedNotify()) {
             prefs.setAskedNotify();
@@ -978,6 +987,8 @@ public final class MainActivity extends Activity {
 
     /** Not connected any more (Disconnect, or the server ended the code): stop and forget the server. */
     static void forget(Context ctx) {
+        // 0.5.0: no alarms ring for an account this phone no longer reads.
+        Reminders.cancelAll(ctx);
         Prefs.of(ctx).disconnect();
         // The last picture belonged to that connection (another account may connect next).
         Wallpapers.preview(ctx).delete();

@@ -38,6 +38,23 @@ final class Refresher {
         return night == Configuration.UI_MODE_NIGHT_YES ? Prefs.THEME_DARK : Prefs.THEME_LIGHT;
     }
 
+    /** Sets the reminders' alarms from the day's JSON and tells the server when the set it holds changed (a failure waits for the next refresh). */
+    private static void reminders(Context ctx, Prefs p, Api api, JSONObject data) {
+        if (!p.remindersOn()) {
+            Reminders.cancelAll(ctx);
+            return;
+        }
+        java.util.List<String> held = Reminders.schedule(ctx, Reminders.parse(data.optJSONArray("alarms")));
+        String key = android.text.TextUtils.join(",", held);
+        if (held.isEmpty() || key.equals(p.alarmsAcked())) return;
+        try {
+            api.remindersScheduled(held);
+            p.setAlarmsAcked(key);
+        } catch (Api.Failure ignored) {
+            // told at the next refresh; meanwhile the server may still email one of them
+        }
+    }
+
     /** `force`: Refresh now and his own changes (they set the picture even in quiet hours, and fetch it again). */
     static synchronized Outcome run(Context ctx, boolean force) {
         Prefs p = Prefs.of(ctx);
@@ -54,6 +71,8 @@ final class Refresher {
             Ambient a = Ambient.parse(data);
             // A new note from the buddy: one notification (quiet hours and the day's limit allowing).
             if (!MainActivity.inFront) Notes.maybeNotify(ctx, a);
+            // 0.5.0: the reminders to come ring on this phone; the server is told which, so no email goes for them.
+            reminders(ctx, p, api, data);
             boolean anywhere = p.home() || p.lock();
             // The QA app (build.mjs --qa) fetches the home picture for its preview even with both screens
             // off, and sets nothing: a test of the pictures never touches his wallpapers.

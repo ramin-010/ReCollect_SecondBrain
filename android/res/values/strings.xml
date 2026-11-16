@@ -107,6 +107,12 @@
     <string name="lately">Lately</string>
     <string name="notify_section">Notes from your buddy</string>
     <string name="notify">Tell me when it leaves a note</string>
+    <string name="reminders_ring">Ring for my reminders</string>
+    <string name="reminders_ring_note">Your reminders ring here at their time, quiet hours or not. The email only goes for one set less than half an hour ahead that this phone hasn\'t got yet.</string>
+    <string name="reminder_title">Reminder</string>
+    <string name="reminder_plain">You have a reminder.</string>
+    <string name="reminder_channel">Reminders</string>
+    <string name="reminder_channel_description">Your reminders from Recollect, at their time, with sound.</string>
     <string name="notify_note">At most two a day, never in quiet hours. A note that touches something private shows only as \"a new note\" on the lock screen.</string>
     <string name="notify_denied">Notifications are off for this app. Turn them on in App info.</string>
     <string name="note_private">Your buddy left you a note. Open the app to read it.</string>
