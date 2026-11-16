@@ -107,6 +107,8 @@ export const TOOL_NAMES = [
     // The buddy's memory (BUDDY_MEMORY_PLAN): remember is listed with the record; look up and forget on more_tools.
     'remember',
     'recall_memory',
+    // The work log (BUDDY_MEMORY_PLAN §11.2, B9): what he did, per project and day.
+    'get_work_log',
     'forget',
 ] as const;
 
@@ -190,6 +192,7 @@ export const TOOL_LEVELS: Readonly<Record<ToolName, 1 | 2 | 3>> = {
     remember: 2,
     recall_memory: 1,
     forget: 2,
+    get_work_log: 1,
 };
 
 export const TOOL_GROUP_NAMES = ['core', 'docs', 'plan', 'record', 'manage'] as const;
@@ -272,6 +275,8 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     remember: 'record',
     recall_memory: 'manage',
     forget: 'manage',
+    // B9 (2026-11-16): the default groups are at their 40,000 characters; the manager has every group.
+    get_work_log: 'manage',
 };
 
 /** RECOLLECT_TOOLS: "all", or groups separated by commas ("core,docs,manage"); else the default. */
@@ -293,12 +298,14 @@ export interface ServerOptions {
     groups?: readonly ToolGroup[];
     /** A work folder: the brief and the buddy's memory stay personal (BUDDY_MEMORY_PLAN §4.3). */
     workMode?: boolean;
+    /** The work folder's project key (get_work_log answers for it alone). */
+    workProject?: string;
 }
 
 export function createRecollectServer(options: ServerOptions): McpServer {
     const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: INSTRUCTIONS });
     const registry = new Map<string, RegisteredTool>();
-    const ctx: ToolContext = { api: options.api, problem: options.problem ?? null, registry, ...(options.workMode ? { workMode: true } : {}) };
+    const ctx: ToolContext = { api: options.api, problem: options.problem ?? null, registry, ...(options.workMode ? { workMode: true } : {}), ...(options.workProject ? { workProject: options.workProject } : {}) };
     registerRecordTools(server, ctx);
     registerWeekTools(server, ctx);
     registerMirrorTools(server, ctx);

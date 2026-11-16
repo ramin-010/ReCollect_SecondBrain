@@ -335,6 +335,9 @@ export async function flushWords(api: RecollectApi, dir: string, sessionId: stri
     try {
         const session = readJson<OpenSession>(path.join(dir, `${sessionId}.json`));
         const state = readJson<FlushState>(flushFile(dir, sessionId)) ?? { sent: 0, seq: 0 };
+        // A work folder (brief: false): its words are office work (B9: the work log keeps them apart).
+        const config = session ? loadHookConfig(env) : null;
+        const office = !!session && !!config && folderRule(session.cwd, config.allow)?.brief === false;
         const lines = readWords(dir, sessionId);
         let { sent, seq } = state;
         while (sent < lines.length) {
@@ -347,7 +350,7 @@ export async function flushWords(api: RecollectApi, dir: string, sessionId: stri
             }
             const messages = unsentMessages(lines.slice(0, end), sent);
             if (messages.length) {
-                await api.post('/api/buddy/words', { sessionKey: session?.key ?? `cc_${sessionId}`, seq: seq + 1, project: session?.project ?? null, messages });
+                await api.post('/api/buddy/words', { sessionKey: session?.key ?? `cc_${sessionId}`, seq: seq + 1, project: session?.project ?? null, ...(office ? { office: true } : {}), messages });
                 seq++;
             }
             sent = end;

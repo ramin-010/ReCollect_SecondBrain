@@ -9,7 +9,7 @@ afterEach(async () => {
     h = undefined;
 });
 
-const READS = ['get_brief', 'list_sessions', 'get_week', 'get_mirror', 'list_tasks', 'list_decisions', 'get_today', 'get_learning_overview', 'search_docs', 'read_doc', 'preview_diagram', 'list_subjects', 'get_path', 'list_due', 'list_goals', 'recent_agent_edits', 'more_tools', 'get_settings', 'list_suggestions', 'list_reminders', 'get_recall', 'get_sharing', 'get_outline', 'recall_memory'];
+const READS = ['get_brief', 'list_sessions', 'get_week', 'get_mirror', 'list_tasks', 'list_decisions', 'get_today', 'get_learning_overview', 'search_docs', 'read_doc', 'preview_diagram', 'list_subjects', 'get_path', 'list_due', 'list_goals', 'recent_agent_edits', 'more_tools', 'get_settings', 'list_suggestions', 'list_reminders', 'get_recall', 'get_sharing', 'get_outline', 'recall_memory', 'get_work_log'];
 
 describe('the server', () => {
     it('lists every tool in TOOL_NAMES (catalogue.test.ts pins the count to the README), each with a title, a description and an object input schema', async () => {
@@ -45,7 +45,7 @@ describe('the server', () => {
         expect(await listed()).toEqual(TOOL_NAMES.filter((n) => DEFAULT_GROUPS.includes(TOOL_GROUPS[n])));
         const changed = new Promise<void>((resolve) => h!.client.setNotificationHandler(ToolListChangedNotificationSchema, () => resolve()));
         const res = await h.call('more_tools', {});
-        expect(res.text).toBe('Turned on: update_goal, add_milestone, complete_milestone, update_milestone, remove_milestone, update_focus, remove_focus, trash_doc, restore_doc, empty_trash, complete_revision, move_revision, get_settings, update_settings, update_project, list_suggestions, set_reminder, list_reminders, cancel_reminder, get_recall, get_sharing, publish_doc, share_doc, spread_backlog, move_blocks, recall_memory, forget. They are in your tool list now.');
+        expect(res.text).toBe('Turned on: update_goal, add_milestone, complete_milestone, update_milestone, remove_milestone, update_focus, remove_focus, trash_doc, restore_doc, empty_trash, complete_revision, move_revision, get_settings, update_settings, update_project, list_suggestions, set_reminder, list_reminders, cancel_reminder, get_recall, get_sharing, publish_doc, share_doc, spread_backlog, move_blocks, recall_memory, get_work_log, forget. They are in your tool list now.');
         await changed;
         expect(await listed()).toEqual([...TOOL_NAMES]);
     });

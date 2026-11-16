@@ -43,6 +43,25 @@ final class Wallpapers {
         return new int[] {Math.min(m.widthPixels, m.heightPixels), Math.max(m.widthPixels, m.heightPixels)};
     }
 
+    /**
+     * How much larger the home screen shows its wallpaper at rest (0.3.1, B8): Android 11 and newer
+     * draw it at the system's config_wallpaperMaxScale (1.1 on stock Android and on his realme) and
+     * zoom out to 1 only while the shade is pulled. The server draws the home picture's words for it,
+     * so they land at their designed size and place. 1 where the phone doesn't say (or before 11).
+     */
+    static float homeZoom() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return 1f;
+        try {
+            android.content.res.Resources sys = android.content.res.Resources.getSystem();
+            int id = sys.getIdentifier("config_wallpaperMaxScale", "dimen", "android");
+            if (id == 0) return 1f;
+            float z = sys.getFloat(id);
+            return z >= 1f && z <= 1.25f ? z : 1f;
+        } catch (RuntimeException e) {
+            return 1f;
+        }
+    }
+
     static void set(Context ctx, Bitmap picture, boolean home, boolean lock) throws IOException {
         int which = (home ? WallpaperManager.FLAG_SYSTEM : 0) | (lock ? WallpaperManager.FLAG_LOCK : 0);
         if (which == 0) return;
@@ -178,10 +197,28 @@ final class Wallpapers {
     }
 
     static void savePreview(Context ctx, byte[] png) {
+        savePreview(ctx, png, 1f);
+    }
+
+    /**
+     * The preview, as the screen shows the picture: a home picture drawn for the phone's zoom is
+     * cropped to its middle 1/zoom (what the home screen shows), so the preview is what he gets.
+     */
+    static void savePreview(Context ctx, byte[] png, float zoom) {
         File tmp = new File(ctx.getFilesDir(), "preview.png.tmp");
         try (OutputStream out = new FileOutputStream(tmp)) {
-            out.write(png);
-        } catch (IOException e) {
+            Bitmap whole = zoom > 1.001f ? android.graphics.BitmapFactory.decodeByteArray(png, 0, png.length) : null;
+            if (whole == null) {
+                out.write(png);
+            } else {
+                int w = Math.round(whole.getWidth() / zoom);
+                int h = Math.round(whole.getHeight() / zoom);
+                Bitmap seen = Bitmap.createBitmap(whole, (whole.getWidth() - w) / 2, (whole.getHeight() - h) / 2, w, h);
+                seen.compress(Bitmap.CompressFormat.PNG, 100, out);
+                if (seen != whole) seen.recycle();
+                whole.recycle();
+            }
+        } catch (IOException | RuntimeException e) {
             tmp.delete();
             return;
         }

@@ -63,8 +63,14 @@ final class Api {
 
     /** The picture in a style and colour (the server's list; null: the sky). */
     byte[] wallpaper(int width, int height, String theme, boolean titles, String screen, String style, String color) throws Failure {
+        return wallpaper(width, height, theme, titles, screen, style, color, 1f);
+    }
+
+    /** `zoom` (0.3.1): how much larger the screen shows the picture at rest; the server draws the words for it. */
+    byte[] wallpaper(int width, int height, String theme, boolean titles, String screen, String style, String color, float zoom) throws Failure {
         String q = "?w=" + width + "&h=" + height + "&theme=" + theme + (titles ? "" : "&titles=0") + "&screen=" + screen
-                + (style == null ? "" : "&style=" + style) + (color == null ? "" : "&color=" + color);
+                + (style == null ? "" : "&style=" + style) + (color == null ? "" : "&color=" + color)
+                + (zoom > 1.001f ? "&zoom=" + String.format(java.util.Locale.ROOT, "%.3f", zoom) : "");
         return call("GET", "/api/ambient/wallpaper.png" + q, "image/png");
     }
 

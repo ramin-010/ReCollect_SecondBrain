@@ -97,6 +97,7 @@ describe('the flow with words', () => {
         const posts = calls.filter((c) => c.url.includes('/api/buddy/words'));
         expect(posts).toHaveLength(1);
         expect(posts[0]!.body).toMatchObject({ sessionKey: 'cc_s1', seq: 1, project: 'second_brain' });
+        expect(posts[0]!.body).not.toHaveProperty('office'); // his own folder: not office work
         expect(posts[0]!.body.messages).toEqual([
             { at: t(1).toISOString(), text: 'I want to try a mock interview this week, it scares me a bit', reply: 'Good idea. Let us pick a day and a format that fits your week.' },
             { at: t(33).toISOString(), text: 'also I study best after 9 pm, never before work', reply: 'Noted.' },
@@ -146,7 +147,7 @@ describe('the flow with words', () => {
         expect(await runHook('prompt', work({ prompt: 'I am tired of this sprint, honestly I want out of this job' }), env, t(1))).toBe('');
         await runHook('end', work(), env, t(5));
         const posts = calls.filter((c) => c.url.includes('/api/buddy/words'));
-        expect(posts[0]!.body).toMatchObject({ sessionKey: 'cc_w1', project: 'acme-api' });
+        expect(posts[0]!.body).toMatchObject({ sessionKey: 'cc_w1', project: 'acme-api', office: true }); // B9: office work
     });
 
     it('a light folder (a plain string) never reads words', async () => {

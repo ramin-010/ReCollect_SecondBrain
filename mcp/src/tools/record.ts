@@ -57,6 +57,8 @@ export interface Brief {
         noteId?: string | null;
         noteDay?: string | null;
     };
+    /** The work log (B9): his own chats get yesterday's lines; a work folder's chat, its project's last days. */
+    work?: { days: Array<{ day: string; projects: Array<{ project: string; minutes: number; lines: string[] }> }> } | null;
     session: { key: string };
 }
 
@@ -149,6 +151,14 @@ export function briefText(b: Brief): string {
         lines.push(`Project ${b.project.name}${b.project.nextStep ? ` · next: ${b.project.nextStep}` : ''}${last}`);
     }
     for (const d of b.decisions?.project ?? []) lines.push(`Decided ${d.day}: ${quote(d.title, 70)} because ${quote(d.why, 90)}`);
+    // The work log (B9): what he did, in his words for a standup.
+    if (b.work?.days.length) {
+        const one = b.work.days.length === 1 && b.work.days[0]!.day !== b.now.day;
+        lines.push(one ? 'His work yesterday:' : 'His work here lately:');
+        for (const d of b.work.days) {
+            for (const p of d.projects) lines.push(`- ${one ? '' : `${d.day} · `}${p.project}${p.minutes ? ` (${p.minutes} min)` : ''}: ${p.lines.map((l) => quote(l, 120)).join('; ')}`);
+        }
+    }
     lines.push(`Session key: ${b.session.key} (pass it to checkpoint)`);
     return lines.join('\n');
 }

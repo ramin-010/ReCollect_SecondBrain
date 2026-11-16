@@ -25,6 +25,25 @@ export type NoteOutcome = { status: 'saved' | 'seen' | 'wrong'; memory: Memory }
 
 const zKind = z.enum(MEMORY_KINDS);
 
+export interface WorkDay {
+    day: string;
+    projects: Array<{ project: string; office: boolean; minutes: number; sessions: number; commits: string[]; lines: Array<{ _id: string; kind: string; text: string }> }>;
+}
+
+const mins = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`);
+
+/** One day of the work log as text: "Sun 15 Nov" then each project with its time, lines and commits. */
+export function workDayText(d: WorkDay): string {
+    const day = new Date(`${d.day}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+    const parts = d.projects.map((p) => {
+        const head = `${p.project}${p.minutes ? ` · ${mins(p.minutes)}` : ''}${p.sessions > 1 ? ` in ${p.sessions} sessions` : ''}`;
+        const lines = p.lines.map((l) => `  - ${l.kind === 'did' ? '' : `${l.kind}: `}${l.text}`);
+        const commits = p.commits.length ? [`  commits: ${p.commits.slice(0, 5).join('; ')}`] : [];
+        return [head, ...lines, ...commits].join('\n');
+    });
+    return `${day}\n${parts.join('\n')}`;
+}
+
 /** One note about Ramin, as remember takes it. */
 export const zNoteFields = {
     text: z.string().trim().min(1).max(300).describe('One thing, e.g. "Studies best after 9 pm".'),
@@ -88,6 +107,32 @@ export function registerBuddyTools(server: McpServer, ctx: ToolContext): void {
             const months = query && !kind ? await api.get<Array<{ period: string; text: string }>>('/api/buddy/chapters', { q: query }).catch(() => []) : [];
             const lines = [...list.map(memoryLine), ...months.map((m) => `Month ${m.period}: ${m.text}`)];
             return lines.length ? lines.join('\n') : query ? `Nothing about "${query}" yet.` : 'Nothing yet.';
+        }
+    );
+
+    defineTool(
+        server,
+        ctx,
+        'get_work_log',
+        {
+            title: 'His work log',
+            description:
+                'What Ramin did, per project and day (from his chats with agents and his sessions): the lines, the time, the commits. Use it for "what did I do on <project> yesterday?" or before a standup. Search words with query; days with from and to (YYYY-MM-DD; the last 7 by default).',
+            input: {
+                project: z.string().trim().max(100).optional().describe('The project (folder name); all of them if left out.'),
+                query: z.string().trim().max(200).optional(),
+                from: z.string().trim().max(10).optional(),
+                to: z.string().trim().max(10).optional(),
+            },
+            annotations: READ_ONLY,
+        },
+        async ({ project, query, from, to }) => {
+            // A work folder asks about its own project only (his other work and his life stay out).
+            const params = ctx.workMode ? { project: ctx.workProject ?? project, work: '1', q: query, from, to } : { project, q: query, from, to };
+            if (ctx.workMode && !params.project) return 'Name the project: in a work folder the log answers for that project only.';
+            const days = await api.get<WorkDay[]>('/api/buddy/work', params);
+            if (!days.length) return query ? `Nothing about "${query}" in his work log.` : 'Nothing in his work log for those days (it may be off: About you › How your buddy learns).';
+            return days.map(workDayText).join('\n');
         }
     );
 

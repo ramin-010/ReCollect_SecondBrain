@@ -69,6 +69,34 @@ describe('recall_memory and forget (manage)', () => {
         expect(refused.text).toMatch(/only he can change it/);
     });
 
+    it('get_work_log (B9): the days as text; in a work folder only that project, whatever is asked', async () => {
+        const day = {
+            day: '2026-11-15',
+            projects: [
+                { project: 'erp', office: true, minutes: 95, sessions: 2, commits: ['Fix GST rounding'], lines: [{ _id: 'w1', kind: 'did', text: 'Fixed the GST rounding' }, { _id: 'w2', kind: 'next', text: 'Add the credit note export' }] },
+            ],
+        };
+        h = await connect({ 'GET /api/buddy/work': [ok([day]), ok([])] }, { groups: TOOL_GROUP_NAMES });
+        const res = await h.call('get_work_log', { project: 'erp', from: '2026-11-15', to: '2026-11-15' });
+        expect(h.requests[0]!.query).toEqual({ project: 'erp', from: '2026-11-15', to: '2026-11-15' });
+        expect(res.text).toBe('Sun 15 Nov\nerp · 1 h 35 min in 2 sessions\n  - Fixed the GST rounding\n  - next: Add the credit note export\n  commits: Fix GST rounding');
+        expect((await h.call('get_work_log', { query: 'rounding' })).text).toBe('Nothing about "rounding" in his work log.');
+        await h.close();
+
+        h = await connect({ 'GET /api/buddy/work': [ok([])] }, { groups: TOOL_GROUP_NAMES, workMode: true, workProject: 'erp' });
+        await h.call('get_work_log', { project: 'second_brain' });
+        expect(h.requests[0]!.query).toEqual({ project: 'erp', work: '1' });
+    });
+
+    it("the brief prints the work log: yesterday in his own chats, the project's days in a work folder", () => {
+        const base = { now: { day: '2026-11-16', weekday: 'Mon', time: '09:00', timezone: 'Asia/Kolkata' }, profile: null, goals: [], today: { revisions: { planned: 0, estMinutes: 0, done: 0, waiting: 0 }, focus: [] }, next: [], recent: [], recall: { days: 7, finished: 0, weakTopics: [] }, project: null, session: { key: 'k' } } as unknown as Brief;
+        const yesterday = briefText({ ...base, work: { days: [{ day: '2026-11-15', projects: [{ project: 'erp', minutes: 95, lines: ['Fixed the GST rounding'] }] }] } });
+        expect(yesterday).toContain('His work yesterday:\n- erp (95 min): "Fixed the GST rounding"');
+        const lately = briefText({ ...base, work: { days: [{ day: '2026-11-15', projects: [{ project: 'erp', minutes: 0, lines: ['Fixed it'] }] }, { day: '2026-11-13', projects: [{ project: 'erp', minutes: 30, lines: ['Kept the old export'] }] }] } });
+        expect(lately).toContain('His work here lately:\n- 2026-11-15 · erp: "Fixed it"\n- 2026-11-13 · erp (30 min): "Kept the old export"');
+        expect(briefText(base)).not.toContain('His work');
+    });
+
     it('remember is listed by default; recall_memory and forget only on more_tools', async () => {
         h = await connect({});
         const names = (await h.client.listTools()).tools.map((t) => t.name);

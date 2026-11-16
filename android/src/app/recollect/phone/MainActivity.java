@@ -361,9 +361,14 @@ public final class MainActivity extends Activity {
         only(paneSettings);
         Ambient a = prefs.ambient();
         dayDate.setText(a == null ? "" : a.date);
-        dayHeadline.setText(a == null ? getString(R.string.status_never) : (a.headline.isEmpty() && a.done() ? getString(R.string.done_today) : a.headline));
-        // The day in numbers (0.3.0: no list, his verdict 11-16); an older server, its quieter lines.
-        String lines = a == null ? "" : a.numbers != null ? a.numbers : String.join("\n", a.lines);
+        // One headline, what is left and how long ("9 left today · about 56 min"), and under it what by
+        // kind ("7 reviews · 2 tasks"; 0.3.1: the card said the same thing twice). An older server: its
+        // headline and quieter lines.
+        String headline = a == null ? getString(R.string.status_never)
+                : a.numbers != null ? a.numbers
+                : (a.headline.isEmpty() && a.done() ? getString(R.string.done_today) : a.headline);
+        dayHeadline.setText(headline);
+        String lines = a == null ? "" : a.numbers != null ? (a.breakdown == null ? "" : a.breakdown) : String.join("\n", a.lines);
         dayLines.setText(lines);
         dayLines.setVisibility(lines.isEmpty() ? View.GONE : View.VISIBLE);
         long at = prefs.okAt();

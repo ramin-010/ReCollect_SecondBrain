@@ -26,6 +26,8 @@ final class Ambient {
     final String serverKey;
     /** The day in numbers ("3 left today · about 21 min"), or null from an older server. */
     final String numbers;
+    /** What is left by kind ("7 reviews · 2 tasks"; 0.3.1), or null (a free or done day, or an older server). */
+    final String breakdown;
     /** The buddy's line for now, only one its lock check passed (the widget's main words), or null. */
     final Line line;
     /** The buddy's part of the app's screen (0.3.0), or null while it is off. */
@@ -90,7 +92,7 @@ final class Ambient {
         }
     }
 
-    private Ambient(String state, String date, String headline, List<String> lines, String appUrl, String accountName, String accountEmail, String serverKey, String numbers, Line line, Buddy buddy) {
+    private Ambient(String state, String date, String headline, List<String> lines, String appUrl, String accountName, String accountEmail, String serverKey, String numbers, String breakdown, Line line, Buddy buddy) {
         this.state = state;
         this.date = date;
         this.headline = headline;
@@ -100,6 +102,7 @@ final class Ambient {
         this.accountEmail = accountEmail;
         this.serverKey = serverKey;
         this.numbers = numbers;
+        this.breakdown = breakdown;
         this.line = line;
         this.buddy = buddy;
     }
@@ -130,6 +133,7 @@ final class Ambient {
                 account == null ? null : account.optString("email", null),
                 str(d, "key"),
                 str(d, "numbers"),
+                str(d, "breakdown"),
                 line,
                 parseBuddy(d.optJSONObject("buddy")));
     }

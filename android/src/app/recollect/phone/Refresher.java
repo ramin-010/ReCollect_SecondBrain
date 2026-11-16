@@ -55,19 +55,24 @@ final class Refresher {
             // A new note from the buddy: one notification (quiet hours and the day's limit allowing).
             if (!MainActivity.inFront) Notes.maybeNotify(ctx, a);
             boolean anywhere = p.home() || p.lock();
-            if (anywhere && (force || !p.inQuietHours(Calendar.getInstance()))) {
+            // The QA app (build.mjs --qa) fetches the home picture for its preview even with both screens
+            // off, and sets nothing: a test of the pictures never touches his wallpapers.
+            boolean previewOnly = BuildConfig.QA && !anywhere;
+            if ((anywhere || previewOnly) && (force || !p.inQuietHours(Calendar.getInstance()))) {
                 String theme = pictureTheme(ctx, p.theme());
                 int[] size = Wallpapers.screenSize(ctx);
-                String key = a.pictureKey() + "|" + theme + "|" + size[0] + "x" + size[1] + "|" + titles + "|" + p.home() + "|" + p.lock() + "|" + p.style() + "|" + p.color();
+                // The home screen shows its wallpaper zoomed (Android 11+); the lock screen doesn't (checked on his phone 11-16).
+                float zoom = Wallpapers.homeZoom();
+                String key = a.pictureKey() + "|" + theme + "|" + size[0] + "x" + size[1] + "|" + titles + "|" + p.home() + "|" + p.lock() + "|" + p.style() + "|" + p.color() + "|" + zoom;
                 if (force || !key.equals(p.pictureKey())) {
-                    // Each screen its own picture: the lock screen the dial, the home screen the sky and its list.
+                    // Each screen its own picture: the lock screen the ring and the buddy's line, the home screen the day in numbers.
                     byte[] lockPng = p.lock() ? api.wallpaper(size[0], size[1], theme, titles, "lock", p.style(), p.color()) : null;
-                    byte[] homePng = p.home() ? api.wallpaper(size[0], size[1], theme, titles, "home", p.style(), p.color()) : null;
+                    byte[] homePng = p.home() || previewOnly ? api.wallpaper(size[0], size[1], theme, titles, "home", p.style(), p.color(), zoom) : null;
                     Bitmap lockPicture = lockPng == null ? null : BitmapFactory.decodeByteArray(lockPng, 0, lockPng.length);
                     Bitmap homePicture = homePng == null ? null : BitmapFactory.decodeByteArray(homePng, 0, homePng.length);
                     if ((lockPng != null && lockPicture == null) || (homePng != null && homePicture == null)) throw new Api.Failure(Api.Failure.BAD_DATA, 200, null);
-                    Wallpapers.beforeFirstPicture(ctx, p.keepCopy());
-                    if (homePicture != null) {
+                    if (!previewOnly) Wallpapers.beforeFirstPicture(ctx, p.keepCopy());
+                    if (homePicture != null && !previewOnly) {
                         Wallpapers.set(ctx, homePicture, true, false);
                         homePicture.recycle();
                     }
@@ -75,8 +80,11 @@ final class Refresher {
                         Wallpapers.set(ctx, lockPicture, false, true);
                         lockPicture.recycle();
                     }
-                    // The app's own preview shows the lock picture when it is on (he sees it most).
-                    Wallpapers.savePreview(ctx, lockPng != null ? lockPng : homePng);
+                    if (homePicture != null && previewOnly) homePicture.recycle();
+                    // The app's own preview shows the lock picture when it is on (he sees it most); a home
+                    // picture as the home screen shows it (its zoom).
+                    if (lockPng != null) Wallpapers.savePreview(ctx, lockPng);
+                    else Wallpapers.savePreview(ctx, homePng, zoom);
                     p.setPictureKey(key);
                 }
             }
