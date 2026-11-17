@@ -27,10 +27,10 @@ export const SERVER_NAME = 'recollect';
 export const SERVER_VERSION = '0.1.0';
 
 export const INSTRUCTIONS = [
-    "Recollect is Ramin's personal learning app and the record of his work: Docs (his notes, in Markdown), subjects with paths (topics in course order), spaced revision (reviews 1, 3, 7 and 21 days after a doc is scheduled), goals with dated milestones, a week of up to 5 targets, up to 3 focus lines a day, personal tasks, and work sessions.",
+    "Recollect is the user's personal learning app and the record of his work: Docs (his notes, in Markdown), subjects with paths (topics in course order), spaced revision (reviews 1, 3, 7 and 21 days after a doc is scheduled), goals with dated milestones, a week of up to 5 targets, up to 3 focus lines a day, personal tasks, and work sessions.",
     'Start a working chat with get_brief (where he stands, and a session key), then checkpoint as you go: after each part, not only at the end. Save quietly, without asking or mentioning it, what he would want later: something lasting about himself (remember, or checkpoint’s learned), a reminder or a dated to-do of his own (set_reminder, add_task), an idea or insight (add_pocket_note); most turns have nothing. When he asks to log the day’s work, use log_work. search_docs before writing a doc. Plan the week with get_week and add_week_target on his yes; when something is his call and he cannot say yes in the chat, suggest it instead.',
-    'Every write is logged with your agent name and Ramin can undo it from Home → From your agent. Docs, goals and subjects are never deleted; a focus line or a milestone can be removed (and Undo brings it back). Answers are compact text with the ids the next call needs.',
-    'Docs take GitHub Markdown plus callouts (> [!TIP]), <details> toggles for self-test questions, ```mermaid diagrams and ```canvas diagrams (Mermaid flowchart text that Recollect lays out as a board Ramin can edit; add_canvas draws one, update_canvas changes one in place, preview_diagram shows it): see create_doc.',
+    'Every write is logged with your agent name and the user can undo it from Home → From your agent. Docs, goals and subjects are never deleted; a focus line or a milestone can be removed (and Undo brings it back). Answers are compact text with the ids the next call needs.',
+    'Docs take GitHub Markdown plus callouts (> [!TIP]), <details> toggles for self-test questions, ```mermaid diagrams and ```canvas diagrams (Mermaid flowchart text that Recollect lays out as a board the user can edit; add_canvas draws one, update_canvas changes one in place, preview_diagram shows it): see create_doc.',
 ].join(' ');
 
 /**
@@ -38,7 +38,7 @@ export const INSTRUCTIONS = [
  * Recollect unless the agent saves it; it saves his own things quietly and never the company's.
  */
 export const OFFICE_INSTRUCTIONS = [
-    "Recollect is Ramin's own notebook, not this company's. This is a work folder: nothing from this chat reaches Recollect unless you save it.",
+    "Recollect is the user's own notebook, not this company's. This is a work folder: nothing from this chat reaches Recollect unless you save it.",
     'Save quietly what he would want later: something about himself (remember), a reminder or a dated to-do of his own (set_reminder, add_task), an idea or insight (add_pocket_note). Don’t ask first, and say nothing about it in your reply unless he asked for it. One thing a call; most turns have nothing. Never save company code, data, clients or colleagues’ names.',
     'When he asks to log the day’s work ("log today’s work", /log-work), use log_work. Call get_brief or get_work_log only when he asks what was done here before.',
 ].join(' ');
@@ -130,7 +130,7 @@ export type ToolName = (typeof TOOL_NAMES)[number];
 
 /**
  * Each tool's level (MANAGER_AND_DOCS_PLAN §3.2), the same for every caller: 1 reads; 2 changes at
- * once, logged with an Undo; 3 can't be undone or leaves the app, so the tool only asks and Ramin's
+ * once, logged with an Undo; 3 can't be undone or leaves the app, so the tool only asks and the user's
  * tap on Home does it (POST /api/actions). catalogue.test.ts checks each tool has one and that the
  * read-only ones are level 1.
  */
@@ -372,7 +372,7 @@ function registerMoreTools(server: McpServer, ctx: ToolContext, registry: Map<st
         'more_tools',
         {
             title: 'More tools',
-            description: "Turn on the manage tools: the trash, mark a review done or move it, settings, projects, goal edits, the mirror, decisions, agents' edits, his buddy's memory, what waits for Ramin's tap.",
+            description: "Turn on the manage tools: the trash, mark a review done or move it, settings, projects, goal edits, the mirror, decisions, agents' edits, his buddy's memory, what waits for the user's tap.",
             input: { group: z.enum(['manage']).optional() },
             annotations: READ_ONLY,
         },

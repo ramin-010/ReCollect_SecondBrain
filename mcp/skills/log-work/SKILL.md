@@ -1,11 +1,11 @@
 ---
 name: log-work
-description: Log the day's work from this chat into Ramin's work log in Recollect (its `log_work` tool), with the time each part took, so "what did I do on this project yesterday?" has an answer before his standup. Use when he says /log-work, "log today's work", "log the work we did", or accepts an offer to log the day.
+description: Log the day's work from this chat into the user's work log in Recollect (its `log_work` tool), with the time each part took, so "what did I do on this project yesterday?" has an answer before his standup. Use when he says /log-work, "log today's work", "log the work we did", or accepts an offer to log the day.
 ---
 
 # Log the day's work
 
-Ramin's work log keeps what he did per project and day. In work folders nothing is captured by itself: this is how the day gets there. He asks; you write it.
+The user's work log keeps what he did per project and day. In work folders nothing is captured by itself: this is how the day gets there. He asks; you write it.
 
 1. **Get the clock.** Call `log_work` with no lines. It answers today's turns in this folder (when he wrote, its first words, when your reply ended) and the stretches worked, from the hooks' clock on his PC. For another day he names (yesterday's work, the next morning), pass `day` (YYYY-MM-DD). With no clock (claude.ai, a folder without the hooks), skip the times.
 2. **Write 3–6 lines** from this chat (and today's commits in this repo if that helps: `git log --since=midnight --oneline`):

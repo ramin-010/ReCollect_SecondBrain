@@ -40,7 +40,7 @@ export function registerDayTools(server: McpServer, ctx: ToolContext, newId: () 
         {
             title: 'Change a focus line',
             description:
-                "Change one of today's focus lines (get_today shows them with their ids): new words, or tick it done / untick it. Use it to fix a line you added by mistake or to tick what Ramin finished.",
+                "Change one of today's focus lines (get_today shows them with their ids): new words, or tick it done / untick it. Use it to fix a line you added by mistake or to tick what the user finished.",
             input: {
                 focusId: z.string().trim().min(1).max(64).describe('The focus line id (get_today shows it).'),
                 text: z.string().trim().min(1, 'A focus line cannot be empty').max(FOCUS_TEXT_MAX).optional().describe('The new words.'),
@@ -65,7 +65,7 @@ export function registerDayTools(server: McpServer, ctx: ToolContext, newId: () 
         {
             title: 'Remove a focus line',
             description:
-                "Remove one of today's focus lines (get_today shows the ids), e.g. one you added by mistake or one Ramin dropped. Ramin can bring it back with Undo.",
+                "Remove one of today's focus lines (get_today shows the ids), e.g. one you added by mistake or one the user dropped. The user can bring it back with Undo.",
             input: { focusId: z.string().trim().min(1).max(64).describe('The focus line id (get_today shows it).') },
             annotations: CHANGES,
         },
@@ -82,7 +82,7 @@ export function registerDayTools(server: McpServer, ctx: ToolContext, newId: () 
         {
             title: 'Add a pocket note',
             description:
-                "Drop a quick note into Ramin's pocket (his private scratch notes on Home): a reminder, a link, an idea to come back to. " +
+                "Drop a quick note into the user's pocket (his private scratch notes on Home): a reminder, a link, an idea to come back to. " +
                 'Agents can add pocket notes but never read them.',
             input: {
                 text: z.string().trim().min(1, 'The note is empty').max(100_000).describe('The note (plain text or simple Markdown).'),

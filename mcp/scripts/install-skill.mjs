@@ -1,7 +1,7 @@
 // Installs Recollect's skills for Claude Code at the user level (every project, like the recollect
 // MCP server itself): each skills/<name>/SKILL.md goes to ~/.claude/skills/<name>/.
 //   recollect-notes   write notes with real diagrams
-//   recollect-study   study with Ramin: get_brief first, checkpoint as you go (SYNC_SPINE_SPEC 1.3)
+//   recollect-study   study with the user: get_brief first, checkpoint as you go (SYNC_SPINE_SPEC 1.3)
 //   log-work          log the day's work from a chat, with its times (BUDDY_MEMORY_PLAN §12, B10)
 //   npm run install:skill
 import { copyFileSync, mkdirSync } from 'node:fs';

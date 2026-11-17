@@ -74,6 +74,8 @@ public final class DayWallpaper extends WallpaperService {
                 // The system's picker shows the lock picture (what this wallpaper is for).
                 locked = isPreview() || keyguardLocked();
                 draw();
+                // 0.5.1: the wallpaper runs all day, so a refresh chain the system broke starts again here.
+                if (!isPreview()) Schedule.ensure(DayWallpaper.this.getApplicationContext());
             }
         }
 

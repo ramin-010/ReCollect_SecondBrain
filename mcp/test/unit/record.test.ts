@@ -59,7 +59,7 @@ describe('get_brief', () => {
     it('a full day fits in 2,400 characters and ends with the session key', () => {
         const text = briefText(fullBrief());
         expect(text.length).toBeLessThanOrEqual(2400);
-        expect(text).toContain('About Ramin: Backend engineer');
+        expect(text).toContain('About the user: Backend engineer');
         expect(text).toContain(
             '- System Design: ▶ 7. Message queues · next step: Do the outbox pattern exercise · 6 of 16 done · topic id t7\n  last: Fri 13 Nov · 35 min study · "Outbox pattern, part 1" · System Design · quiz 6/8 · weak spots: at-least-once vs exactly-once; outbox polling vs CDC'
         );

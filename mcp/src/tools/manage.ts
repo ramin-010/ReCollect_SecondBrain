@@ -1,5 +1,5 @@
 // The manager's tools (MANAGER_AND_DOCS_PLAN §3.3), the "manage" group: the trash, reviews marked
-// done or moved, a few settings, projects, what waits for Ramin. Level 2 tools act at once and are
+// done or moved, a few settings, projects, what waits for the user. Level 2 tools act at once and are
 // undoable; empty_trash is level 3: it only asks, and his tap on Home does it.
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -121,7 +121,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         'restore_doc',
         {
             title: 'Restore a doc',
-            description: 'Take a doc out of the trash (where trash_doc or Ramin put it), as it was.',
+            description: 'Take a doc out of the trash (where trash_doc or the user put it), as it was.',
             input: { docId: zDocId },
             annotations: CHANGES,
         },
@@ -242,7 +242,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         ctx,
         'list_suggestions',
         {
-            title: 'Waiting for Ramin',
+            title: 'Waiting for the user',
             description: "What waits under Suggested on his Home: proposals and actions that need his tap. Agents can't accept them.",
             input: {},
             annotations: READ_ONLY,

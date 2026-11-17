@@ -23,7 +23,7 @@ const EMAIL = process.env['RECOLLECT_SMOKE_EMAIL'] ?? 'dev@recollect.local';
 const PASSWORD = process.env['RECOLLECT_SMOKE_PASSWORD'] ?? 'devpass123';
 const SERVER = fileURLToPath(new URL('../../dist/index.js', import.meta.url));
 const AGENT = 'MCP smoke test';
-const UNDO = 'Undo: Ramin can undo this from Home → From your agent.';
+const UNDO = 'Undo: the user can undo this from Home → From your agent.';
 
 const TITLE = `MCP smoke test ${new Date().toISOString().slice(0, 19).replace('T', ' ')}`;
 const MARKDOWN = [

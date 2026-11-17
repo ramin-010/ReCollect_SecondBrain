@@ -15,7 +15,7 @@ export interface CatalogueTool {
     description: string;
     /** JSON Schema of the input (as tools/list gives it, without "$schema"). */
     inputSchema: Record<string, unknown>;
-    /** 1 reads, 2 changes with an Undo, 3 only asks for Ramin's tap. */
+    /** 1 reads, 2 changes with an Undo, 3 only asks for the user's tap. */
     level: 1 | 2 | 3;
 }
 

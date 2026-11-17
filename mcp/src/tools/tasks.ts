@@ -30,7 +30,7 @@ export function registerTaskTools(server: McpServer, ctx: ToolContext): void {
         'list_tasks',
         {
             title: 'Tasks',
-            description: "Ramin's personal tasks, soonest due first: due today (and overdue), this week, overdue, or all (all includes done ones).",
+            description: "The user's personal tasks, soonest due first: due today (and overdue), this week, overdue, or all (all includes done ones).",
             input: { due: z.enum(['today', 'week', 'overdue', 'all']).optional().describe('Default all.') },
             annotations: READ_ONLY,
         },
@@ -46,7 +46,7 @@ export function registerTaskTools(server: McpServer, ctx: ToolContext): void {
         'add_task',
         {
             title: 'Add a task',
-            description: 'Add a personal task for Ramin (when he asks, or agrees). A dated one shows on Home under Due today.',
+            description: 'Add a personal task for the user (when he asks, or agrees). A dated one shows on Home under Due today.',
             input: { title: z.string().trim().min(1).max(200), due: zDue.optional(), priority: z.enum(['low', 'normal', 'high', 'urgent']).optional() },
             annotations: ADDS,
         },

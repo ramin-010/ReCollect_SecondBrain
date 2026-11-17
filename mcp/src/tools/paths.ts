@@ -1,6 +1,6 @@
 // Paths (BUDDY_PLAN B1): a subject's topics in order (a course: "01 · How the web works" …
 // "16 · Machine coding"), each planned, in progress, done or skipped, and what comes next. Agents
-// plan the course, insert a topic where it is needed, and move a topic along as Ramin studies it.
+// plan the course, insert a topic where it is needed, and move a topic along as the user studies it.
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { ToolError, orNotFound } from '../errors.js';
@@ -62,7 +62,7 @@ export function registerPathTools(server: McpServer, ctx: ToolContext): void {
             title: "A subject's path",
             description:
                 "The topics of a subject in their order, like a course: ✓ done, ▶ in progress, ○ planned, – skipped, with each one's next step and doc, and the topic to do next. " +
-                'Read it before studying with Ramin, to pick up where he is.',
+                'Read it before studying with the user, to pick up where he is.',
             input: { subject: zSubjectName.describe('The subject name, e.g. "System Design".') },
             annotations: READ_ONLY,
         },
@@ -80,7 +80,7 @@ export function registerPathTools(server: McpServer, ctx: ToolContext): void {
             title: 'Plan topics on a path',
             description:
                 "Put topics on a subject's path as planned (not studied yet, no doc): a whole course at once, or one topic where it is needed (after: the topic it follows). " +
-                'Keep titles short, without numbers (the order gives them). Ramin can undo it.',
+                'Keep titles short, without numbers (the order gives them). The user can undo it.',
             input: {
                 subject: zSubjectName.describe('The subject name.'),
                 titles: z.array(z.string().trim().min(1).max(200)).min(1).max(50).describe('The topic titles, in order.'),
@@ -102,8 +102,8 @@ export function registerPathTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Move a topic along its path',
             description:
-                'Change one topic on its path: status (in_progress when Ramin starts it, done when learned, skipped, or back to planned), its next step (null clears it), ' +
-                'its place (after), or a planned topic’s title. Ramin can undo it.',
+                'Change one topic on its path: status (in_progress when the user starts it, done when learned, skipped, or back to planned), its next step (null clears it), ' +
+                'its place (after), or a planned topic’s title. The user can undo it.',
             input: {
                 topicId: zId('topic').describe('The topic id (get_path shows them).'),
                 status: z.enum(['planned', 'in_progress', 'done', 'skipped']).optional(),

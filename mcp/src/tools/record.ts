@@ -1,4 +1,4 @@
-// The record and the brief (SYNC_SPINE_SPEC 1.3): a chat starts with get_brief (where Ramin
+// The record and the brief (SYNC_SPINE_SPEC 1.3): a chat starts with get_brief (where the user
 // stands, one call), checkpoints as it goes (one session under one key, written again and again:
 // a closed tab loses nothing), and list_sessions answers "where did my week go".
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -102,7 +102,7 @@ function sessionLine(s: BriefSession): string {
 /** The brief as compact text (about 1,600 characters on a normal day). */
 export function briefText(b: Brief): string {
     const lines = [`Brief · ${b.now.weekday} ${b.now.day} ${b.now.time} (${b.now.timezone})`];
-    if (b.profile) lines.push(`About Ramin: ${b.profile}`);
+    if (b.profile) lines.push(`About the user: ${b.profile}`);
     const buddy = b.buddy;
     if (buddy?.who) lines.push(`Who he is: ${buddy.who}`);
     if (buddy?.heading) lines.push(`Where he is heading: ${buddy.heading}`);
@@ -171,7 +171,7 @@ export function registerRecordTools(server: McpServer, ctx: ToolContext): void {
         ctx,
         'get_brief',
         {
-            title: 'Brief: where Ramin stands',
+            title: 'Brief: where the user stands',
             description:
                 'Start every working chat here: his profile, goals and pace, today, each path’s next topic with its last session and weak spots, recent sessions, Recall’s weak topics, and a session key for checkpoint.',
             input: {
@@ -208,7 +208,7 @@ export function registerRecordTools(server: McpServer, ctx: ToolContext): void {
                 cleared: z.array(z.string().trim().min(1).max(160)).max(20).optional().describe('Weak spots he now gets right (their text or id).'),
                 topicStatus: z.enum(['planned', 'in_progress', 'done', 'skipped']).optional(),
                 nextStep: z.string().trim().max(300).optional().describe('What to do next on the topic (or the project).'),
-                learned: z.array(zNote).max(3).optional().describe('What you learned about Ramin himself (see remember).'),
+                learned: z.array(zNote).max(3).optional().describe('What you learned about the user (see remember).'),
             },
             annotations: CHANGES,
         },
@@ -224,7 +224,7 @@ export function registerRecordTools(server: McpServer, ctx: ToolContext): void {
             ];
             if (w.topic) lines.push(`Topic: ${w.topic.position}. ${w.topic.title} · ${w.topic.status.replace('_', ' ')}${w.topic.nextStep ? ` · next step: ${w.topic.nextStep}` : ''}`);
             if (w.weakSpots.length) lines.push(`Open weak spots: ${w.weakSpots.map((x) => x.text).join('; ')}`);
-            if (w.learned) lines.push(w.learned.paused ? 'Learned: not kept (Ramin has paused his buddy).' : `Learned: ${plural(w.learned.saved, 'new memory', 'new memories')}${w.learned.seen ? `, ${w.learned.seen} already known` : ''}${w.learned.skipped ? `, ${w.learned.skipped} not kept` : ''}.`);
+            if (w.learned) lines.push(w.learned.paused ? 'Learned: not kept (the user has paused his buddy).' : `Learned: ${plural(w.learned.saved, 'new memory', 'new memories')}${w.learned.seen ? `, ${w.learned.seen} already known` : ''}${w.learned.skipped ? `, ${w.learned.skipped} not kept` : ''}.`);
             const text = lines.join('\n');
             return w.topicEditId ? withUndo(text) : text;
         }
@@ -236,7 +236,7 @@ export function registerRecordTools(server: McpServer, ctx: ToolContext): void {
         'list_sessions',
         {
             title: 'Sessions',
-            description: 'What Ramin did, day by day: minutes per kind (study, practice, build, review) and each session. For "where did my week go" or before planning.',
+            description: 'What the user did, day by day: minutes per kind (study, practice, build, review) and each session. For "where did my week go" or before planning.',
             input: {
                 days: z.number().int().min(1).max(90).optional().describe('How many days back, today included (default 7).'),
                 kind: z.enum(['study', 'practice', 'build', 'review']).optional(),

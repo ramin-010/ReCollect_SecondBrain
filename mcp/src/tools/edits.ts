@@ -1,4 +1,4 @@
-// The agent edit log: what agents wrote, and whether Ramin kept or undid it.
+// The agent edit log: what agents wrote, and whether the user kept or undid it.
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { plural, timestamp } from '../format.js';
@@ -7,7 +7,7 @@ import type { AgentEdit } from '../types.js';
 import { userTimeZone } from '../timezone.js';
 
 function stateOf(edit: AgentEdit): string {
-    if (edit.undoneAt) return 'undone by Ramin';
+    if (edit.undoneAt) return 'undone by the user';
     if (edit.seenAt) return 'kept';
     return 'not reviewed yet';
 }
@@ -22,7 +22,7 @@ export function registerEditTools(server: McpServer, ctx: ToolContext, agentName
         {
             title: 'Recent agent edits',
             description:
-                'What agents (you included) recently wrote in Recollect, newest first: each edit with its doc id and whether Ramin kept it, undid it or has not reviewed it yet. ' +
+                'What agents (you included) recently wrote in Recollect, newest first: each edit with its doc id and whether the user kept it, undid it or has not reviewed it yet. ' +
                 'Check it to avoid repeating work, or after an error to see whether a write went through.',
             input: {
                 limit: z.number().int().min(1).max(100).optional().describe('How many edits, 1–100 (default 10).'),

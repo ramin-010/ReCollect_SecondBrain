@@ -1,7 +1,7 @@
 // Drift guards for the tool catalogue (SYNC_SPINE_SPEC 0.4):
 //   - the README names every tool and says how many there are;
 //   - the tool definitions every chat loads stay under a budget. When a new tool would break it,
-//     shorten descriptions; raise the number only with Ramin's say-so.
+//     shorten descriptions; raise the number only with the owner's say-so.
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_GROUPS, TOOL_GROUPS, TOOL_NAMES } from '../../src/server.js';

@@ -43,7 +43,7 @@ export function registerGoalTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'List goals',
             description:
-                "Ramin's goals, active first: deadline, days left, milestone progress, the forecast (on track / behind …) and, for active goals, the why, subjects and every milestone with its id.",
+                "The user's goals, active first: deadline, days left, milestone progress, the forecast (on track / behind …) and, for active goals, the why, subjects and every milestone with its id.",
             input: {},
             annotations: READ_ONLY,
         },
@@ -161,7 +161,7 @@ export function registerGoalTools(server: McpServer, ctx: ToolContext): void {
         'complete_milestone',
         {
             title: 'Complete a milestone',
-            description: "Mark a goal's milestone as done (when Ramin says he finished it).",
+            description: "Mark a goal's milestone as done (when the user says he finished it).",
             input: { milestoneId: zId('milestone').describe('Milestone id (from list_goals).') },
             annotations: CHANGES,
         },
@@ -212,7 +212,7 @@ export function registerGoalTools(server: McpServer, ctx: ToolContext): void {
         'remove_milestone',
         {
             title: 'Remove a milestone',
-            description: "Remove a goal's milestone (list_goals shows the ids), e.g. one added by mistake or one Ramin dropped. Ramin can bring it back with Undo.",
+            description: "Remove a goal's milestone (list_goals shows the ids), e.g. one added by mistake or one the user dropped. The user can bring it back with Undo.",
             input: { milestoneId: zId('milestone').describe('Milestone id (from list_goals).') },
             annotations: CHANGES,
         },

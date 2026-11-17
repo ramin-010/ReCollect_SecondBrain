@@ -19,7 +19,7 @@ describe('manage tools', () => {
             [`POST /api/agent/docs/${DOC}/trash`]: [ok({ id: DOC, title: 'Old draft', trashedAt: '2026-11-14T10:00:00Z', editId: 'e1' }), ok({ id: DOC, title: 'Old draft', trashedAt: '2026-11-14T10:00:00Z', editId: null })],
             [`POST /api/agent/docs/${DOC}/restore`]: ok({ id: DOC, title: 'Old draft', trashedAt: null, editId: 'e2' }),
         });
-        expect((await h.call('trash_doc', { docId: DOC })).text).toBe('Moved "Old draft" to the trash (30 days).\nUndo: Ramin can undo this from Home → From your agent.');
+        expect((await h.call('trash_doc', { docId: DOC })).text).toBe('Moved "Old draft" to the trash (30 days).\nUndo: the user can undo this from Home → From your agent.');
         expect((await h.call('trash_doc', { docId: DOC })).text).toBe('"Old draft" was already in the trash.');
         expect((await h.call('restore_doc', { docId: DOC })).text).toContain('Restored "Old draft".');
     });
@@ -79,7 +79,7 @@ describe('manage tools', () => {
             'GET /api/reminders': ok([{ _id: 'm1', taskId: 't1', task: 'Book the mock', at, when, status: 'pending' }]),
             'POST /api/reminders/m1/cancel': ok({ _id: 'm1', taskId: 't1', task: 'Book the mock', at, when, status: 'cancelled' }),
         });
-        expect((await h.call('set_reminder', { at: '19:00', taskId: 't1' })).text).toBe(`Reminder set: "Book the mock" at ${when} · id m1.\nUndo: Ramin can undo this from Home → From your agent.`);
+        expect((await h.call('set_reminder', { at: '19:00', taskId: 't1' })).text).toBe(`Reminder set: "Book the mock" at ${when} · id m1.\nUndo: the user can undo this from Home → From your agent.`);
         expect(h.requests.at(-1)).toMatchObject({ method: 'POST', path: '/api/reminders', body: { at: '19:00', taskId: 't1' } });
         expect((await h.call('set_reminder', { at: '19:00', title: 'Call the bank' })).text).toContain('(a new task)');
         const both = await h.call('set_reminder', { at: '19:00', taskId: 't1', title: 'x' });
@@ -117,7 +117,7 @@ describe('manage tools', () => {
                 ok({ moved: 0, spreadDays: 0, changes: [], asked: false, card: null }),
             ],
         });
-        expect((await h.call('spread_backlog', {})).text).toBe('Spread 6 overdue reviews over 3 days.\nUndo: Ramin can undo this from Home → From your agent.');
+        expect((await h.call('spread_backlog', {})).text).toBe('Spread 6 overdue reviews over 3 days.\nUndo: the user can undo this from Home → From your agent.');
         expect((await h.call('spread_backlog', { reason: 'he is back' })).text).toMatch(/^Asked: Spread 34 overdue reviews over the next 6 days, as your daily budget allows\. Waiting for his tap/);
         expect(h.requests.at(-1)).toMatchObject({ body: { reason: 'he is back' } });
         expect((await h.call('spread_backlog', {})).text).toBe('Nothing is overdue: nothing to spread.');

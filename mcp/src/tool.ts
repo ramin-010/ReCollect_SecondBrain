@@ -30,9 +30,9 @@ export interface ToolSpec<S extends z.ZodRawShape> {
 
 /** Reads only. */
 export const READ_ONLY: ToolAnnotations = { readOnlyHint: true, openWorldHint: false };
-/** Adds something (Ramin can undo it). */
+/** Adds something (the user can undo it). */
 export const ADDS: ToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
-/** Changes or replaces existing content (Ramin can undo it). */
+/** Changes or replaces existing content (the user can undo it). */
 export const CHANGES: ToolAnnotations = { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false };
 
 export const textResult = (text: string): CallToolResult => ({ content: [{ type: 'text', text }] });

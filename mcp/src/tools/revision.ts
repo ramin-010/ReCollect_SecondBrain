@@ -48,7 +48,7 @@ export function registerRevisionTools(server: McpServer, ctx: ToolContext): void
             description:
                 'Put a doc on the spaced-revision schedule: reviews 1, 3, 7 and 21 days from today, shown on Home when due. ' +
                 "A doc that isn't filed under a subject yet needs subject (a name); a doc already scheduled is left as it is. " +
-                'Only Ramin marks reviews as done.',
+                'Only the user marks reviews as done.',
             input: {
                 docId: zDocId,
                 subject: zSubjectName.optional().describe('Subject to file the doc under if it has none yet (case-insensitive name).'),
@@ -57,7 +57,7 @@ export function registerRevisionTools(server: McpServer, ctx: ToolContext): void
             annotations: ADDS,
         },
         async ({ docId, subject, create_subject_if_missing }) => {
-            const notFound = `No doc with id ${docId} that Ramin can open (search_docs finds docs).`;
+            const notFound = `No doc with id ${docId} that the user can open (search_docs finds docs).`;
             const status = await orNotFound(api.get<TopicByDoc>(`/api/topics/by-doc/${docId}`), notFound);
 
             if (!status.topic) {

@@ -2,7 +2,7 @@
 // them, dates as YYYY-MM-DD.
 import type { GoalForecast, Milestone, RevisionItem } from './types.js';
 
-export const UNDO_LINE = 'Undo: Ramin can undo this from Home → From your agent.';
+export const UNDO_LINE = 'Undo: the user can undo this from Home → From your agent.';
 
 /** Revision cycles of a topic (1, 3, 7 and 21 days). */
 export const REVISION_CYCLES = 4;
@@ -41,7 +41,7 @@ function partsIn(date: Date, timeZone: string): Record<string, string> {
     return Object.fromEntries(fmt.formatToParts(date).map((p) => [p.type, p.value]));
 }
 
-/** An ISO instant → its day in Ramin's time zone (`2026-11-14`); UTC without a zone. */
+/** An ISO instant → its day in the user's time zone (`2026-11-14`); UTC without a zone. */
 export function dayOf(iso: string | null | undefined, timeZone = 'UTC'): string {
     if (typeof iso !== 'string') return '?';
     const date = new Date(iso);
@@ -50,7 +50,7 @@ export function dayOf(iso: string | null | undefined, timeZone = 'UTC'): string 
     return `${p['year']}-${p['month']}-${p['day']}`;
 }
 
-/** An ISO instant → `2026-11-14 15:00` in Ramin's time zone; UTC without a zone. */
+/** An ISO instant → `2026-11-14 15:00` in the user's time zone; UTC without a zone. */
 export function timestamp(iso: string | null | undefined, timeZone = 'UTC'): string {
     if (typeof iso !== 'string') return '?';
     const date = new Date(iso);

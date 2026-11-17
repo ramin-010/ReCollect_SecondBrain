@@ -43,11 +43,11 @@ export const MARKDOWN_GUIDE = [
     '- **bold**, *italic*, ~~strike~~, `code`, ==highlight==, [links](https://…), images ![alt](https://…).',
     '- Lists, numbered lists and task lists (- [ ] todo / - [x] done), nested.',
     '- Fenced code with a language (```ts).',
-    '- Diagrams: a ```canvas fence for architecture, request flows, data flows and concept maps (a board Ramin can rearrange); a ```mermaid fence for sequence, ER, state, class, timeline and mind-map diagrams.',
+    '- Diagrams: a ```canvas fence for architecture, request flows, data flows and concept maps (a board the user can rearrange); a ```mermaid fence for sequence, ER, state, class, timeline and mind-map diagrams.',
     `- ${CANVAS_GUIDE}`,
     '- Each ```mermaid block is checked with Mermaid 11 before anything is stored: a block it can\'t parse makes the whole call fail with 400 ("Mermaid block N (type), line L: <Mermaid\'s message>") and nothing is written, so fix that block and send the same call again.',
     '- Callouts: a quote whose first line is [!NOTE], [!TIP], [!IMPORTANT], [!WARNING] or [!CAUTION], e.g. "> [!TIP]\\n> Use a heap here."',
-    '- Toggles: <details><summary>Question?</summary>\\n\\nAnswer\\n\\n</details>. Ideal for self-test questions: the answer stays folded until Ramin opens it.',
+    '- Toggles: <details><summary>Question?</summary>\\n\\nAnswer\\n\\n</details>. Ideal for self-test questions: the answer stays folded until the user opens it.',
     '- > quotes and --- dividers.',
     '- GFM tables (| a | b |) for comparisons.',
     '- One newline inside a paragraph is a space: leave a blank line between paragraphs.',
@@ -88,7 +88,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Search docs',
             description:
-                "Find docs in Ramin's Recollect library by words in the title or text (every word must match, in any form or as a word's start; best match first). " +
+                "Find docs by words in the title or text (every word must match, in any form or as a word's start; best match first). " +
                 'Without a query: the most recently updated docs. Returns id, subject, last update and a snippet per doc. Search before creating a doc, to extend an existing one instead of making a duplicate.',
             input: {
                 query: z.string().trim().max(200).optional().describe('Words to look for. Leave out for the most recently updated docs.'),
@@ -115,7 +115,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Read a doc',
             description:
-                'Read one doc as Markdown (the live version if Ramin has it open), after a one-line header with its id, title, subject, last update and whether you can edit it. ' +
+                'Read one doc as Markdown (the live version if it is open), after a one-line header with its id, title, subject, last update and whether you can edit it. ' +
                 'Read before replace_section, to see the exact headings. A canvas shows as a ```canvas fence in Mermaid flowchart text, its id on the first line (%% id: cv_…): ' +
                 'change it with update_canvas (small changes, or a whole new diagram) and see it with preview_diagram; positions are not in the text, Recollect keeps them.',
             input: { docId: zDocId },
@@ -128,7 +128,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
                 quote(doc.title, 120),
                 doc.subject ? `subject ${doc.subject.name}` : 'no subject',
                 `updated ${dayOf(doc.updatedAt, zone)}`,
-                doc.canEdit ? 'editable' : 'read-only (shared with Ramin as a viewer)',
+                doc.canEdit ? 'editable' : 'read-only (shared with the user as a viewer)',
             ].join(' · ');
             return `${header}\n\n${doc.markdown.trim() ? doc.markdown : '(empty doc)'}`;
         }
@@ -141,7 +141,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Create a doc',
             description:
-                "Create a new doc in Ramin's Recollect library from Markdown. Optionally file it under a subject (by name) and schedule spaced revision " +
+                "Create a new doc from Markdown. Optionally file it under a subject (by name) and schedule spaced revision " +
                 '(revise: true → reviews 1, 3, 7 and 21 days from today; needs a subject). ' +
                 'A good learning doc: a 2–3 line summary, sections under ## headings, a worked example or code, a ```mermaid diagram where structure helps, ' +
                 'pitfalls in a > [!WARNING] callout, and 3–5 self-test questions as <details> toggles at the end. ' +
@@ -192,8 +192,8 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
         {
             title: "Change a doc's title or filing",
             description:
-                'Rename a doc (live if Ramin has it open), file it under a subject, or make it the note of a planned topic on a path (topicId: the topic is then in progress). ' +
-                'A doc is on one path once. Ramin can undo it.',
+                'Rename a doc (live if it is open), file it under a subject, or make it the note of a planned topic on a path (topicId: the topic is then in progress). ' +
+                'A doc is on one path once. The user can undo it.',
             input: {
                 docId: zDocId,
                 title: z.string().trim().min(1, 'title is empty').max(200).optional().describe('The new title.'),
@@ -223,7 +223,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Append to a doc',
             description:
-                'Add Markdown at the end of an existing doc: a new section, an example, self-test questions. It appears live if Ramin has the doc open; his own text is never touched. ' +
+                'Add Markdown at the end of an existing doc: a new section, an example, self-test questions. It appears live if the doc is open; his own text is never touched. ' +
                 SAME_MARKDOWN,
             input: {
                 docId: zDocId,
@@ -247,7 +247,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
                 'Rewrite one section of a doc: everything under the first heading with this text (case-insensitive, without the #s) up to the next heading of the same or a higher level. ' +
                 'If markdown starts with a heading of the same or a higher level, it replaces the old heading too (a rename); otherwise the heading stays and only the body under it is replaced. ' +
                 "An unknown heading fails with a list of the doc's headings. Read the doc first (read_doc). " +
-                'A ```canvas fence you send back with the %% id line read_doc showed updates that board in place: the boxes Ramin arranged keep their places and only new boxes are laid out ' +
+                'A ```canvas fence you send back with the %% id line read_doc showed updates that board in place: the boxes the user arranged keep their places and only new boxes are laid out ' +
                 '(update_canvas does the same without rewriting the section). ' +
                 SAME_MARKDOWN,
             input: {
@@ -275,10 +275,10 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Add a canvas (a diagram of boxes and arrows)',
             description:
-                'Draw a diagram at the end of a doc that Ramin can drag, connect and edit: a system-design sketch, a request or data flow, a decision flow, a concept map. ' +
+                'Draw a diagram at the end of a doc that the user can drag, connect and edit: a system-design sketch, a request or data flow, a decision flow, a concept map. ' +
                 'For sequence, ER, state, class or timeline diagrams use a ```mermaid fence with append_to_doc. ' +
                 'It answers with what it drew and problems to fix (crossing arrows, a box with no arrows, too wide): fix them with update_canvas, look with preview_diagram. ' +
-                'read_doc shows the board as a ```canvas fence with its id; update_canvas changes it in place (Undo takes it back), keeping what Ramin arranged. ' +
+                'read_doc shows the board as a ```canvas fence with its id; update_canvas changes it in place (Undo takes it back), keeping what the user arranged. ' +
                 'To put it under a heading, append the heading first, or write a ```canvas fence in any Markdown. ' +
                 "The text form (shapes, arrows, zones, colours, kinds, notes) is in create_doc's Markdown guide, without the fence.",
             input: {
@@ -306,11 +306,11 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Change a canvas in place',
             description:
-                "Change one canvas board of a doc by its id (read_doc shows it on the fence's first line: %% id: cv_…), keeping everything Ramin arranged: boxes that stay keep their places, " +
+                "Change one canvas board of a doc by its id (read_doc shows it on the fence's first line: %% id: cv_…), keeping everything the user arranged: boxes that stay keep their places, " +
                 'new boxes are laid out next to what they connect to, zones grow to hold them, arrows that stay keep their routes. ' +
                 'Either send small changes: add (lines in the canvas text form, e.g. "api --> cache[(Redis)]"; a box written again changes its label, shape, colour or kind; ' +
                 '"subgraph tier … end" with an existing zone id puts new boxes in that zone), remove (box ids, their arrows go too; or arrows like "a --> b"), rename (box id → new label). ' +
-                'Or send diagram: the whole new text (as read_doc printed it, edited). It answers with the same line as a write (size, zoom in a doc, problems to fix); Ramin can undo it.',
+                'Or send diagram: the whole new text (as read_doc printed it, edited). It answers with the same line as a write (size, zoom in a doc, problems to fix); the user can undo it.',
             input: {
                 docId: zDocId,
                 canvasId: z
@@ -326,7 +326,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
                     .boolean()
                     .optional()
                     .describe(
-                        'true: lay the whole board out again instead of keeping every box where it is: needed for a new direction (flowchart TB / LR) or a board that reads badly. Boxes Ramin moved lose their places (he can undo). Leave out to keep his arrangement.'
+                        'true: lay the whole board out again instead of keeping every box where it is: needed for a new direction (flowchart TB / LR) or a board that reads badly. Boxes the user moved lose their places (he can undo). Leave out to keep his arrangement.'
                     ),
             },
             annotations: CHANGES,
@@ -353,7 +353,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'See a canvas',
             description:
-                "A PNG of a doc's canvas board as Ramin sees it (boxes, zones, routed arrows, labels), with its report (size, zoom in a doc, problems to fix). " +
+                "A PNG of a doc's canvas board as the user sees it (boxes, zones, routed arrows, labels), with its report (size, zoom in a doc, problems to fix). " +
                 'Use it to check a board after drawing or changing it. The first canvas of the doc without a canvasId. ' +
                 'Mermaid blocks are drawn by the browser only: the server does not draw them yet.',
             input: {

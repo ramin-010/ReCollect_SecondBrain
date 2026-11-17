@@ -105,7 +105,7 @@ describe('the flow with words', () => {
         expect(JSON.parse(readFileSync(path.join(home, 'note.json'), 'utf8')).id).toBe('n1');
 
         // The next prompt carries the note once; the one after doesn't.
-        expect(await runHook('prompt', input({ prompt: 'ok next part of the plan please' }), env, t(35))).toContain("from Ramin's buddy");
+        expect(await runHook('prompt', input({ prompt: 'ok next part of the plan please' }), env, t(35))).toContain("from the user's buddy");
         expect(await runHook('prompt', input({ prompt: 'and the part after that one' }), env, t(36))).toBe('');
 
         // The end sends what is left and forgets the session's files.

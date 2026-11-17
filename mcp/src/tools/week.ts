@@ -1,5 +1,5 @@
 // The week and suggestions (LOOP_COMPLETE_SPEC 1.6): 3–5 targets for Monday to Sunday that tick
-// themselves when what they point at is done, and proposals Ramin accepts on Home with one tap.
+// themselves when what they point at is done, and proposals the user accepts on Home with one tap.
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { ToolError } from '../errors.js';
@@ -50,7 +50,7 @@ export function registerWeekTools(server: McpServer, ctx: ToolContext): void {
         'get_week',
         {
             title: 'The week',
-            description: "Ramin's week (Monday to Sunday): its targets and what is done (worked out), last week in numbers, and whether his weekly review waits.",
+            description: "The user's week (Monday to Sunday): its targets and what is done (worked out), last week in numbers, and whether his weekly review waits.",
             input: { week: zDay.optional().describe('Any day of the week (default: this week).') },
             annotations: READ_ONLY,
         },
@@ -127,7 +127,7 @@ export function registerWeekTools(server: McpServer, ctx: ToolContext): void {
         ctx,
         'suggest',
         {
-            title: 'Suggest something to Ramin',
+            title: 'Suggest something to the user',
             description:
                 "Propose instead of doing when it is his call and he can't say yes here: a week target, a focus line, or a profile change. It waits on Home until he accepts.",
             input: {
@@ -143,7 +143,7 @@ export function registerWeekTools(server: McpServer, ctx: ToolContext): void {
             if (kind === 'profile_edit' && profile === undefined) throw new ToolError('profile_edit needs profile: the whole new text.');
             const payload = kind === 'profile_edit' ? { profile } : { text: text.slice(0, 140), ...(topicId ? { topicId } : {}) };
             const s = await api.post<{ _id: string }>('/api/suggestions', { kind, text, reason, payload });
-            return `Suggested (${kind.replace('_', ' ')}): ${quote(text)}. It waits on Home for Ramin (id ${s._id}).`;
+            return `Suggested (${kind.replace('_', ' ')}): ${quote(text)}. It waits on Home for the user (id ${s._id}).`;
         }
     );
 }

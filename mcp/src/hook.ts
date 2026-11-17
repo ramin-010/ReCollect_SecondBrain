@@ -1,5 +1,5 @@
 // Claude Code hooks for Recollect (SYNC_SPINE_SPEC 1.4): coding sessions log themselves, and a
-// session in an allowed folder starts knowing where Ramin stands. No model has to remember anything.
+// session in an allowed folder starts knowing where the user stands. No model has to remember anything.
 //
 //   node <mcp>/dist/hook.js start    SessionStart       sweep stale sessions; open this one; print the brief
 //   node <mcp>/dist/hook.js prompt   UserPromptSubmit   one timestamp (active minutes); in a "full" folder his
@@ -34,7 +34,7 @@ import { briefText, type Brief } from './tools/record.js';
 export type FolderMode = 'full' | 'light' | 'off';
 /** A folder (logged, briefed, words not read) or a rule. */
 /**
- * `nudge` (B10): each prompt reminds the agent, with the clock, to save quietly what Ramin would want
+ * `nudge` (B10): each prompt reminds the agent, with the clock, to save quietly what the user would want
  * later (a work folder: nothing else leaves the PC). `commits: false`: the session goes without its
  * branch and commit subjects (office repos: company text).
  */
@@ -71,7 +71,7 @@ export interface OpenSession {
     heads: Array<{ repo: string; head: string }>;
     /** The first real prompt (first line, ≤ 120): the title when there is no commit. */
     firstPrompt?: string;
-    /** The session's own title, when Ramin gave it one (`session_title`). */
+    /** The session's own title, when the user gave it one (`session_title`). */
     sessionTitle?: string;
     /** Set when closing failed (the backend was down): the next sweep sends it. */
     endedAt?: string;
@@ -423,7 +423,7 @@ function pruneClocks(env: Env, now: Date): void {
 /** The reminder to save, with the clock (a `nudge` folder's every prompt). */
 export function nudgeText(now: Date): string {
     return (
-        `Recollect [${dayLabel(now)}, ${localTime(now)}]: before you finish this turn, if his message or your answer holds something Ramin would want later ` +
+        `Recollect [${dayLabel(now)}, ${localTime(now)}]: before you finish this turn, if his message or your answer holds something the user would want later ` +
         "(something about him, a reminder or dated to-do, an idea or insight), save it quietly with the recollect tools and say nothing about it in your reply. " +
         'Most turns have nothing. Never save company code, data or client names.'
     );
@@ -776,7 +776,7 @@ export async function runHook(event: string, input: Record<string, unknown>, env
         }
         // B10: in a `nudge` folder every prompt reminds the agent to save quietly (with the clock), and once a day to offer to log the work.
         const nudge = event === 'prompt' && rule.nudge ? [nudgeText(now), ...logReminders(clockProject, now, firstToday, env)] : [];
-        return [note ? `Recollect, from Ramin's buddy (pass it on in one sentence at a natural pause; skip it if he is in the middle of something): ${note.text}` : '', ...nudge]
+        return [note ? `Recollect, from the user's buddy (pass it on in one sentence at a natural pause; skip it if he is in the middle of something): ${note.text}` : '', ...nudge]
             .filter(Boolean)
             .join('\n');
     }
@@ -806,7 +806,7 @@ export async function runHook(event: string, input: Record<string, unknown>, env
             writeFileSync(file, JSON.stringify({ ...session, notesShown: [...(session.notesShown ?? []), b.noteId].slice(-20) }));
         }
         return [
-            `Recollect (session-start hook): where Ramin stands. This Claude Code session is logged by the hook (key ${session.key}, project "${session.project}"). ` +
+            `Recollect (session-start hook): where the user stands. This Claude Code session is logged by the hook (key ${session.key}, project "${session.project}"). ` +
                 `When you finish a piece of work here, call checkpoint once with that key, project "${session.project}", a short title and the nextStep, so the project's next step stays current. ` +
                 'If you study or practise with him, checkpoint as the recollect-study skill says, with the same key.',
             briefText(brief),

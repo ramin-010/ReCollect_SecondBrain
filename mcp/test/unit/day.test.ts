@@ -83,7 +83,7 @@ describe('recent_agent_edits', () => {
         ...over,
     });
 
-    it('asks for 10 by default and shows state, doc and other agents, in Ramin’s time zone', async () => {
+    it('asks for 10 by default and shows state, doc and other agents, in the user’s time zone', async () => {
         h = await connect({
             'GET /api/learning/settings': ok({ dailyBudgetMin: 25, busyUntil: null, timezone: 'Asia/Kolkata' }),
             'GET /api/agent/edits': ok([
@@ -99,7 +99,7 @@ describe('recent_agent_edits', () => {
                 '3 edits by agents, newest first (times in Asia/Kolkata):',
                 '- 2026-11-14 15:00 · Created "Postgres locks" · doc docA · not reviewed yet',
                 '- 2026-11-13 23:30 · Added focus "Graphs" · by Cursor · kept',
-                '- 2026-11-13 16:30 · Appended 2 blocks to "MVCC" · doc docB · undone by Ramin',
+                '- 2026-11-13 16:30 · Appended 2 blocks to "MVCC" · doc docB · undone by the user',
             ].join('\n')
         );
     });

@@ -41,7 +41,7 @@ describe('remember', () => {
             ],
         });
         expect((await h.call('remember', { text: 'x y' })).text).toBe('Already known, seen again: "Studies best after 9 pm" (state, private, seen 3×) · id mem1');
-        expect((await h.call('remember', { text: 'x y' })).text).toBe('Not saved: Ramin marked "Studies best after 9 pm" wrong.');
+        expect((await h.call('remember', { text: 'x y' })).text).toBe('Not saved: the user marked "Studies best after 9 pm" wrong.');
         expect((await h.call('remember', { text: 'x y' })).text).toMatch(/paused his buddy/);
     });
 });
@@ -58,7 +58,7 @@ describe('recall_memory and forget (manage)', () => {
 
     it('forget closes one, with Undo; his own are refused', async () => {
         h = await connect(
-            { 'POST /api/buddy/memories/mem1/close': [ok({ memory: memory({ status: 'closed' }), editId: 'e1' }), fail(403, 'Ramin wrote or changed this memory himself: only he can change it (on /you)')] },
+            { 'POST /api/buddy/memories/mem1/close': [ok({ memory: memory({ status: 'closed' }), editId: 'e1' }), fail(403, 'The user wrote or changed this memory: only they can change it (on /you)')] },
             { groups: TOOL_GROUP_NAMES }
         );
         const res = await h.call('forget', { id: 'mem1', reason: 'He stopped' });
@@ -66,7 +66,7 @@ describe('recall_memory and forget (manage)', () => {
         expect(res.text).toBe(`Forgot: "Studies best after 9 pm".\n${UNDO}`);
         const refused = await h.call('forget', { id: 'mem1' });
         expect(refused.isError).toBe(true);
-        expect(refused.text).toMatch(/only he can change it/);
+        expect(refused.text).toMatch(/only they can change it/);
     });
 
     it('get_work_log (B9): the days as text; in a work folder only that project, whatever is asked', async () => {

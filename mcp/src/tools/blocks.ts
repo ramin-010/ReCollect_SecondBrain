@@ -95,7 +95,7 @@ export function registerBlockTools(server: McpServer, ctx: ToolContext): void {
             title: 'Insert blocks',
             description:
                 "Markdown (create_doc's dialect: callouts, toggles, ```mermaid and ```canvas fences, tables) as new blocks at an exact place: after, before or under a block id from get_outline, or at the start or end. " +
-                'Live in an open doc; Ramin can undo it.',
+                'Live in an open doc; the user can undo it.',
             input: { docId: zDocId, markdown: zMarkdown.min(1, 'markdown is empty').describe('The blocks to add, in Markdown.'), where: zWhere },
             annotations: ADDS,
         },
@@ -151,7 +151,7 @@ export function registerBlockTools(server: McpServer, ctx: ToolContext): void {
         'delete_blocks',
         {
             title: 'Delete blocks',
-            description: 'Delete blocks (with their children) by id. Ramin can undo it from Home.',
+            description: 'Delete blocks (with their children) by id. The user can undo it from Home.',
             input: { docId: zDocId, ids: z.array(zBlockId).min(1).max(200) },
             annotations: CHANGES,
         },

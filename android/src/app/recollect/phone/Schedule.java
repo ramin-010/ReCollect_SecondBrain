@@ -8,7 +8,8 @@ import android.content.Context;
 import java.util.Calendar;
 
 /**
- * When the picture refreshes: every half hour while he is awake, and on the day's turns exactly (just
+ * When the picture refreshes: every 15 minutes while he is awake (0.5.1: was half an hour, so a reminder
+ * reaches the phone sooner), and on the day's turns exactly (just
  * after midnight for the new date, noon and 18:00, when the server's states change: morning, working,
  * evening). Quiet hours wait for their end. One chained job (RefreshJob schedules the next), persisted
  * across restarts; a refresh that can't reach the server leaves everything as it was.
@@ -16,7 +17,7 @@ import java.util.Calendar;
 final class Schedule {
     static final int JOB_ID = 1;
     /** Minutes between refreshes while awake. */
-    static final int EVERY = 30;
+    static final int EVERY = 15;
     /** The day's turns, in minutes after midnight. */
     private static final int[] TURNS = {1, 12 * 60, 18 * 60};
 

@@ -34,7 +34,7 @@ The first build creates the signing key in `keys/` (git-ignored). **Back up `key
 |---|---|
 | The screen: connect, the day's picture, where it shows, theme, quiet hours, Hide titles, Refresh now, Disconnect | `MainActivity.java`, `res/layout/activity_main.xml` |
 | One refresh: the lines, the widget, then the picture when it changed (outside quiet hours) | `Refresher.java` |
-| When: every 30 minutes while awake, and exactly at the day's turns (00:01, 12:00, 18:00); one persisted job that chains the next | `Schedule.java`, `RefreshJob.java`, `Wake.java` |
+| When: every 15 minutes while awake (0.5.1; it was 30), and exactly at the day's turns (00:01, 12:00, 18:00); one persisted job that chains the next | `Schedule.java`, `RefreshJob.java`, `Wake.java` |
 | The widget, 4 × 2 and 4 × 1, one layout per theme | `DayWidget.java`, `res/layout/widget_day*.xml` |
 | The wallpaper, and the copy of yours | `Wallpapers.java` |
 | The token, sealed with a key in the Android Keystore | `Vault.java`, `Prefs.java` |

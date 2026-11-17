@@ -1,4 +1,4 @@
-// The buddy (BUDDY_MEMORY_PLAN §3.1 B): what a chat learns about Ramin goes to his memory, and a
+// The buddy (BUDDY_MEMORY_PLAN §3.1 B): what a chat learns about the user goes to his memory, and a
 // chat can look things up there. remember is in the default set (record); the rest are on more_tools.
 import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -51,7 +51,7 @@ export function workDayText(d: WorkDay): string {
     return `${day}\n${parts.join('\n')}`;
 }
 
-/** One note about Ramin, as remember takes it. */
+/** One note about the user, as remember takes it. */
 export const zNoteFields = {
     text: z.string().trim().min(1).max(300).describe('One thing, e.g. "Studies best after 9 pm".'),
     kind: zKind.optional().describe('Default fact. pattern: a habit; state: a mood or worry; thread: a promise or plan.'),
@@ -69,7 +69,7 @@ export function noteLine(n: NoteOutcome): string {
     if (n.status === 'empty') return 'Not saved: nothing left after removing secrets.';
     if (n.status === 'saved') return `Saved: ${memoryLine(n.memory)}`;
     if (n.status === 'seen') return `Already known, seen again: ${memoryLine(n.memory)}`;
-    return `Not saved: Ramin marked ${quote(n.memory.text, 80)} wrong.`;
+    return `Not saved: the user marked ${quote(n.memory.text, 80)} wrong.`;
 }
 
 export function registerBuddyTools(server: McpServer, ctx: ToolContext): void {
@@ -80,14 +80,14 @@ export function registerBuddyTools(server: McpServer, ctx: ToolContext): void {
         ctx,
         'remember',
         {
-            title: 'Remember about Ramin',
+            title: 'Remember about the user',
             description: 'Save something lasting he says about himself (a preference, worry, plan, promise, aim, idea, decision) for his buddy, which remembers across chats. One thing a call.',
             input: zNoteFields,
             annotations: ADDS,
         },
         async (note) => {
             const r = await api.post<{ paused: boolean; notes: NoteOutcome[] }>('/api/buddy/remember', note);
-            if (r.paused) return 'Not saved: Ramin has paused his buddy (nothing is kept while it is paused).';
+            if (r.paused) return 'Not saved: the user has paused his buddy (nothing is kept while it is paused).';
             return quietly(ctx.workMode, r.notes.map(noteLine).join('\n'));
         }
     );
@@ -98,7 +98,7 @@ export function registerBuddyTools(server: McpServer, ctx: ToolContext): void {
         'recall_memory',
         {
             title: 'What his buddy knows',
-            description: 'Search what Ramin’s buddy knows about him (words or word starts), or list it by kind. Private ones are marked: use them only to understand him, never repeat them unasked.',
+            description: 'Search what the user’s buddy knows about him (words or word starts), or list it by kind. Private ones are marked: use them only to understand him, never repeat them unasked.',
             input: {
                 query: z.string().trim().max(200).optional(),
                 kind: zKind.optional(),
@@ -124,7 +124,7 @@ export function registerBuddyTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'His work log',
             description:
-                'What Ramin did, per project and day (from his chats with agents and his sessions): the lines, the time, the commits. Use it for "what did I do on <project> yesterday?" or before a standup. Search words with query; days with from and to (YYYY-MM-DD; the last 7 by default).',
+                'What the user did, per project and day (from his chats with agents and his sessions): the lines, the time, the commits. Use it for "what did I do on <project> yesterday?" or before a standup. Search words with query; days with from and to (YYYY-MM-DD; the last 7 by default).',
             input: {
                 project: z.string().trim().max(100).optional().describe('The project (folder name); all of them if left out.'),
                 query: z.string().trim().max(200).optional(),

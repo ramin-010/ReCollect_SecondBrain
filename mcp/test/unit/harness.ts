@@ -108,7 +108,7 @@ export async function connect(routes: Routes, options: { problem?: string | null
     };
 }
 
-export const UNDO = 'Undo: Ramin can undo this from Home → From your agent.';
+export const UNDO = 'Undo: the user can undo this from Home → From your agent.';
 
 /** The last line of a tool answer. */
 export const lastLine = (text: string): string => text.trimEnd().split('\n').at(-1) ?? '';

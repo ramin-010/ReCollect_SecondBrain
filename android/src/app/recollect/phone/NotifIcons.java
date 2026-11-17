@@ -75,6 +75,11 @@ public final class NotifIcons extends NotificationListenerService {
     public void onListenerConnected() {
         connected = true;
         refresh();
+        // 0.5.1: the system keeps this service bound and binds it again after it stops the app (a
+        // stop cancels the refresh chain and the reminders' alarms), so both come back from here.
+        Context app = getApplicationContext();
+        Schedule.ensure(app);
+        Reminders.rearm(app);
     }
 
     @Override

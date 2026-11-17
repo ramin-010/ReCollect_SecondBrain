@@ -111,7 +111,7 @@ describe('schedule_revision', () => {
     it('an unknown doc: a clear message instead of "Not found"', async () => {
         h = await connect({ 'GET /api/topics/by-doc/docZ': fail(404, 'Not found', 'NOT_FOUND') });
         const res = await h.call('schedule_revision', { docId: 'docZ' });
-        expect(res).toEqual({ text: 'No doc with id docZ that Ramin can open (search_docs finds docs).', isError: true });
+        expect(res).toEqual({ text: 'No doc with id docZ that the user can open (search_docs finds docs).', isError: true });
     });
 
     it('a token without learning:write gets the scope named', async () => {

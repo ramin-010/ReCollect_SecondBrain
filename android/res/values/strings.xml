@@ -31,7 +31,7 @@
     <string name="fail_unreachable">Couldn\'t reach Recollect at %1$s. Until Recollect is online, the phone needs your computer on and the same Wi-Fi or hotspot, or the USB cable.</string>
     <string name="fail_revoked">This phone\'s code was ended. Make a new one on your computer in Settings → Phone app.</string>
     <string name="fail_forbidden">This code can\'t read the picture. Make a new one in Settings → Phone app.</string>
-    <string name="fail_server">Recollect answered with an error (%1$d). The app tries again in half an hour.</string>
+    <string name="fail_server">Recollect answered with an error (%1$d). The app tries again in 15 minutes.</string>
     <string name="fail_data">Recollect sent something this app can\'t read. Build and install the latest app.</string>
     <string name="fail_wallpaper">The phone didn\'t accept the wallpaper. Try Refresh now.</string>
 
@@ -108,7 +108,7 @@
     <string name="notify_section">Notes from your buddy</string>
     <string name="notify">Tell me when it leaves a note</string>
     <string name="reminders_ring">Ring for my reminders</string>
-    <string name="reminders_ring_note">Your reminders ring here at their time, quiet hours or not. The email only goes for one set less than half an hour ahead that this phone hasn\'t got yet.</string>
+    <string name="reminders_ring_note">Your reminders ring here at their time, quiet hours or not. The email only goes for one set less than 15 minutes ahead that this phone hasn\'t got yet.</string>
     <string name="reminder_title">Reminder</string>
     <string name="reminder_plain">You have a reminder.</string>
     <string name="reminder_channel">Reminders</string>
