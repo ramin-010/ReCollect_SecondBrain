@@ -41,9 +41,14 @@ final class Api {
         this.token = token;
     }
 
-    /** GET /api/ambient/widget → its `data`. */
+    /** GET /api/ambient/widget → its `data`. 0.6.0 names its version: from it the day carries the questions and each word's end time. */
     JSONObject widget(boolean titles) throws Failure {
-        byte[] body = call("GET", "/api/ambient/widget" + (titles ? "" : "?titles=0"), "application/json");
+        return widget(titles, false);
+    }
+
+    /** `quiet` (0.6.0): in the phone's quiet hours no question comes, and none is marked as shown. */
+    JSONObject widget(boolean titles, boolean quiet) throws Failure {
+        byte[] body = call("GET", "/api/ambient/widget?app=" + BuildConfig.VERSION + (titles ? "" : "&titles=0") + (quiet ? "&quiet=1" : ""), "application/json");
         try {
             JSONObject data = new JSONObject(new String(body, StandardCharsets.UTF_8)).getJSONObject("data");
             Ambient.parse(data); // fails early on a shape this app can't read
@@ -76,10 +81,16 @@ final class Api {
      * notification icons and says where in X-Ambient-Icons (kept in `lastIcons`).
      */
     byte[] wallpaper(int width, int height, String theme, boolean titles, String screen, String style, String color, float zoom, boolean icons) throws Failure {
+        return wallpaper(width, height, theme, titles, screen, style, color, zoom, icons, false);
+    }
+
+    /** `plain` (0.6.0): the plain twin, the same picture without the buddy's words (shown when they end, in quiet hours, once answered). */
+    byte[] wallpaper(int width, int height, String theme, boolean titles, String screen, String style, String color, float zoom, boolean icons, boolean plain) throws Failure {
         String q = "?w=" + width + "&h=" + height + "&theme=" + theme + (titles ? "" : "&titles=0") + "&screen=" + screen
                 + (style == null ? "" : "&style=" + style) + (color == null ? "" : "&color=" + color)
                 + (zoom > 1.001f ? "&zoom=" + String.format(java.util.Locale.ROOT, "%.3f", zoom) : "")
-                + (icons ? "&icons=1" : "");
+                + (icons ? "&icons=1" : "") + "&app=" + BuildConfig.VERSION + (plain ? "&plain=1" : "")
+                + (withoutCard && "home".equals(screen) ? "&card=0" : "");
         lastIcons = null;
         return call("GET", "/api/ambient/wallpaper.png" + q, "image/png");
     }
@@ -120,6 +131,18 @@ final class Api {
         }
     }
 
+    /** POST /api/buddy/asks/:id/answer (0.6.0): his quick answer (its place) or his own words to one of the buddy's questions. */
+    void answer(String askId, int choice, String text) throws Failure {
+        try {
+            JSONObject body = new JSONObject();
+            if (text != null) body.put("text", text);
+            else body.put("choice", choice);
+            post("/api/buddy/asks/" + java.net.URLEncoder.encode(askId, "UTF-8") + "/answer", body);
+        } catch (JSONException | java.io.UnsupportedEncodingException e) {
+            throw new Failure(Failure.BAD_DATA, 0, e);
+        }
+    }
+
     /** POST /api/buddy/tell: his words, a private note for tonight. False when the buddy is paused. */
     boolean tell(String text) throws Failure {
         try {
@@ -129,6 +152,36 @@ final class Api {
         } catch (JSONException e) {
             throw new Failure(Failure.BAD_DATA, 0, e);
         }
+    }
+
+    /**
+     * Stage 19 (0.7.0): POST /api/ambient/later, Later on the widget's card. `tappedAt` (millis) is when he tapped, so a
+     * tap kept while offline lands when the button said. Returns the server's answer ({id, at, label}).
+     */
+    JSONObject later(String id, long tappedAt, long shownAt) throws Failure {
+        try {
+            JSONObject body0 = new JSONObject().put("id", id).put("tappedAt", java.time.Instant.ofEpochMilli(tappedAt).toString());
+            // 0.7.1: the time the button showed; the server keeps it while it still holds (the owner: "at the time shown").
+            if (shownAt > 0) body0.put("at", java.time.Instant.ofEpochMilli(shownAt).toString());
+            byte[] body = post("/api/ambient/later", body0);
+            JSONObject data = new JSONObject(new String(body, StandardCharsets.UTF_8)).optJSONObject("data");
+            return data == null ? new JSONObject() : data;
+        } catch (JSONException e) {
+            throw new Failure(Failure.BAD_DATA, 0, e);
+        }
+    }
+
+    /** Stage 19: the home picture without the widget's item (`card=0`) while a widget is on a home screen. */
+    private boolean withoutCard;
+
+    Api withoutCard(boolean on) {
+        withoutCard = on;
+        return this;
+    }
+
+    /** Stage 11 (his item 10d): POST /api/phone/diagnostics, the phone's facts for the owner's People page. */
+    void diagnostics(JSONObject facts) throws Failure {
+        post("/api/phone/diagnostics", facts);
     }
 
     private byte[] post(String path, JSONObject body) throws Failure {
@@ -165,9 +218,14 @@ final class Api {
             if (code < 200 || code >= 300) throw new Failure(Failure.SERVER, code, null);
             String icons = c.getHeaderField("X-Ambient-Icons");
             if (icons != null) lastIcons = icons;
+            byte[] body;
             try (InputStream in = c.getInputStream()) {
-                return readAll(in);
+                body = readAll(in);
             }
+            // 0.5.2: a connection read to its end goes back to the pool and the next call reuses it (no new
+            // secure handshake each time); only a failed one is closed.
+            c = null;
+            return body;
         } catch (IOException e) {
             throw new Failure(Failure.UNREACHABLE, 0, e);
         } finally {

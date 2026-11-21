@@ -28,11 +28,11 @@ export function registerDecisionTools(server: McpServer, ctx: ToolContext): void
         'log_decision',
         {
             title: 'Log a decision',
-            description: 'A decision that matters (a design choice, a career call): what, why, what he expects, when to look again. That day Home asks "Was this right?".',
+            description: 'A decision that matters (a design choice, a career call): what, why, what they expect, when to look again. That day Home asks "Was this right?".',
             input: {
                 title: z.string().trim().min(1).max(160).describe('What was decided.'),
                 why: z.string().trim().min(1).max(600),
-                expect: z.string().trim().max(400).optional().describe('What he expects to happen.'),
+                expect: z.string().trim().max(400).optional().describe('What they expect to happen.'),
                 lookAgain: z.string().trim().min(2).max(20).describe('A day YYYY-MM-DD, or 30d / 6w / 3m.'),
                 project: z.string().trim().max(200).optional().describe('The project (repo folder) it belongs to.'),
             },
@@ -47,7 +47,7 @@ export function registerDecisionTools(server: McpServer, ctx: ToolContext): void
         'list_decisions',
         {
             title: 'Decisions',
-            description: 'His decisions, newest first: open or reviewed, or one project’s (what was decided there and why).',
+            description: 'Their decisions, newest first: open or reviewed, or one project’s (what was decided there and why).',
             input: { status: z.enum(['open', 'reviewed']).optional(), project: z.string().trim().max(200).optional() },
             annotations: READ_ONLY,
         },

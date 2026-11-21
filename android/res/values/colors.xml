@@ -25,23 +25,53 @@
     <color name="press">#141A1A1C</color>
     <color name="press_on_main">#2EFFFFFF</color>
 
-    <!-- The widget's own steps, light and dark (DayWidget sets them when the theme is not "System"). -->
+    <!-- The widget's own steps (0.7.0, stage 19: the app's two looks, mockups/phone-app/widget.html), light and dark;
+         each fixed theme has its own layouts (widget-themes.py). The widget is a raised card over the home picture: the
+         look's ground in light, its surface in dark. Slate: the web app's greys. -->
     <color name="w_light_ground">#FFFFFF</color>
     <color name="w_light_ring">#E3E2DF</color>
     <color name="w_light_ink_1">#2C2C2B</color>
     <color name="w_light_ink_2">#5F5E59</color>
-    <color name="w_light_ink_3">#73706B</color>
-    <color name="w_dark_ground">#202020</color>
-    <color name="w_dark_ring">#383836</color>
+    <color name="w_light_ink_3">#6E6B66</color>
+    <color name="w_light_line_strong">#DDDCD8</color>
+    <color name="w_light_set">#E9E8E5</color>
+    <color name="w_dark_ground">#252525</color>
+    <color name="w_dark_ring">#2C2C2B</color>
     <color name="w_dark_ink_1">#F0EFED</color>
     <color name="w_dark_ink_2">#ADA9A3</color>
-    <color name="w_dark_ink_3">#8E8B86</color>
+    <color name="w_dark_ink_3">#96938E</color>
+    <color name="w_dark_line_strong">#414140</color>
+    <color name="w_dark_set">#333332</color>
+    <!-- Paper: the cream notebook. -->
+    <color name="wp_light_ground">#F5F0E6</color>
+    <color name="wp_light_ring">#E3DACA</color>
+    <color name="wp_light_ink_1">#23201B</color>
+    <color name="wp_light_ink_2">#564F44</color>
+    <color name="wp_light_ink_3">#6B6255</color>
+    <color name="wp_light_line_strong">#CEC2AB</color>
+    <color name="wp_light_set">#E2D8C5</color>
+    <color name="wp_dark_ground">#24211C</color>
+    <color name="wp_dark_ring">#312C25</color>
+    <color name="wp_dark_ink_1">#F0EADF</color>
+    <color name="wp_dark_ink_2">#BDB4A4</color>
+    <color name="wp_dark_ink_3">#9C9282</color>
+    <color name="wp_dark_line_strong">#4A4338</color>
+    <color name="wp_dark_set">#38332A</color>
     <!-- "System": follows the phone (values-night swaps these). -->
     <color name="w_ground">@color/w_light_ground</color>
     <color name="w_ring">@color/w_light_ring</color>
     <color name="w_ink_1">@color/w_light_ink_1</color>
     <color name="w_ink_2">@color/w_light_ink_2</color>
     <color name="w_ink_3">@color/w_light_ink_3</color>
+    <color name="w_line_strong">@color/w_light_line_strong</color>
+    <color name="w_set">@color/w_light_set</color>
+    <color name="wp_ground">@color/wp_light_ground</color>
+    <color name="wp_ring">@color/wp_light_ring</color>
+    <color name="wp_ink_1">@color/wp_light_ink_1</color>
+    <color name="wp_ink_2">@color/wp_light_ink_2</color>
+    <color name="wp_ink_3">@color/wp_light_ink_3</color>
+    <color name="wp_line_strong">@color/wp_light_line_strong</color>
+    <color name="wp_set">@color/wp_light_set</color>
 
     <!-- The launcher icon: the mark in white on ink, so it reads apart from the web app's (ink on white). -->
     <color name="icon_ground">#2C2C2B</color>

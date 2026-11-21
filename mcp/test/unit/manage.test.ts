@@ -2,7 +2,7 @@
 // tool only asks.
 import { afterEach, describe, expect, it } from 'vitest';
 import { TOOL_GROUP_NAMES } from '../../src/server.js';
-import { connect, ok, type Harness, type Routes } from './harness.js';
+import { connect, fail, ok, type Harness, type Routes } from './harness.js';
 
 let h: Harness | undefined;
 afterEach(async () => {
@@ -32,7 +32,7 @@ describe('manage tools', () => {
             ],
         });
         const pub = await h.call('publish_doc', { docId: DOC });
-        expect(pub.text).toBe('Asked: Publish "Heaps" to the web: anyone with the link can read it (never edit). Waiting for his tap: it shows under Suggested on his Home with "Do it"; nothing happens until he taps it.');
+        expect(pub.text).toBe('Asked: Publish "Heaps" to the web: anyone with the link can read it (never edit). Waiting for the user’s tap: it shows under Suggested on their Home with "Do it"; nothing happens until they tap it.');
         expect(h.requests[0]).toMatchObject({ method: 'POST', path: '/api/actions', body: { action: 'publish_doc', input: { docId: DOC, on: true } } });
         await h.call('share_doc', { docId: DOC, email: 'asha@example.com' });
         expect(h.requests[1]).toMatchObject({ body: { action: 'share_doc', input: { docId: DOC, email: 'asha@example.com', role: 'editor' } } });
@@ -42,7 +42,7 @@ describe('manage tools', () => {
     it('empty_trash only asks: it posts the action and says it waits for his tap', async () => {
         h = await all({ 'POST /api/actions': ok({ _id: 's1', kind: 'action', text: 'Empty the trash: delete 2 docs for good ("A", "B")', reason: null, proposedBy: 'agent', agentName: 'Claude Code' }, 201) });
         const res = await h.call('empty_trash', { reason: 'he asked' });
-        expect(res.text).toBe('Asked: Empty the trash: delete 2 docs for good ("A", "B"). Waiting for his tap: it shows under Suggested on his Home with "Do it"; nothing happens until he taps it.');
+        expect(res.text).toBe('Asked: Empty the trash: delete 2 docs for good ("A", "B"). Waiting for the user’s tap: it shows under Suggested on their Home with "Do it"; nothing happens until they tap it.');
         expect(h.requests[0]).toMatchObject({ method: 'POST', path: '/api/actions', body: { action: 'empty_trash', reason: 'he asked' } });
     });
 
@@ -67,7 +67,7 @@ describe('manage tools', () => {
             ]),
         });
         expect((await h.call('list_suggestions', {})).text).toBe(
-            '2 items waiting:\n- [needs his tap] Empty the trash: delete 1 doc for good ("A") · from Ask AI\n- Finish 7. Message queues · from the app'
+            '2 items waiting:\n- [needs their tap] Empty the trash: delete 1 doc for good ("A") · from Ask AI\n- Finish 7. Message queues · from the app'
         );
     });
 
@@ -79,13 +79,51 @@ describe('manage tools', () => {
             'GET /api/reminders': ok([{ _id: 'm1', taskId: 't1', task: 'Book the mock', at, when, status: 'pending' }]),
             'POST /api/reminders/m1/cancel': ok({ _id: 'm1', taskId: 't1', task: 'Book the mock', at, when, status: 'cancelled' }),
         });
-        expect((await h.call('set_reminder', { at: '19:00', taskId: 't1' })).text).toBe(`Reminder set: "Book the mock" at ${when} · id m1.\nUndo: the user can undo this from Home → From your agent.`);
+        // An older server (no `ring` in its answer): every reminder rings there, and the reply says so.
+        expect((await h.call('set_reminder', { at: '19:00', taskId: 't1' })).text).toBe(
+            `Reminder set: "Book the mock" at ${when} (this Recollect server rings every reminder, once: silent and repeating ones come with its next release) · id m1.\nUndo: the user can undo this from Home → From your agent.`
+        );
         expect(h.requests.at(-1)).toMatchObject({ method: 'POST', path: '/api/reminders', body: { at: '19:00', taskId: 't1' } });
         expect((await h.call('set_reminder', { at: '19:00', title: 'Call the bank' })).text).toContain('(a new task)');
         const both = await h.call('set_reminder', { at: '19:00', taskId: 't1', title: 'x' });
         expect([both.isError, both.text]).toEqual([true, 'Give taskId (an existing task) or title (a new task), one of them.']);
         expect((await h.call('list_reminders', {})).text).toBe(`1 reminder:\n- ${when} · "Book the mock" · id m1`);
         expect((await h.call('cancel_reminder', { reminderId: 'm1' })).text).toContain(`Cancelled the reminder for "Book the mock" (${when}).`);
+    });
+
+    it('an older server refuses ring and repeat: the reminder is set without them (it rings there, once), and says so', async () => {
+        const at = '2026-11-16T12:00:00.000Z';
+        const when = 'Mon 16 Nov, 17:30';
+        h = await all({ 'POST /api/reminders': [fail(400, 'Unrecognized keys: "ring", "repeat"'), ok({ _id: 'm5', taskId: 't5', task: 'Stretch', at, when, status: 'pending', createdTask: true }, 201)] });
+        const res = await h.call('set_reminder', { at: '17:30', title: 'Stretch', ring: true, repeat: 'daily' });
+        expect(h.requests.filter((r) => r.method === 'POST').map((r) => r.body)).toEqual([
+            { at: '17:30', title: 'Stretch', ring: true, repeat: 'daily' },
+            { at: '17:30', title: 'Stretch' },
+        ]);
+        expect(res.isError).toBeFalsy();
+        expect(res.text).toContain('(this Recollect server rings every reminder, once: silent and repeating ones come with its next release)');
+    });
+
+    it('stage 7: set_reminder is silent unless he asks for a ring, and may repeat; show_on_lock_screen and clear_lock_line', async () => {
+        const at = '2026-11-16T12:00:00.000Z';
+        const when = 'Mon 16 Nov, 17:30';
+        h = await all({
+            'POST /api/reminders': [ok({ _id: 'm3', taskId: 't3', task: 'Stand up and stretch', at, when, status: 'pending', ring: false, repeat: 'weekdays', createdTask: true }, 201), ok({ _id: 'm4', taskId: 't4', task: 'Catch the train', at, when, status: 'pending', ring: true, repeat: null, createdTask: true }, 201)],
+            'POST /api/lock-pins': ok({ _id: 'p1', text: 'Ship the invoice fix', from: '14:00', to: '18:00', days: [], until: '2026-11-16', setBy: 'agent', now: true }, 201),
+            'POST /api/lock-pins/clear': [ok({ cleared: 1 }), ok({ cleared: 0 })],
+        });
+        const silent = await h.call('set_reminder', { at: '17:30', title: 'Stand up and stretch', repeat: 'weekdays' });
+        expect(silent.text).toContain('(silent, every weekday)');
+        expect(h.requests.at(-1)).toMatchObject({ body: { at: '17:30', title: 'Stand up and stretch', repeat: 'weekdays' } });
+        expect(h.requests.at(-1)!.body).not.toHaveProperty('ring');
+        expect((await h.call('set_reminder', { at: '06:30', title: 'Catch the train', ring: true })).text).toContain('(rings)');
+        expect(h.requests.at(-1)).toMatchObject({ body: { ring: true } });
+        const pin = await h.call('show_on_lock_screen', { text: 'Ship the invoice fix', to: '18:00' });
+        expect(pin.text).toBe('On their lock screen: "Ship the invoice fix" 14:00-18:00 until 2026-11-16 (showing now) · id p1. clear_lock_line takes it off.');
+        expect(h.requests.at(-1)).toMatchObject({ method: 'POST', path: '/api/lock-pins', body: { text: 'Ship the invoice fix', to: '18:00' } });
+        expect((await h.call('clear_lock_line', {})).text).toBe('Cleared 1 pinned line from their lock screen.');
+        expect((await h.call('clear_lock_line', { all: true })).text).toBe('Nothing pinned was showing.');
+        expect(h.requests.at(-1)).toMatchObject({ body: { all: true } });
     });
 
     it('get_recall lists the sessions, the missed questions and the weak spots; get_sharing says who can see a doc', async () => {
@@ -118,7 +156,7 @@ describe('manage tools', () => {
             ],
         });
         expect((await h.call('spread_backlog', {})).text).toBe('Spread 6 overdue reviews over 3 days.\nUndo: the user can undo this from Home → From your agent.');
-        expect((await h.call('spread_backlog', { reason: 'he is back' })).text).toMatch(/^Asked: Spread 34 overdue reviews over the next 6 days, as your daily budget allows\. Waiting for his tap/);
+        expect((await h.call('spread_backlog', { reason: 'he is back' })).text).toMatch(/^Asked: Spread 34 overdue reviews over the next 6 days, as your daily budget allows\. Waiting for the user’s tap/);
         expect(h.requests.at(-1)).toMatchObject({ body: { reason: 'he is back' } });
         expect((await h.call('spread_backlog', {})).text).toBe('Nothing is overdue: nothing to spread.');
     });

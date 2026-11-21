@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  "Your day", 4 x 2 under 140 dp tall (0.7.0, stage 19; CardRule.SHORT_BELOW_DP): the card without the line under
+  the title, the title on one line (fading at the edge), Later kept. With nothing ahead: the date and the buddy's line
+  (two lines) or the day's words. Same ids as widget_day.xml.
+  Edit this file, then run `python widget-themes.py` in android/ for the light, dark and Paper copies.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:paddingStart="16dp"
+    android:paddingTop="11dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="11dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/w_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:singleLine="true"
+            android:ellipsize="none"
+            android:requiresFadingEdge="horizontal"
+            android:fadingEdgeLength="24dp"
+            android:textColor="@color/w_ink_3"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/w_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:singleLine="true"
+            android:textColor="@color/w_ink_3"
+            android:textSize="12sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/w_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:singleLine="true"
+        android:ellipsize="none"
+        android:requiresFadingEdge="horizontal"
+        android:fadingEdgeLength="24dp"
+        android:fontFamily="sans-serif-medium"
+        android:textColor="@color/w_ink_1"
+        android:textSize="17sp" />
+
+    <TextView
+        android:id="@+id/w_voice"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:fontFamily="serif"
+        android:textColor="@color/w_ink_1"
+        android:textSize="16sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/w_detail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:singleLine="true"
+        android:textColor="@color/w_ink_2"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/w_later_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="9dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/w_later"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:background="@drawable/widget_pill"
+            android:contentDescription="@string/later_button_description"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="11dp"
+            android:paddingEnd="15dp">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_later"
+                android:tint="@color/w_ink_1" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="7dp"
+                android:fontFamily="sans-serif-medium"
+                android:singleLine="true"
+                android:text="@string/later_button"
+                android:textColor="@color/w_ink_1"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/w_later_set"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:background="@drawable/widget_pill_set"
+            android:contentDescription="@string/later_set_description"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="11dp"
+            android:paddingEnd="15dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_tick"
+                android:tint="@color/w_ink_1" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="7dp"
+                android:fontFamily="sans-serif-medium"
+                android:singleLine="true"
+                android:text="@string/later_button"
+                android:textColor="@color/w_ink_1"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/w_later_when"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:singleLine="true"
+            android:ellipsize="none"
+            android:requiresFadingEdge="horizontal"
+            android:fadingEdgeLength="16dp"
+            android:textColor="@color/w_ink_2"
+            android:textSize="13sp" />
+    </LinearLayout>
+</LinearLayout>

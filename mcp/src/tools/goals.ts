@@ -161,7 +161,7 @@ export function registerGoalTools(server: McpServer, ctx: ToolContext): void {
         'complete_milestone',
         {
             title: 'Complete a milestone',
-            description: "Mark a goal's milestone as done (when the user says he finished it).",
+            description: "Mark a goal's milestone as done (when the user says they finished it).",
             input: { milestoneId: zId('milestone').describe('Milestone id (from list_goals).') },
             annotations: CHANGES,
         },

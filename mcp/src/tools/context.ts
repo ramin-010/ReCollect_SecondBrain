@@ -157,8 +157,8 @@ export function registerContextTools(server: McpServer, ctx: ToolContext): void 
         {
             title: 'Today',
             description:
-                "The user's day on Home: today's planned revisions (with the doc to open), his focus lines, each path's next topic, " +
-                'and his active goals (deadline, days left, milestones, forecast, next milestone). Start here to plan a day.',
+                "The user's day on Home: today's planned revisions (with the doc to open), their focus lines, each path's next topic, " +
+                'and their active goals (deadline, days left, milestones, forecast, next milestone). Start here to plan a day.',
             input: {},
             annotations: READ_ONLY,
         },

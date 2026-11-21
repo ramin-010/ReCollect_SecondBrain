@@ -82,6 +82,17 @@ describe('the flow', () => {
 
     const input = (over: Record<string, unknown> = {}) => ({ session_id: 's1', cwd: 'E:/PERSONAL_PROJECTS/second_brain', source: 'startup', ...over });
 
+    it('a session longer than the server takes is logged with its most (600 minutes), never refused at every start', async () => {
+        const { env, calls } = setup();
+        const t = (m: number) => new Date(Date.UTC(2026, 10, 14, 6, 0) + m * 60_000);
+        await runHook('start', input(), env, t(0));
+        // A prompt every 4 minutes for 13 hours: 780 active minutes.
+        for (let m = 4; m <= 780; m += 4) await runHook('prompt', input(), env, t(m));
+        await runHook('end', input({ reason: 'prompt_input_exit' }), env, t(780));
+        const put = calls.find((c) => c.method === 'PUT')!;
+        expect(put.body).toMatchObject({ minutes: 600 });
+    });
+
     it('start prints the brief and opens the session; prompts stamp it; end logs it under cc_<session> and forgets it', async () => {
         const { env, calls } = setup();
         const t = (m: number) => new Date(Date.UTC(2026, 10, 14, 10, m));

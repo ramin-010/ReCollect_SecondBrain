@@ -14,7 +14,7 @@ interface Task {
     due: string | null;
 }
 
-const zDue = z.string().trim().max(40).describe('A day YYYY-MM-DD (6 pm his time) or an ISO time.');
+const zDue = z.string().trim().max(40).describe('A day YYYY-MM-DD (6 pm their time) or an ISO time.');
 
 function taskLine(t: Task): string {
     const due = t.due ? ` · due ${new Date(t.due).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}` : '';
@@ -46,7 +46,7 @@ export function registerTaskTools(server: McpServer, ctx: ToolContext): void {
         'add_task',
         {
             title: 'Add a task',
-            description: 'Add a personal task for the user (when he asks, or agrees). A dated one shows on Home under Due today.',
+            description: 'Add a personal task for the user (when they ask, or agree). A dated one shows on Home under Due today.',
             input: { title: z.string().trim().min(1).max(200), due: zDue.optional(), priority: z.enum(['low', 'normal', 'high', 'urgent']).optional() },
             annotations: ADDS,
         },

@@ -24,6 +24,10 @@ public final class DayWallpaper extends WallpaperService {
         return new DayEngine();
     }
 
+    /** 0.6.0: at most one check of the day per this long, when the screen turns on. */
+    static final long CHECK_EVERY_MS = 3 * 60_000L;
+    private static volatile long lastCheck;
+
     private final class DayEngine extends Engine implements Live.Listener, NotifIcons.Listener {
         private final Handler main = new Handler(Looper.getMainLooper());
         private boolean visible;
@@ -36,10 +40,28 @@ public final class DayWallpaper extends WallpaperService {
                 // Off: draw the lock picture now, so it is there the moment the screen comes on.
                 if (Intent.ACTION_SCREEN_OFF.equals(a)) locked = true;
                 else if (Intent.ACTION_USER_PRESENT.equals(a)) locked = false;
-                else if (Intent.ACTION_SCREEN_ON.equals(a)) locked = keyguardLocked();
+                else if (Intent.ACTION_SCREEN_ON.equals(a)) {
+                    locked = keyguardLocked();
+                    // 0.6.0: the words go the moment their time has passed (no network needed), and the small
+                    // day JSON is read at most once per 3 minutes: an answer given elsewhere goes at once.
+                    Live.decide(ctx);
+                    check(ctx.getApplicationContext());
+                }
                 draw();
             }
         };
+
+        /** The check when the screen turns on (0.6.0): the day's JSON, at most once per 3 minutes; new pictures follow. */
+        private void check(Context app) {
+            long now = System.currentTimeMillis();
+            if (now - lastCheck < CHECK_EVERY_MS) return;
+            lastCheck = now;
+            new Thread(() -> {
+                Refresher.run(app, false);
+                Live.decide(app);
+                main.post(this::draw);
+            }, "recollect-screen-on").start();
+        }
 
         @Override
         public void onCreate(SurfaceHolder holder) {
@@ -73,6 +95,7 @@ public final class DayWallpaper extends WallpaperService {
             if (v) {
                 // The system's picker shows the lock picture (what this wallpaper is for).
                 locked = isPreview() || keyguardLocked();
+                Live.decide(DayWallpaper.this.getApplicationContext());
                 draw();
                 // 0.5.1: the wallpaper runs all day, so a refresh chain the system broke starts again here.
                 if (!isPreview()) Schedule.ensure(DayWallpaper.this.getApplicationContext());
@@ -92,6 +115,7 @@ public final class DayWallpaper extends WallpaperService {
 
         @Override
         public void onPicturesChanged() {
+            Live.decide(DayWallpaper.this.getApplicationContext());
             main.post(this::draw);
         }
 

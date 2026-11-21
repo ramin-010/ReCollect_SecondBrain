@@ -3,6 +3,7 @@
 // undoable; empty_trash is level 3: it only asks, and his tap on Home does it.
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { ApiError } from '../api.js';
 import { ToolError } from '../errors.js';
 import { plural, quietly, quote, withUndo } from '../format.js';
 import { zDay, zDocId, zId } from '../schemas.js';
@@ -47,7 +48,26 @@ interface Reminder {
     when: string;
     status: string;
     createdTask?: boolean;
+    /** Stage 7: it rings (an alarm), or it is silent (shows on his phone's home screen). */
+    ring?: boolean;
+    repeat?: string | null;
 }
+
+interface LockPin {
+    _id: string;
+    text: string;
+    from: string;
+    to: string;
+    days: number[];
+    until: string | null;
+    now: boolean;
+}
+
+const REPEAT_WORDS: Record<string, string> = { daily: 'every day', weekdays: 'every weekday', weekly: 'every week' };
+const DAY_NAMES: Record<string, string> = { mo: 'Mon', tu: 'Tue', we: 'Wed', th: 'Thu', fr: 'Fri', sa: 'Sat', su: 'Sun' };
+// A series on chosen days comes as "mo,we,fr" (a newer server joins a day asked for the same thing at the same time).
+const repeatWords = (repeat: string) => REPEAT_WORDS[repeat] ?? `on ${repeat.split(',').map((d) => DAY_NAMES[d] ?? d).join(', ')}`;
+const howItRings = (r: Reminder) => `${r.ring ? 'rings' : 'silent'}${r.repeat ? `, ${repeatWords(r.repeat)}` : ''}`;
 
 interface RecallResults {
     topic: { _id: string; title: string; docId: string | null };
@@ -84,7 +104,7 @@ interface Project {
     goal: { _id: string; title: string } | null;
 }
 
-const TAP = 'Waiting for his tap: it shows under Suggested on his Home with "Do it"; nothing happens until he taps it.';
+const TAP = 'Waiting for the user’s tap: it shows under Suggested on their Home with "Do it"; nothing happens until they tap it.';
 
 function settingsText(s: Settings): string {
     return [
@@ -105,7 +125,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         'trash_doc',
         {
             title: 'Move a doc to the trash',
-            description: 'Move a doc of his to the trash (kept 30 days, then gone; restore_doc takes it out). For "delete this doc".',
+            description: 'Move a doc of theirs to the trash (kept 30 days, then gone; restore_doc takes it out). For "delete this doc".',
             input: { docId: zDocId },
             annotations: CHANGES,
         },
@@ -136,8 +156,8 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         ctx,
         'empty_trash',
         {
-            title: 'Empty the trash (needs his tap)',
-            description: "Ask to delete the docs in his trash for good. It can't be undone, so it only asks: he taps \"Do it\" on Home.",
+            title: 'Empty the trash (needs their tap)',
+            description: "Ask to delete the docs in their trash for good. It can't be undone, so it only asks: they tap \"Do it\" on Home.",
             input: { reason: z.string().trim().max(200).optional() },
             annotations: ADDS,
         },
@@ -153,7 +173,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         'complete_revision',
         {
             title: 'Mark a review done',
-            description: 'Mark a due review done (list_due shows ids) when he has just reviewed it with you; the next one is scheduled.',
+            description: 'Mark a due review done (list_due shows ids) when they have just reviewed it with you; the next one is scheduled.',
             input: { revisionId: zId('revision') },
             annotations: CHANGES,
         },
@@ -184,7 +204,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         server,
         ctx,
         'get_settings',
-        { title: 'Settings', description: 'His learning settings: daily budget, busy days, the morning email, the profile agents read.', input: {}, annotations: READ_ONLY },
+        { title: 'Settings', description: 'Their learning settings: daily budget, busy days, the morning email, the profile agents read.', input: {}, annotations: READ_ONLY },
         async () => settingsText(await api.get<Settings>('/api/learning/settings'))
     );
 
@@ -194,7 +214,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         'update_settings',
         {
             title: 'Change settings',
-            description: 'Change his daily budget (minutes), busy-until day (null ends it), the morning email (on/off, time HH:mm) or the profile agents read.',
+            description: 'Change their daily budget (minutes), busy-until day (null ends it), the morning email (on/off, time HH:mm) or the profile agents read.',
             input: {
                 dailyBudgetMin: z.number().int().min(5).max(600).optional(),
                 busyUntil: zDay.nullable().optional(),
@@ -243,16 +263,16 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         'list_suggestions',
         {
             title: 'Waiting for the user',
-            description: "What waits under Suggested on his Home: proposals and actions that need his tap. Agents can't accept them.",
+            description: "What waits under Suggested on their Home: proposals and actions that need their tap. Agents can't accept them.",
             input: {},
             annotations: READ_ONLY,
         },
         async () => {
             const list = await api.get<Suggestion[]>('/api/suggestions');
-            if (list.length === 0) return 'Nothing is waiting for him.';
+            if (list.length === 0) return 'Nothing is waiting for them.';
             const by = (s: Suggestion) => (s.agentName ? ` · from ${s.agentName}` : s.proposedBy === 'app' ? ' · from the app' : '');
             const clip = (t: string) => (t.length > 160 ? `${t.slice(0, 159)}…` : t);
-            return [`${plural(list.length, 'item')} waiting:`, ...list.map((s) => `- ${s.kind === 'action' ? '[needs his tap] ' : ''}${clip(s.text)}${by(s)}`)].join('\n');
+            return [`${plural(list.length, 'item')} waiting:`, ...list.map((s) => `- ${s.kind === 'action' ? '[needs their tap] ' : ''}${clip(s.text)}${by(s)}`)].join('\n');
         }
     );
 
@@ -265,18 +285,30 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Set a reminder',
             description:
-                'Remind him at a time (his phone rings then): on a task (taskId from list_tasks), or with a title, which makes that task. at = "HH:mm" (next such time), "YYYY-MM-DDTHH:mm" (his zone) or ISO.',
+                'Remind them: silent unless they ask for an alarm (ring: true). On a task (taskId) or a title (a new task). at: "HH:mm", "YYYY-MM-DDTHH:mm" (their zone) or ISO.',
             input: {
                 at: z.string().trim().min(4).max(40),
                 taskId: zId('task').optional(),
                 title: z.string().trim().min(1).max(200).optional(),
+                ring: z.boolean().optional(),
+                repeat: z.enum(['daily', 'weekdays', 'weekly']).optional(),
             },
             annotations: ADDS,
         },
-        async ({ at, taskId, title }) => {
+        async ({ at, taskId, title, ring, repeat }) => {
             if (!taskId === !title) throw new ToolError('Give taskId (an existing task) or title (a new task), one of them.');
-            const r = await api.post<Reminder>('/api/reminders', { at, ...(taskId ? { taskId } : { title }) });
-            return quietly(ctx.workMode, withUndo(`Reminder set: ${quote(r.task)} at ${r.when}${r.createdTask ? ' (a new task)' : ''} · id ${r._id}.`));
+            const base = { at, ...(taskId ? { taskId } : { title }) };
+            let r: Reminder & { createdTask?: boolean };
+            try {
+                r = await api.post<Reminder>('/api/reminders', { ...base, ...(ring ? { ring } : {}), ...(repeat ? { repeat } : {}) });
+            } catch (err) {
+                // An older Recollect server (before stage 7's release) refuses ring and repeat: there a reminder rings, once.
+                if (!(err instanceof ApiError) || err.status !== 400 || !(ring || repeat) || !/\b(ring|repeat)\b/.test(err.message)) throw err;
+                r = await api.post<Reminder>('/api/reminders', base);
+            }
+            // An older server says nothing of how it rings: there every reminder rings (an alarm on the phone, an email), once.
+            const kind = r.ring === undefined ? ' (this Recollect server rings every reminder, once: silent and repeating ones come with its next release)' : ` (${howItRings(r)})`;
+            return quietly(ctx.workMode, withUndo(`Reminder set: ${quote(r.task)} at ${r.when}${kind}${r.createdTask ? ' (a new task)' : ''} · id ${r._id}.`));
         }
     );
 
@@ -284,11 +316,52 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         server,
         ctx,
         'list_reminders',
-        { title: 'Reminders', description: 'His reminders still to come, soonest first, with ids for cancel_reminder.', input: {}, annotations: READ_ONLY },
+        { title: 'Reminders', description: 'Their reminders still to come, soonest first, with ids for cancel_reminder.', input: {}, annotations: READ_ONLY },
         async () => {
             const list = await api.get<Reminder[]>('/api/reminders');
             if (list.length === 0) return 'No reminders to come.';
-            return [`${plural(list.length, 'reminder')}:`, ...list.map((r) => `- ${r.when} · ${quote(r.task)} · id ${r._id}`)].join('\n');
+            return [`${plural(list.length, 'reminder')}:`, ...list.map((r) => `- ${r.when} · ${quote(r.task)}${r.ring === undefined ? '' : ` · ${howItRings(r)}`} · id ${r._id}`)].join('\n');
+        }
+    );
+
+    // Stage 7 (V1): his own words on the lock screen for a window; his pin wins over the buddy's words in it.
+    defineTool(
+        server,
+        ctx,
+        'show_on_lock_screen',
+        {
+            title: 'Show on their lock screen',
+            description:
+                'Put their words on their phone\'s lock screen for a window, on their say-so ("put this on my lock screen until 6"). from/to "HH:mm" (their time; from: now, to: midnight); days "weekdays", "weekends" or 0-6 (Sunday 0) to repeat; until "YYYY-MM-DD". Without days or until: today only.',
+            input: {
+                text: z.string().trim().min(1).max(120),
+                from: z.string().trim().max(5).optional(),
+                to: z.string().trim().max(5).optional(),
+                days: z.union([z.enum(['weekdays', 'weekends']), z.array(z.number().int().min(0).max(6)).max(7)]).optional(),
+                until: z.string().trim().max(10).optional(),
+            },
+            annotations: ADDS,
+        },
+        async ({ text, from, to, days, until }) => {
+            const p = await api.post<LockPin>('/api/lock-pins', { text, ...(from ? { from } : {}), ...(to ? { to } : {}), ...(days ? { days } : {}), ...(until ? { until } : {}) });
+            const when = `${p.from}-${p.to === '00:00' ? 'midnight' : p.to}${p.days.length ? ` on ${p.days.length === 5 && !p.days.includes(0) && !p.days.includes(6) ? 'weekdays' : `days ${p.days.join(',')}`}` : ''}${p.until ? ` until ${p.until}` : ''}`;
+            return `On their lock screen: ${quote(p.text)} ${when}${p.now ? ' (showing now)' : ''} · id ${p._id}. clear_lock_line takes it off.`;
+        }
+    );
+
+    defineTool(
+        server,
+        ctx,
+        'clear_lock_line',
+        {
+            title: 'Clear their lock screen line',
+            description: 'Take their pinned words off the lock screen: the one showing now, one by id (from show_on_lock_screen), or all.',
+            input: { id: z.string().trim().min(1).max(40).optional(), all: z.boolean().optional() },
+            annotations: CHANGES,
+        },
+        async ({ id, all }) => {
+            const r = await api.post<{ cleared: number }>('/api/lock-pins/clear', { ...(id ? { id } : {}), ...(all ? { all } : {}) });
+            return r.cleared ? `Cleared ${plural(r.cleared, 'pinned line')} from their lock screen.` : 'Nothing pinned was showing.';
         }
     );
 
@@ -309,7 +382,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         'get_recall',
         {
             title: 'Recall results',
-            description: "A topic's last Recall sessions: grades, the questions he missed with the grader's words, open weak spots. To quiz him on what he gets wrong. topicId, or docId.",
+            description: "A topic's last Recall sessions: grades, the questions they missed with the grader's words, open weak spots. To quiz them on what they get wrong. topicId, or docId.",
             input: { topicId: zId('topic').optional(), docId: zDocId.optional() },
             annotations: READ_ONLY,
         },
@@ -333,7 +406,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         'get_sharing',
         {
             title: 'Who can see a doc',
-            description: 'Who can see a doc of his: published to the web or not (its read-only link), the people added with their roles, and who asks to edit.',
+            description: 'Who can see a doc of theirs: published to the web or not (its read-only link), the people added with their roles, and who asks to edit.',
             input: { docId: zDocId },
             annotations: READ_ONLY,
         },
@@ -351,9 +424,9 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         ctx,
         'publish_doc',
         {
-            title: 'Publish a doc to the web (needs his tap)',
+            title: 'Publish a doc to the web (needs their tap)',
             description:
-                'Ask to publish a doc of his (anyone with the link can read it, never edit; the link stays until unpublished) or to stop publishing it (on: false; its link stops working). It leaves the app, so it only asks: he taps "Do it" on Home.',
+                'Ask to publish a doc of theirs (anyone with the link can read it, never edit; the link stays until unpublished) or to stop publishing it (on: false; its link stops working). It leaves the app, so it only asks: they tap "Do it" on Home.',
             input: { docId: zDocId, on: z.boolean().default(true), reason: z.string().trim().max(200).optional() },
             annotations: ADDS,
         },
@@ -368,9 +441,9 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         ctx,
         'share_doc',
         {
-            title: 'Share a doc with someone (needs his tap)',
+            title: 'Share a doc with someone (needs their tap)',
             description:
-                'Ask to give someone with a Recollect account access to a doc of his by their email: role "viewer" (can view), "editor" (can edit), or "remove" to take it away. It only asks: he taps "Do it" on Home.',
+                'Ask to give someone with a Recollect account access to a doc of theirs by their email: role "viewer" (can view), "editor" (can edit), or "remove" to take it away. It only asks: they tap "Do it" on Home.',
             input: {
                 docId: zDocId,
                 email: z.string().trim().email().max(200),
@@ -391,7 +464,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         'spread_backlog',
         {
             title: 'Spread the overdue reviews',
-            description: 'Spread every overdue review over today and the next days, as his daily budget allows (undoable). Over 20 at once it only asks: he taps "Do it" on Home.',
+            description: 'Spread every overdue review over today and the next days, as their daily budget allows (undoable). Over 20 at once it only asks: they tap "Do it" on Home.',
             input: { reason: z.string().trim().max(200).optional() },
             annotations: CHANGES,
         },

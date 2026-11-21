@@ -5,14 +5,14 @@ description: Write study notes into Recollect (the user's learning app) with its
 
 # Writing notes in Recollect
 
-Recollect is the user's learning app; he revises what he writes there. You write into it with the `recollect` MCP tools. A note is Markdown with diagram fences, and **one `create_doc` call writes the whole note, diagrams included**. You never place boxes: you say what is in a diagram, and Recollect lays it out.
+Recollect is the user's learning app; they revise what they write there. You write into it with the `recollect` MCP tools. A note is Markdown with diagram fences, and **one `create_doc` call writes the whole note, diagrams included**. You never place boxes: you say what is in a diagram, and Recollect lays it out.
 
 ## The workflow: two calls at most
 
 1. `create_doc` with the full note (or `append_to_doc` / `replace_section` for an existing doc).
 2. Read the answer. Every canvas reports its boxes, arrows, size, how big it shows in a doc, and any problems ("2 arrows cross", "box x has no arrows", "shows at 55%"). If a problem matters, fix it once with `update_canvas` (small changes) or `replace_section` with the corrected fence, then stop. `preview_diagram` shows you the board as a picture when you want to look.
 
-**A small change to an existing doc** (one paragraph, a heading, a to-do ticked, a block removed): `get_outline` gives every block's id, then `update_block`, `insert_blocks` (after, before or under a block) or `delete_blocks` changes just that block, live, while he types elsewhere. Keep `replace_section` for rewriting a whole section.
+**A small change to an existing doc** (one paragraph, a heading, a to-do ticked, a block removed): `get_outline` gives every block's id, then `update_block`, `insert_blocks` (after, before or under a block) or `delete_blocks` changes just that block, live, while they type elsewhere. Keep `replace_section` for rewriting a whole section.
 
 Don't ask the user to arrange anything, and never write coordinates.
 
@@ -58,7 +58,7 @@ flowchart
 
 **Read it well**: 5–15 boxes per board, labels under 40 characters, every box on an arrow, one idea per board. Split a big system into two boards (the write path, the read path) rather than one crowded one.
 
-**Changing a board**: `read_doc` prints each canvas in this language with `%% id: cv_…` on its first line. Send it back edited (keep that line) and every box the user moved stays where he put it; only new boxes are placed. For small changes use `update_canvas` with `add` (new lines), `remove` (box ids, or arrows as `a --> b`) and `rename`. Positions are kept, so a new direction or a cleaner layout needs `update_canvas` with `relayout: true` (that lays the whole board out again).
+**Changing a board**: `read_doc` prints each canvas in this language with `%% id: cv_…` on its first line. Send it back edited (keep that line) and every box the user moved stays where they put it; only new boxes are placed. For small changes use `update_canvas` with `add` (new lines), `remove` (box ids, or arrows as `a --> b`) and `rename`. Positions are kept, so a new direction or a cleaner layout needs `update_canvas` with `relayout: true` (that lays the whole board out again).
 
 ## What a good system-design note holds
 
@@ -68,7 +68,7 @@ flowchart
 4. **The data**: an `erDiagram` (or a short list of tables and keys) and why it is shaped that way.
 5. **One flow in detail**: a `sequenceDiagram` of the hardest request.
 6. **Trade-offs and failure cases**: what breaks first, what happens when a part dies, the alternatives and why not. Use a callout for the key insight: `> [!TIP]`, a trap: `> [!WARNING]`.
-7. **Check yourself**: three to five questions as toggles, answer folded inside, so the user can test his recall:
+7. **Check yourself**: three to five questions as toggles, answer folded inside, so the user can test their recall:
    `<details><summary>Why is the counter range per server, not global?</summary>` answer `</details>`
 
 Headings `##`, short paragraphs, lists; a small GFM table where a comparison reads best. One blank line between paragraphs.

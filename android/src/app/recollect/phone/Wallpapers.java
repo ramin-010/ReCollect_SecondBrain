@@ -75,10 +75,16 @@ final class Wallpapers {
         }
     }
 
+    /**
+     * Sets the picture on the screens named. Stage 11 (his item 10b): with a visible crop hint, the middle of the picture
+     * at the screen's own shape, so a launcher that scrolls or zooms its wallpaper never cuts the words at the sides.
+     */
     static void set(Context ctx, Bitmap picture, boolean home, boolean lock) throws IOException {
         int which = (home ? WallpaperManager.FLAG_SYSTEM : 0) | (lock ? WallpaperManager.FLAG_LOCK : 0);
         if (which == 0) return;
-        WallpaperManager.getInstance(ctx).setBitmap(picture, null, true, which);
+        int[] screen = screenSize(ctx);
+        int[] c = ScreenLook.cropHint(picture.getWidth(), picture.getHeight(), screen[0], screen[1]);
+        WallpaperManager.getInstance(ctx).setBitmap(picture, new android.graphics.Rect(c[0], c[1], c[2], c[3]), true, which);
     }
 
     // ── The copy of his own wallpaper ─────────────────────────────────────────────────

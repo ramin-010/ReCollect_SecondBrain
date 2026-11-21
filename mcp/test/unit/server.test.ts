@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
-import { DEFAULT_GROUPS, INSTRUCTIONS, TOOL_GROUP_NAMES, TOOL_GROUPS, TOOL_LEVELS, TOOL_NAMES } from '../../src/server.js';
+import { DEFAULT_GROUPS, EXCLUDED_INSTRUCTIONS, INSTRUCTIONS, OFFICE_INSTRUCTIONS, OFFICE_TOOLS, TOOL_GROUP_NAMES, TOOL_GROUPS, TOOL_LEVELS, TOOL_NAMES, WEB_INSTRUCTIONS, WEB_TOOLS } from '../../src/server.js';
+import { CATCH_UP } from '../../src/prompts.js';
 import { connect, fail, type Harness } from './harness.js';
 
 let h: Harness | undefined;
@@ -45,7 +46,7 @@ describe('the server', () => {
         expect(await listed()).toEqual(TOOL_NAMES.filter((n) => DEFAULT_GROUPS.includes(TOOL_GROUPS[n])));
         const changed = new Promise<void>((resolve) => h!.client.setNotificationHandler(ToolListChangedNotificationSchema, () => resolve()));
         const res = await h.call('more_tools', {});
-        expect(res.text).toMatch(/^Turned on: .*get_mirror.*list_decisions.*recent_agent_edits.*get_work_log, forget\. They are in your tool list now\.$/);
+        expect(res.text).toMatch(/^Turned on: list_sessions, .*get_mirror.*list_decisions.*get_learning_overview.*recent_agent_edits.*get_work_log, update_work_line\. They are in your tool list now\.$/);
         expect(res.text).not.toContain('set_reminder');
         await changed;
         expect(await listed()).toEqual([...TOOL_NAMES]);
@@ -54,7 +55,11 @@ describe('the server', () => {
     it('offers the note recipe as a prompt: the skill’s text, plus the topic', async () => {
         h = await connect({});
         const { prompts } = await h.client.listPrompts();
-        expect(prompts.map((p) => p.name)).toEqual(['note_recipe']);
+        expect(prompts.map((p) => p.name)).toEqual(['catch_up', 'note_recipe']);
+        // E4: the catch-up for a chat with no hooks names the tools it uses.
+        const catchUp = await h.client.getPrompt({ name: 'catch_up', arguments: {} });
+        const words = (catchUp.messages[0]!.content as { text: string }).text;
+        for (const tool of ['get_brief', 'remember', 'update_memory', 'said_on', 'checkpoint']) expect(words).toContain(tool);
         const got = await h.client.getPrompt({ name: 'note_recipe', arguments: { topic: 'consistent hashing' } });
         const text = (got.messages[0]!.content as { text: string }).text;
         expect(text).toContain('## The canvas language');
@@ -92,5 +97,58 @@ describe('the server', () => {
         const res = await h.call('read_doc', {});
         expect(res.isError).toBe(true);
         expect(res.text).toMatch(/docId/);
+    });
+});
+
+describe('a tool set per door (MCP_MEMORY_PLAN §4.1)', () => {
+    const names = async () => (await h!.client.listTools()).tools.map((t) => t.name);
+
+    it('web (claude.ai, ChatGPT): its 32 tools, no more_tools, its own instructions; another tool answers one clear line', async () => {
+        h = await connect({}, { set: 'web' });
+        expect((await names()).sort()).toEqual([...WEB_TOOLS].sort());
+        expect(WEB_TOOLS).toHaveLength(32);
+        expect(await names()).not.toContain('more_tools');
+        expect(h.client.getInstructions()).toBe(WEB_INSTRUCTIONS);
+        const other = await h.call('update_canvas', { docId: 'd1', canvasId: 'c1', diagram: 'flowchart LR\n a --> b' });
+        expect(other).toEqual({ text: 'update_canvas is not available in this app: use Recollect itself, or Claude Code.', isError: true });
+        expect(other.text).not.toMatch(/disabled/);
+    });
+
+    it('code (Claude Code): the default groups with saving, finding and correcting; manage on more_tools', async () => {
+        h = await connect({});
+        const listed = await names();
+        expect(listed).toEqual(expect.arrayContaining(['remember', 'update_memory', 'recall_memory', 'forget', 'more_tools']));
+        expect(listed).not.toContain('list_sessions');
+        expect(listed).not.toContain('get_learning_overview');
+        expect(h.client.getInstructions()).toBe(INSTRUCTIONS);
+    });
+
+    it('office (a work folder): the seven saving tools; excluded: none, and one line', async () => {
+        h = await connect({}, { set: 'office' });
+        expect((await names()).sort()).toEqual([...OFFICE_TOOLS].sort());
+        expect(h.client.getInstructions()).toBe(OFFICE_INSTRUCTIONS);
+        await h.close();
+        h = await connect({}, { set: 'excluded' });
+        expect(await names()).toEqual([]);
+        expect(h.client.getInstructions()).toBe(EXCLUDED_INSTRUCTIONS);
+        expect(await h.call('remember', { text: 'x' })).toEqual({ text: EXCLUDED_INSTRUCTIONS, isError: true });
+        expect(h.requests).toHaveLength(0);
+    });
+
+    it('all (Ask AI): every tool', async () => {
+        h = await connect({}, { set: 'all' });
+        expect((await names()).sort()).toEqual([...TOOL_NAMES].sort());
+    });
+});
+
+describe('the wording, for anyone (MCP_MEMORY_PLAN §4.10)', () => {
+    // Stage 1: the instructions and the tools it touched; stage 4 widens this to every text.
+    const TOUCHED = ['get_brief', 'remember', 'update_memory', 'recall_memory', 'forget', 'checkpoint', 'get_work_log', 'log_work', 'create_doc'];
+
+    it('says "the user" and "they": never he, him or his', async () => {
+        h = await connect({}, { set: 'all' });
+        const { tools } = await h.client.listTools();
+        const texts = [INSTRUCTIONS, WEB_INSTRUCTIONS, OFFICE_INSTRUCTIONS, EXCLUDED_INSTRUCTIONS, CATCH_UP, ...tools.filter((t) => TOUCHED.includes(t.name)).map((t) => JSON.stringify(t))];
+        for (const text of texts) expect(text, text.slice(0, 80)).not.toMatch(/\b(he|him|his|himself)\b/i);
     });
 });

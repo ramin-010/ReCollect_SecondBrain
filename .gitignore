@@ -19,6 +19,9 @@
 /context/specs/BUDDY_MEMORY_PLAN.md
 /context/specs/HOSTING_PREP_PLAN.md
 /context/specs/ECOSYSTEM_V2_PLAN.md
+/context/specs/MCP_MEMORY_PLAN.md
+/context/specs/SIMULATION_PLAN.md
+/context/specs/PHONE_APP_REDESIGN_PLAN.md
 /context/specs/HOME_DOCS_AGENT_PLAN.md
 
 # The Android app's build tools, outputs and signing key
@@ -35,6 +38,7 @@
 
 node_modules/
 dist/
+dist-next/
 *.stackdump
 .env
 .env.*

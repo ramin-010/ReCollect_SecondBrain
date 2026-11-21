@@ -2,13 +2,14 @@
 // live into an open editor (the API applies them through Hocuspocus) and keep a snapshot for Undo.
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { ApiError } from '../api.js';
 import { ToolError } from '../errors.js';
 import { dayOf, plural, quote, withUndo } from '../format.js';
 import { userTimeZone } from '../timezone.js';
 import { zDocId, zId, zMarkdown, zSubjectName } from '../schemas.js';
 import { afterSubject, resolveSubject } from '../subjects.js';
 import { ADDS, CHANGES, READ_ONLY, defineTool, type ToolContext } from '../tool.js';
-import type { CanvasPreview, CanvasReport, CanvasUpdated, DocAppended, DocCreated, DocListItem, DocRead, DocUpdated, SectionReplaced } from '../types.js';
+import type { CanvasPreview, CanvasReport, CanvasUpdated, DocAppended, DocCreated, DocListItem, DocRead, DocUpdated, NoteAdded, SectionReplaced } from '../types.js';
 
 /** What a box can be (backend/src/services/docs/canvas.ts CANVAS_KINDS): an icon, and its default shape. */
 export const CANVAS_KINDS = [
@@ -78,8 +79,30 @@ export function canvasLine(report: CanvasReport): string {
 
 const canvasLines = (reports: readonly CanvasReport[] | undefined): string[] => (reports ?? []).map(canvasLine);
 
+/**
+ * The web door's shorter words for the docs tools (ECOSYSTEM_V2_PLAN stage 12: room for the work log in its 24,000
+ * characters). The canvas and block tools are not listed there, so their mentions go; guide: true still answers the
+ * full writing guide.
+ */
+const WEB_DOC_WORDS = {
+    search_docs: 'Find their docs by words (every word must match; best first), or the most recent without a query: id, subject, last update, a snippet. Search before creating a doc.',
+    read_doc: 'Read one doc as Markdown, after a header with its id, title, subject and last update.',
+    create_doc:
+        'Create a doc from Markdown (GitHub style, > [!TIP] callouts, <details> toggles, ```mermaid diagrams), optionally under a subject with spaced revision (revise: true). search_docs first: append_to_doc beats a duplicate. guide: true answers the full guide and creates nothing.',
+    append_to_doc: 'Add Markdown to a doc: at its end, or with heading inside that section (after: a few words of the paragraph it follows). Their own text is never touched.',
+} as const;
+
+/**
+ * Stage 14 (ECOSYSTEM_V2_PLAN, "Docs that keep what helped"): the moment to offer is while they study the doc, so the
+ * rule rides at the end of read_doc's answer (no tool-budget cost), for a doc they can edit.
+ */
+export const STUDY_NOTE_LINE =
+    // Tuning round 1 (the manager's set, 11-20): "ascending, right?" drew an offer to add "sorted ascending".
+    'Studying this with them? When explaining a part of it took real work in this chat (a new explanation, an example that made it click, a step or a term the doc lacks, a correction) and it would help their next revision, offer once to add it under its heading (append_to_doc with heading and after); add only on their yes. A question answered in a sentence or two, or anything the doc already says or implies, needs no offer.';
+
 export function registerDocTools(server: McpServer, ctx: ToolContext): void {
     const { api } = ctx;
+    const web = ctx.set === 'web';
 
     defineTool(
         server,
@@ -87,9 +110,10 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
         'search_docs',
         {
             title: 'Search docs',
-            description:
-                "Find docs by words in the title or text (every word must match, in any form or as a word's start; best match first). " +
-                'Without a query: the most recently updated docs. Returns id, subject, last update and a snippet per doc. Search before creating a doc, to extend an existing one instead of making a duplicate.',
+            description: web
+                ? WEB_DOC_WORDS.search_docs
+                : "Find docs by words in the title or text (every word must match, in any form or as a word's start; best match first). " +
+                  'Without a query: the most recently updated docs. Returns id, subject, last update and a snippet per doc. Search before creating a doc, to extend an existing one instead of making a duplicate.',
             input: {
                 query: z.string().trim().max(200).optional().describe('Words to look for. Leave out for the most recently updated docs.'),
                 limit: z.number().int().min(1).max(50).optional().describe('How many docs, 1–50 (default 10).'),
@@ -114,10 +138,11 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
         'read_doc',
         {
             title: 'Read a doc',
-            description:
-                'Read one doc as Markdown (the live version if it is open), after a one-line header with its id, title, subject, last update and whether you can edit it. ' +
-                'Read before replace_section, to see the exact headings. A canvas shows as a ```canvas fence in Mermaid flowchart text, its id on the first line (%% id: cv_…): ' +
-                'change it with update_canvas (small changes, or a whole new diagram) and see it with preview_diagram; positions are not in the text, Recollect keeps them.',
+            description: web
+                ? WEB_DOC_WORDS.read_doc
+                : 'Read one doc as Markdown (the live version if it is open), after a one-line header with its id, title, subject, last update and whether you can edit it. ' +
+                  'Read before replace_section, to see the exact headings. A canvas shows as a ```canvas fence in Mermaid flowchart text, its id on the first line (%% id: cv_…): ' +
+                  'change it with update_canvas (small changes, or a whole new diagram) and see it with preview_diagram; positions are not in the text, Recollect keeps them.',
             input: { docId: zDocId },
             annotations: READ_ONLY,
         },
@@ -130,7 +155,8 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
                 `updated ${dayOf(doc.updatedAt, zone)}`,
                 doc.canEdit ? 'editable' : 'read-only (shared with the user as a viewer)',
             ].join(' · ');
-            return `${header}\n\n${doc.markdown.trim() ? doc.markdown : '(empty doc)'}`;
+            const body = doc.markdown.trim() ? doc.markdown : '(empty doc)';
+            return `${header}\n\n${body}${doc.canEdit && doc.markdown.trim() ? `\n\n---\n${STUDY_NOTE_LINE}` : ''}`;
         }
     );
 
@@ -140,16 +166,19 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
         'create_doc',
         {
             title: 'Create a doc',
-            description:
-                "Create a new doc from Markdown. Optionally file it under a subject (by name) and schedule spaced revision " +
-                '(revise: true → reviews 1, 3, 7 and 21 days from today; needs a subject). ' +
-                'A good learning doc: a 2–3 line summary, sections under ## headings, a worked example or code, a ```mermaid diagram where structure helps, ' +
-                'pitfalls in a > [!WARNING] callout, and 3–5 self-test questions as <details> toggles at the end. ' +
-                'search_docs first: extending an existing doc (append_to_doc) beats a duplicate.\n\n' +
-                MARKDOWN_GUIDE,
+            description: web
+                ? WEB_DOC_WORDS.create_doc
+                : "Create a new doc from Markdown. Optionally file it under a subject (by name) and schedule spaced revision " +
+                  '(revise: true → reviews 1, 3, 7 and 21 days from today; needs a subject). ' +
+                  'A good learning doc: a 2–3 line summary, sections under ## headings, a worked example or code, a diagram where structure helps, ' +
+                  'pitfalls in a > [!WARNING] callout, and 3–5 self-test questions as <details> toggles at the end. ' +
+                  'search_docs first: extending an existing doc (append_to_doc) beats a duplicate. ' +
+                  'Markdown: GitHub style plus callouts (> [!TIP]), <details> toggles, ```mermaid diagrams (checked on write: a broken one is a 400 naming its line, nothing stored) and ```canvas boards (Mermaid flowchart text). ' +
+                  'Before your first doc, call it with only guide: true: it answers the full Markdown and diagram guide and creates nothing.',
             input: {
-                title: z.string().trim().min(1, 'A doc needs a title').max(200).describe('The doc title (shown above the body).'),
-                markdown: zMarkdown.describe("The body in Markdown. Don't repeat the title as a heading at the top."),
+                guide: z.boolean().optional().describe('true: answer the writing guide and create nothing (send nothing else).'),
+                title: z.string().trim().min(1, 'A doc needs a title').max(200).optional().describe('The doc title (shown above the body). Needed unless guide.'),
+                markdown: zMarkdown.optional().describe("The body in Markdown. Don't repeat the title as a heading at the top. Needed unless guide."),
                 subject: zSubjectName.optional().describe('Subject name to file it under, e.g. "DSA" (case-insensitive; see list_subjects).'),
                 topicId: zId('topic')
                     .optional()
@@ -159,7 +188,10 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
             },
             annotations: ADDS,
         },
-        async ({ title, markdown, subject, topicId, revise, create_subject_if_missing }) => {
+        async ({ guide, title, markdown, subject, topicId, revise, create_subject_if_missing }) => {
+            // The full guide on request (MCP_MEMORY_PLAN §4.10): a host with tools only (no prompts) can still read it.
+            if (guide) return `${MARKDOWN_GUIDE}\n\nThe whole note recipe, with worked examples, is the note_recipe prompt where the app shows prompts.`;
+            if (!title || !markdown) throw new ToolError('Send title and markdown (or only guide: true for the writing guide).');
             if (revise && !subject && !topicId) throw new ToolError('revise needs a subject or a topicId: pass subject (a name from list_subjects) or the planned topic it is the note of.');
             const resolved = subject ? await resolveSubject(api, subject, { createIfMissing: create_subject_if_missing }) : null;
             const doc = await afterSubject(
@@ -222,18 +254,39 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
         'append_to_doc',
         {
             title: 'Append to a doc',
-            description:
-                'Add Markdown at the end of an existing doc: a new section, an example, self-test questions. It appears live if the doc is open; his own text is never touched. ' +
-                SAME_MARKDOWN,
+            description: web
+                ? WEB_DOC_WORDS.append_to_doc
+                : 'Add Markdown to an existing doc: at its end (a new section, self-test questions), or with heading inside that section, after the paragraph whose words you quote in after (a note that helped them, on their yes). It appears live if the doc is open; the user’s own text is never touched. ' +
+                  SAME_MARKDOWN,
             input: {
                 docId: zDocId,
                 markdown: zMarkdown.min(1, 'markdown is empty').describe('What to add, in Markdown.'),
+                // Stage 14: a note inside one section (the server places it, adds the day and the app, refuses a repeat).
+                heading: z.string().trim().min(1).max(300).optional(),
+                after: z.string().trim().max(300).optional(),
             },
             annotations: ADDS,
         },
-        async ({ docId, markdown }) => {
-            const result = await api.post<DocAppended>(`/api/agent/docs/${docId}/append`, { markdown });
-            return withUndo([`Appended ${plural(result.appended, 'block')} to the end of doc ${result.id}.`, ...canvasLines(result.canvases)].join('\n'));
+        async ({ docId, markdown, heading, after }) => {
+            if (!heading) {
+                if (after) throw new ToolError('after needs heading: the section the note goes in.');
+                const result = await api.post<DocAppended>(`/api/agent/docs/${docId}/append`, { markdown });
+                return withUndo([`Appended ${plural(result.appended, 'block')} to the end of doc ${result.id}.`, ...canvasLines(result.canvases)].join('\n'));
+            }
+            let note: NoteAdded | DocAppended;
+            try {
+                note = await api.post<NoteAdded | DocAppended>(`/api/agent/docs/${docId}/append`, { markdown, heading, ...(after ? { after } : {}) });
+            } catch (err) {
+                if (err instanceof ApiError && err.status === 400 && /unrecognized key/i.test(err.message)) {
+                    return 'This Recollect server is older: it adds notes inside a section from its next release. Nothing was added.';
+                }
+                throw err;
+            }
+            // An older Recollect server (before the deploy) ignores the two fields and appends at the doc's end.
+            if (!('heading' in note)) return withUndo(`Appended ${plural(note.appended, 'block')} to the end of doc ${note.id} (this Recollect server is older: notes go inside a section from its next release).`);
+            if ('already' in note) return `Already in that section (${quote(note.heading, 80)}): not added again.`;
+            const where = note.placed === 'after' ? 'right after the paragraph you quoted' : 'at the end of that section';
+            return withUndo([`Added a note under ${quote(note.heading, 80)} in doc ${note.id}, ${where}, with the day and your app under it.`, ...canvasLines(note.canvases)].join('\n'));
         }
     );
 
@@ -326,7 +379,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
                     .boolean()
                     .optional()
                     .describe(
-                        'true: lay the whole board out again instead of keeping every box where it is: needed for a new direction (flowchart TB / LR) or a board that reads badly. Boxes the user moved lose their places (he can undo). Leave out to keep his arrangement.'
+                        'true: lay the whole board out again instead of keeping every box where it is: needed for a new direction (flowchart TB / LR) or a board that reads badly. Boxes the user moved lose their places (they can undo). Leave out to keep the user’s arrangement.'
                     ),
             },
             annotations: CHANGES,

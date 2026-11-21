@@ -62,7 +62,7 @@ export function registerPathTools(server: McpServer, ctx: ToolContext): void {
             title: "A subject's path",
             description:
                 "The topics of a subject in their order, like a course: ✓ done, ▶ in progress, ○ planned, – skipped, with each one's next step and doc, and the topic to do next. " +
-                'Read it before studying with the user, to pick up where he is.',
+                'Read it before studying with the user, to pick up where they are.',
             input: { subject: zSubjectName.describe('The subject name, e.g. "System Design".') },
             annotations: READ_ONLY,
         },

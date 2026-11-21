@@ -19,6 +19,10 @@ export interface ToolContext {
     workProject?: string;
     /** B10: the folder's project when Recollect's hooks act in it (log_work reads the hook's clock). */
     clockProject?: string;
+    /** MCP_MEMORY_PLAN §4.9: Claude Code's folder, sent with remember and update_memory. */
+    project?: string;
+    /** MCP_MEMORY_PLAN §4.1: the door's tool set (the web's get_brief is the small buddy brief). */
+    set?: 'web' | 'code' | 'office' | 'excluded' | 'all';
 }
 
 export interface ToolSpec<S extends z.ZodRawShape> {
@@ -50,9 +54,11 @@ export function defineTool<S extends z.ZodRawShape>(
 ): void {
     // The SDK validates the arguments against this shape before the callback runs.
     const inputSchema: ZodRawShapeCompat = spec.input;
+    // The title once, at the top (the protocol's display name since 2025-06-18; clients fall back to annotations.title
+    // only without it): the copy in the annotations cost about 30 characters a tool of both tool budgets (stage 13).
     const handle = server.registerTool(
         name,
-        { title: spec.title, description: spec.description, inputSchema, annotations: { title: spec.title, ...spec.annotations } },
+        { title: spec.title, description: spec.description, inputSchema, annotations: { ...spec.annotations } },
         async (args: unknown): Promise<CallToolResult> => {
             if (ctx.problem) return errorResult(ctx.problem);
             try {

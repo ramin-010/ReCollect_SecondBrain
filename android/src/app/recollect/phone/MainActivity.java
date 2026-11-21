@@ -95,7 +95,12 @@ public final class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         prefs = Prefs.of(this);
         bind();
-        handle(getIntent());
+        // 0.5.2: after the system stops the app, Android recreates it with the intent it was first opened
+        // with, the connect link, so a connected app showed "Connect to Recollect?" again. A recreated
+        // screen (`state`) or one opened from Recents never replays its link.
+        boolean replay = state != null || (getIntent().getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0;
+        if (replay) show();
+        else handle(getIntent());
     }
 
     @Override
@@ -242,6 +247,12 @@ public final class MainActivity extends Activity {
         intent.setData(null); // a later resume doesn't run it again
         try {
             pending = ConnectLink.parse(data.toString());
+            // 0.5.2: the link this phone already holds is no news: the app shows where it is.
+            if (prefs.connected() && pending.server.equals(prefs.server()) && pending.token.equals(prefs.token())) {
+                pending = null;
+                showSettings();
+                return;
+            }
             showConfirm(null);
         } catch (ConnectLink.Refused r) {
             pending = null;
@@ -395,6 +406,7 @@ public final class MainActivity extends Activity {
         showPreview();
         notice(problem, prefs.failure());
         showBuddy(a == null ? null : a.buddy);
+        showAsks(a);
         showStyles();
         if (BuildConfig.QA) showWidgetPreview();
         toggle(swNotify, prefs.notesOn(), on -> {
@@ -484,6 +496,46 @@ public final class MainActivity extends Activity {
         }
         latelyTitle.setVisibility(shown > 0 ? View.VISIBLE : View.GONE);
         lately.setVisibility(shown > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    /** 0.6.0: the buddy's open questions on the app's screen, above its line, each with its quick answers. */
+    private LinearLayout askBox;
+
+    private void showAsks(Ambient a) {
+        if (askBox == null) {
+            askBox = new LinearLayout(this);
+            askBox.setOrientation(LinearLayout.VERTICAL);
+            android.view.ViewGroup parent = (android.view.ViewGroup) lineRow.getParent();
+            parent.addView(askBox, parent.indexOfChild(lineRow));
+        }
+        askBox.removeAllViews();
+        if (a == null || a.buddy == null) return;
+        long now = System.currentTimeMillis();
+        for (Ambient.Ask q : a.asks) {
+            if (Asks.answered(this, q.id) || (q.until > 0 && q.until <= now)) continue;
+            TextView text = new TextView(this, null, 0, R.style.Text_Body);
+            text.setText(q.text);
+            text.setPadding(0, dp(8), 0, dp(6));
+            askBox.addView(text);
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setPadding(0, 0, 0, dp(12));
+            for (int i = 0; i < q.answers.size(); i++) {
+                final int choice = i;
+                Button b = new Button(this);
+                b.setText(q.answers.get(i));
+                b.setAllCaps(false);
+                b.setOnClickListener(v -> {
+                    v.setEnabled(false);
+                    new Thread(() -> {
+                        Asks.answer(getApplicationContext(), q.id, choice, null);
+                        runOnUiThread(() -> showAsks(prefs.ambient()));
+                    }, "recollect-answer").start();
+                });
+                row.addView(b);
+            }
+            askBox.addView(row);
+        }
     }
 
     // ── The pictures' style (0.3.0) ───────────────────────────────────────────────────
@@ -976,6 +1028,10 @@ public final class MainActivity extends Activity {
             }
             Wallpapers.putBack(app, home, lock);
             Wallpapers.forgetCopy(app);
+            // 0.6.0: the questions' notifications, the answers kept here, the kept pictures and their alarm go.
+            Asks.clear(app);
+            Laters.clear(app);
+            Pictures.clear(app);
             forget(app);
             main.post(() -> {
                 if (isDestroyed()) return;

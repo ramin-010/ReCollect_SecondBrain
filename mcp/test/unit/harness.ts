@@ -3,7 +3,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { RecollectApi } from '../../src/api.js';
-import { createRecollectServer, type ToolGroup } from '../../src/server.js';
+import { createRecollectServer, type ToolGroup, type ToolSet } from '../../src/server.js';
 
 export const BASE = 'http://recollect.test';
 export const TOKEN = `rcl_${'a'.repeat(43)}`;
@@ -67,7 +67,7 @@ export interface Harness {
     close(): Promise<void>;
 }
 
-export async function connect(routes: Routes, options: { problem?: string | null; groups?: readonly ToolGroup[]; workMode?: boolean; workProject?: string; clockProject?: string } = {}): Promise<Harness> {
+export async function connect(routes: Routes, options: { problem?: string | null; groups?: readonly ToolGroup[]; set?: ToolSet; workMode?: boolean; workProject?: string; clockProject?: string } = {}): Promise<Harness> {
     const { fetch, requests } = fakeFetch(routes);
     const logs: string[] = [];
     const api = new RecollectApi({
@@ -85,6 +85,7 @@ export async function connect(routes: Routes, options: { problem?: string | null
         problem: options.problem ?? null,
         newId: () => NOTE_ID,
         ...(options.groups ? { groups: options.groups } : {}),
+        ...(options.set ? { set: options.set } : {}),
         ...(options.workMode ? { workMode: true } : {}),
         ...(options.workProject ? { workProject: options.workProject } : {}),
         ...(options.clockProject ? { clockProject: options.clockProject } : {}),

@@ -1,6 +1,6 @@
 // The brief and the record (SYNC_SPINE_SPEC 1.3): get_brief, checkpoint, list_sessions.
 import { afterEach, describe, expect, it } from 'vitest';
-import { UNDO, connect, lastLine, ok, type Harness } from './harness.js';
+import { UNDO, connect, fail, lastLine, ok, type Harness } from './harness.js';
 import { SYS, subjects } from './fixtures.js';
 import { briefText, type Brief } from '../../src/tools/record.js';
 
@@ -71,6 +71,11 @@ describe('get_brief', () => {
         h = await connect({ 'GET /api/brief': ok(fullBrief()) });
         await h.call('get_brief', { project: 'second_brain', key: 'cc_abc' });
         expect(h.requests[0]).toMatchObject({ method: 'GET', path: '/api/brief', query: { project: 'second_brain', key: 'cc_abc' } });
+        // MCP_MEMORY_PLAN §4.2: the brief only reads. A host's old list may still send `about`: it is not passed
+        // on, and the answer says to reconnect.
+        const old = await h.call('get_brief', { about: 'Help me plan a calm week before the exam' });
+        expect(h.requests[1]!.query).toEqual({});
+        expect(lastLine(old.text)).toBe('about was not passed on. This app’s list of Recollect tools is out of date: reconnect the Recollect connector. What the user says about themselves goes to remember or update_memory.');
     });
 });
 
@@ -100,7 +105,7 @@ describe('checkpoint', () => {
         });
 
     it('PUTs the key with the subject resolved; says what is saved; Undo only when the topic changed', async () => {
-        h = await connect({ 'GET /api/subjects': ok(subjects()), 'PUT /api/sessions/by-key/s_k': [written(), written({ topicEditId: 'e1' })] });
+        h = await connect({ 'GET /api/subjects': ok(subjects()), 'PUT /api/sessions/by-key/s_k': [written(), written(), written({ topicEditId: 'e1' })] });
         const res = await h.call('checkpoint', { key: 's_k', subject: 'system design', topicId: 't7', score: { done: 6, total: 8 }, weakSpots: ['at-least-once vs exactly-once'] });
         const put = h.requests.find((r) => r.method === 'PUT')!;
         expect(put.body).toEqual({ subjectId: SYS._id, topicId: 't7', score: { done: 6, total: 8 }, weakSpots: ['at-least-once vs exactly-once'] });
@@ -111,9 +116,19 @@ describe('checkpoint', () => {
                 'Open weak spots: at-least-once vs exactly-once',
             ].join('\n')
         );
+        // MCP_MEMORY_PLAN §4.2: `said` and `learned` went (one way in: remember, update_memory); an old list's call runs without them.
+        const old = await h.call('checkpoint', { key: 's_k', title: 'Heaps', said: ['I want to do one DP problem a day this month'], learned: [{ text: 'x' }] });
+        expect(h.requests.filter((r) => r.method === 'PUT').at(-1)!.body).toEqual({ title: 'Heaps' });
+        expect(lastLine(old.text)).toMatch(/^said and learned were not passed on\. .*reconnect the Recollect connector/);
         const done = await h.call('checkpoint', { key: 's_k', topicStatus: 'done' });
         expect(lastLine(done.text)).toBe(UNDO);
         expect((await h.call('checkpoint', { key: 's_k' })).text).toMatch(/^Send at least a title/);
+    });
+
+    it('a refusal from the server stays an error', async () => {
+        h = await connect({ 'PUT /api/sessions/by-key/s_k': fail(400, 'title: Too big') });
+        const other = await h.call('checkpoint', { key: 's_k', title: 'x'.repeat(10) });
+        expect(other.isError).toBe(true);
     });
 });
 
@@ -143,8 +158,46 @@ describe('list_sessions', () => {
                 days: [{ day: '2026-11-14', minutes: { study: 45, practice: 0, build: 80, review: 0 }, count: 2 }],
             }),
         });
+        // MCP_MEMORY_PLAN §4.1: list_sessions is in the manage group now.
+        expect((await h.call('list_sessions', {})).text).toBe('list_sessions is in the manage group: call more_tools first, then call it again.');
+        await h.call('more_tools', {});
         const res = await h.call('list_sessions', {});
         expect(h.requests[0]!.query).toEqual({ days: '7' });
         expect(res.text).toBe(['Sat 14 Nov · 2 h 5 min: study 45 min, build 1 h 20 min', '- "Graphs" · 45 min study · by hand', '- "Paths UI" · 1 h 20 min build · second_brain · hook'].join('\n'));
+    });
+});
+
+describe('get_brief on the web (MCP_MEMORY_PLAN §4.6)', () => {
+    const view = {
+        now: { day: '2026-11-19', weekday: 'Thu', time: '09:00', timezone: 'Asia/Kolkata' },
+        who: 'A backend engineer who studies at night.',
+        inMotion: [{ _id: 't1', type: 'thread', text: 'Walking after work', stage: 'active', last: { day: '2026-11-18', kind: 'done', text: 'Walked' } }],
+        savedLately: [{ text: 'Prefers backend work', day: '2026-11-18', app: 'Claude', update: null }],
+        asks: [{ _id: 'a1', threadId: 't1', text: 'Did you get your walk in?', answers: ['Yes', 'Not today'] }],
+        howTo: ['Pass on what the user says.', 'Read this again on a later day.'],
+    };
+
+    it('asks for the buddy view and prints it small, with the ids update_memory needs', async () => {
+        h = await connect({ 'GET /api/brief': ok(view) }, { set: 'web' });
+        const text = (await h.call('get_brief', {})).text;
+        expect(h.requests[0]!.query).toEqual({ view: 'buddy' });
+        expect(text).toBe(
+            [
+                'Today: Thu 2026-11-19 09:00 (Asia/Kolkata)',
+                'Who they are: A backend engineer who studies at night.',
+                'In motion (their buddy follows these; ids for update_memory):',
+                '- "Walking after work" · id t1 · 2026-11-18 done',
+                'Saved lately: "Prefers backend work" (2026-11-18, Claude)',
+                'Their buddy\'s question (ask once at a natural pause; pass the answer with update_memory on t1): "Did you get your walk in?" (Yes / Not today)',
+                'Pass on what the user says.',
+                'Read this again on a later day.',
+            ].join('\n')
+        );
+        expect(text.length).toBeLessThan(900);
+    });
+
+    it('an older server answers the full brief: printed as before', async () => {
+        h = await connect({ 'GET /api/brief': ok(fullBrief()) }, { set: 'web' });
+        expect(lastLine((await h.call('get_brief', {})).text)).toBe('Session key: s_0abcdefgh123 (pass it to checkpoint)');
     });
 });

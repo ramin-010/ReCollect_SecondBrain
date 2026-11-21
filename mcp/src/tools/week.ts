@@ -50,7 +50,7 @@ export function registerWeekTools(server: McpServer, ctx: ToolContext): void {
         'get_week',
         {
             title: 'The week',
-            description: "The user's week (Monday to Sunday): its targets and what is done (worked out), last week in numbers, and whether his weekly review waits.",
+            description: "The user's week (Monday to Sunday): its targets and what is done (worked out), last week in numbers, and whether their weekly review waits.",
             input: { week: zDay.optional().describe('Any day of the week (default: this week).') },
             annotations: READ_ONLY,
         },
@@ -61,7 +61,7 @@ export function registerWeekTools(server: McpServer, ctx: ToolContext): void {
             const l = w.lastWeek;
             const kinds = (Object.entries(l.minutes) as [Kind, number][]).filter(([, m]) => m > 0).map(([k, m]) => `${k} ${mins(m)}`).join(', ');
             lines.push(`Week before ${shortDay(w.review.weekStart)}: ${l.targets.total ? `${l.targets.done}/${l.targets.total} targets` : 'no targets'}${kinds ? `, ${kinds}` : ''}, ${plural(l.topicsDone, 'topic')} finished, ${plural(l.revisionsDone, 'revision')}.`);
-            if (w.review.due) lines.push(`His weekly review for the week of ${shortDay(w.review.weekStart)} is waiting on Home. If he plans it with you, add 3 to 5 targets with add_week_target on his yes.`);
+            if (w.review.due) lines.push(`Their weekly review for the week of ${shortDay(w.review.weekStart)} is waiting on Home. If they plan it with you, add 3 to 5 targets with add_week_target on their yes.`);
             return lines.join('\n');
         }
     );
@@ -73,7 +73,7 @@ export function registerWeekTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Add a week target',
             description:
-                'A week target (at most 5), on his yes: text that points at one thing (topicId, milestoneId, taskId: it ticks itself) or counts (measure + amount).',
+                'A week target (at most 5), on their yes: text that points at one thing (topicId, milestoneId, taskId: it ticks itself) or counts (measure + amount).',
             input: {
                 text: z.string().trim().min(1).max(140),
                 week: zDay.optional().describe('Any day of the week (default: this week).'),
@@ -129,7 +129,7 @@ export function registerWeekTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Suggest something to the user',
             description:
-                "Propose instead of doing when it is his call and he can't say yes here: a week target, a focus line, or a profile change. It waits on Home until he accepts.",
+                "Propose instead of doing when it is their call and they can't say yes here: a week target, a focus line, or a profile change. It waits on Home until they accept.",
             input: {
                 kind: z.enum(['week_target', 'focus_line', 'profile_edit']),
                 text: z.string().trim().min(1).max(200).describe('What the card says (for a target or focus line: the line itself).'),

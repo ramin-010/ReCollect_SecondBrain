@@ -32,6 +32,65 @@ final class Ambient {
     final Line line;
     /** The buddy's part of the app's screen (0.3.0), or null while it is off. */
     final Buddy buddy;
+    /** 0.6.0: when the lock line's words end (millis; 0: not known, an older server). */
+    final long lineUntil;
+    /** 0.6.0: the lock line is this question (its id), or null. */
+    final String lineAskId;
+    /** 0.6.0: the home picture holds a thought from the buddy, and when it ends (millis; 0: not known). */
+    final boolean hasInsight;
+    final long insightUntil;
+    /** 0.6.0: the key of the plain twins (the pictures without the buddy's words), or null (an older server). */
+    final String plainKey;
+    /** 0.6.0: the buddy's open questions for this phone (never with titles hidden). */
+    final List<Ask> asks;
+    /** 0.7.0 (stage 19): the widget's card, one item with Later, or null (the widget shows the day). */
+    final Next next;
+
+    /** The widget's card (backend later.ts `NextCard`): one item, and what Later would do. */
+    static final class Next {
+        /** "pu_…", "tk_…", "th_…", "rm_…": what POST /api/ambient/later takes. */
+        final String id;
+        /** "Pick up", "Coming up · Sun", "Today · 3 pm". */
+        final String label;
+        final String title;
+        /** Where they stopped (a left-off item), or empty. */
+        final String detail;
+        /** The problem's page or the doc's, or null (the app opens). */
+        final String link;
+        /** What the button's words say ("Tonight · 8:30 pm"), or null: no time left before its own day. */
+        final String laterLabel;
+        /** When the Later would bring it back (millis; 0: not known). */
+        final long laterAt;
+
+        Next(String id, String label, String title, String detail, String link, String laterLabel, long laterAt) {
+            this.id = id;
+            this.label = label;
+            this.title = title;
+            this.detail = detail;
+            this.link = link;
+            this.laterLabel = laterLabel;
+            this.laterAt = laterAt;
+        }
+    }
+
+    /** One of the buddy's questions (0.6.0): a silent notification with its quick answers and a reply box. */
+    static final class Ask {
+        final String id;
+        final String text;
+        final List<String> answers;
+        /** Millis: it goes then, by itself. */
+        final long until;
+        /** The server's lock check passed its words: shown on the lock screen (else hidden there). */
+        final boolean lockOk;
+
+        Ask(String id, String text, List<String> answers, long until, boolean lockOk) {
+            this.id = id;
+            this.text = text;
+            this.answers = answers;
+            this.until = until;
+            this.lockOk = lockOk;
+        }
+    }
 
     /** One of the buddy's lines: which step said it, for which part of the day, and when in words. */
     static final class Line {
@@ -92,7 +151,15 @@ final class Ambient {
         }
     }
 
-    private Ambient(String state, String date, String headline, List<String> lines, String appUrl, String accountName, String accountEmail, String serverKey, String numbers, String breakdown, Line line, Buddy buddy) {
+    private Ambient(String state, String date, String headline, List<String> lines, String appUrl, String accountName, String accountEmail, String serverKey, String numbers, String breakdown, Line line, Buddy buddy,
+            long lineUntil, String lineAskId, boolean hasInsight, long insightUntil, String plainKey, List<Ask> asks, Next next) {
+        this.next = next;
+        this.lineUntil = lineUntil;
+        this.lineAskId = lineAskId;
+        this.hasInsight = hasInsight;
+        this.insightUntil = insightUntil;
+        this.plainKey = plainKey;
+        this.asks = asks;
         this.state = state;
         this.date = date;
         this.headline = headline;
@@ -105,6 +172,34 @@ final class Ambient {
         this.breakdown = breakdown;
         this.line = line;
         this.buddy = buddy;
+    }
+
+    /** An ISO time as millis, or 0 when missing or unreadable. */
+    static long millis(String iso) {
+        if (iso == null) return 0;
+        try {
+            return java.time.Instant.parse(iso).toEpochMilli();
+        } catch (RuntimeException e) {
+            return 0;
+        }
+    }
+
+    private static List<Ask> parseAsks(JSONArray arr) {
+        List<Ask> out = new ArrayList<>();
+        if (arr == null) return Collections.unmodifiableList(out);
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject q = arr.optJSONObject(i);
+            if (q == null || str(q, "_id") == null || str(q, "text") == null) continue;
+            List<String> labels = new ArrayList<>();
+            JSONArray ans = q.optJSONArray("answers");
+            if (ans != null) for (int j = 0; j < ans.length() && labels.size() < 3; j++) {
+                JSONObject a = ans.optJSONObject(j);
+                String label = a == null ? null : str(a, "label");
+                if (label != null) labels.add(label);
+            }
+            out.add(new Ask(str(q, "_id"), str(q, "text"), Collections.unmodifiableList(labels), millis(str(q, "until")), q.optBoolean("lockOk", false)));
+        }
+        return Collections.unmodifiableList(out);
     }
 
     private static String str(JSONObject o, String key) {
@@ -122,7 +217,8 @@ final class Ambient {
         }
         JSONObject account = d.optJSONObject("account");
         JSONObject l = d.optJSONObject("line");
-        Line line = l == null || str(l, "text") == null ? null : new Line(l.optString("dayId", ""), l.optString("slot", ""), str(l, "text"), "", true);
+        // The thumbs' target: a timed line's key (its start, from 0.6.0's day), else its part of the day.
+        Line line = l == null || str(l, "text") == null ? null : new Line(l.optString("dayId", ""), l.optString("key", l.optString("slot", "")), str(l, "text"), "", true);
         return new Ambient(
                 d.getString("state"),
                 d.optString("date", ""),
@@ -135,7 +231,23 @@ final class Ambient {
                 str(d, "numbers"),
                 str(d, "breakdown"),
                 line,
-                parseBuddy(d.optJSONObject("buddy")));
+                parseBuddy(d.optJSONObject("buddy")),
+                l == null ? 0 : millis(str(l, "until")),
+                l == null ? null : str(l, "askId"),
+                str(d, "insight") != null,
+                millis(str(d, "insightUntil")),
+                str(d, "plainKey"),
+                parseAsks(d.optJSONArray("asks")),
+                parseNext(d.optJSONObject("next")));
+    }
+
+    /** The card (0.7.0); null when absent, an older server, or without the words a card needs. */
+    private static Next parseNext(JSONObject n) {
+        if (n == null || str(n, "id") == null || str(n, "title") == null) return null;
+        JSONObject later = n.optJSONObject("later");
+        String label = str(n, "label");
+        return new Next(str(n, "id"), label == null ? "" : label, str(n, "title"), n.optString("detail", "").trim(), str(n, "link"),
+                later == null ? null : str(later, "label"), later == null ? 0 : millis(str(later, "at")));
     }
 
     private static Buddy parseBuddy(JSONObject b) {
@@ -147,7 +259,7 @@ final class Ambient {
         if (arr != null) for (int i = 0; i < arr.length(); i++) {
             JSONObject x = arr.optJSONObject(i);
             if (x == null || str(x, "text") == null) continue;
-            lines.add(new Line(x.optString("dayId", ""), x.optString("slot", ""), str(x, "text"), x.optString("when", ""), x.optBoolean("current", false)));
+            lines.add(new Line(x.optString("dayId", ""), x.optString("key", x.optString("slot", "")), str(x, "text"), x.optString("when", ""), x.optBoolean("current", false)));
         }
         JSONObject thumbs = new JSONObject();
         JSONArray t = b.optJSONArray("thumbs");

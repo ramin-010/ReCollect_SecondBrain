@@ -23,7 +23,7 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 /**
- * Reminders ring on the phone (app 0.5.0; Ramin 11-16: "if the phone does it, I'm good; we don't need
+ * Reminders ring on the phone (app 0.5.0; the owner 11-16: "if the phone does it, I'm good; we don't need
  * the email"). After each refresh the app sets one exact alarm per reminder still to come (the widget
  * JSON's `alarms`: the next 26 hours), drops the ones it set before that are gone, and tells the server
  * which ones it holds, so no email goes for those. At the time ReminderAlarm posts a notification with

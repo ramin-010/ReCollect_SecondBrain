@@ -108,7 +108,7 @@ export function registerRevisionTools(server: McpServer, ctx: ToolContext): void
         {
             title: 'Due revisions',
             description:
-                "Every revision due today or overdue: today's plan first (in order, fitted to his daily budget), then the ones waiting for room. " +
+                "Every revision due today or overdue: today's plan first (in order, fitted to their daily budget), then the ones waiting for room. " +
                 'Each line: subject, cycle (1–4), how late, the doc to open, the review id.',
             input: {},
             annotations: READ_ONLY,

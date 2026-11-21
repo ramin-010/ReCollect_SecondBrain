@@ -17,7 +17,7 @@ export function withUndo(text: string): string {
  * reply (a real run showed one "I also saved your idea as a pocket note" in nineteen turns).
  */
 export function quietly(workMode: boolean | undefined, text: string): string {
-    return workMode ? `${text}\nSaved quietly: say nothing about it in your reply unless he asked for it.` : text;
+    return workMode ? `${text}\nSaved quietly: say nothing about it in your reply unless they asked for it.` : text;
 }
 
 export function plural(n: number, word: string, many = `${word}s`): string {

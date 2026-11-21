@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- The buddy's notes (0.3.0); asked on Android 13 and newer when he turns them on. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Stage 11 (his item 10c): reminders on the minute from Android 12; the person allows it from the checklist. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Only to keep a copy of the wallpaper he had, so Disconnect can put it back (Android 12 and older; asked when he ticks it). -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
@@ -22,6 +24,10 @@
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <!-- The shell's mic (0.7.0): Android's own speech recognizer, when the phone has one. -->
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
         </intent>
     </queries>
 
@@ -42,6 +48,7 @@
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+            <!-- qa:launcher (the QA build gives the launcher to the shell in the test app) -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -53,6 +60,19 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="recollect" android:host="connect" />
             </intent-filter>
+        </activity>
+
+        <!-- The shell (PHONE_APP_REDESIGN_PLAN §7 step 5): the web app's phone world in a WebView, with the phone's
+             own parts through a bridge. In the test app only for now, where the QA build makes it the launcher and
+             the share target; his app closes it at once. Exported so adb can open it with a page. -->
+        <activity
+            android:name=".Shell"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.Recollect.Shell"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density">
+            <!-- qa:shell -->
         </activity>
 
         <service
@@ -96,6 +116,15 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- 0.6.0: a question's quick answer or reply from its notification, and the alarm that switches a
+             picture to its plain twin at an end time or quiet hours (both sent only by the app itself). -->
+        <receiver
+            android:name=".Asks"
+            android:exported="false" />
+        <receiver
+            android:name=".Pictures"
+            android:exported="false" />
 
         <!-- 0.5.0: a reminder's alarm (set by the app itself; nothing outside may send it). -->
         <receiver

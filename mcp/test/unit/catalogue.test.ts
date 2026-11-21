@@ -37,4 +37,14 @@ describe('the catalogue', () => {
         const size = JSON.stringify(tools).length;
         expect(size, `tool definitions are ${size} characters; the budget is ${TOOL_JSON_BUDGET}`).toBeLessThanOrEqual(TOOL_JSON_BUDGET);
     });
+
+    it('the web set (claude.ai, ChatGPT) stays under its own budget (MCP_MEMORY_PLAN §4.1)', async () => {
+        h = await connect({}, { set: 'web' });
+        const { tools } = await h.client.listTools();
+        const size = JSON.stringify(tools).length;
+        expect(size, `the web set's definitions are ${size} characters; its budget is ${WEB_TOOL_JSON_BUDGET}`).toBeLessThanOrEqual(WEB_TOOL_JSON_BUDGET);
+    });
 });
+
+/** The web set's budget: a host with no tool search loads all of it into every chat. */
+export const WEB_TOOL_JSON_BUDGET = 24_000;

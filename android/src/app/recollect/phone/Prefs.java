@@ -45,7 +45,7 @@ final class Prefs {
 
     /** Forgets the server's side; his choices (screens, theme, quiet hours) stay for next time. */
     void disconnect() {
-        sp.edit().remove("server").remove("token").remove("ambient").remove("ok_at").remove("failure").remove("failure_at").remove("picture_key").apply();
+        sp.edit().remove("server").remove("token").remove("ambient").remove("ok_at").remove("failure").remove("failure_at").remove("picture_key").remove("refusals").remove("refused_at").apply();
     }
 
     // ── His choices ───────────────────────────────────────────────────────────────────
@@ -81,6 +81,18 @@ final class Prefs {
         return sp.getString("theme", THEME_SYSTEM);
     }
 
+    /** 0.7.0 (stage 19): the widget wears the app's look, "paper" (the app's default) or "slate", as its page last said. */
+    String widgetLook() {
+        return sp.getString("widget_look", "paper");
+    }
+
+    /** True when it changed (the widget is redrawn). */
+    boolean setWidgetLook(String look) {
+        if (look == null || look.equals(widgetLook())) return false;
+        sp.edit().putString("widget_look", look).apply();
+        return true;
+    }
+
     /** The pictures' style (the server's list; "sky" by default) and its colour (null: the style's first). */
     String style() {
         return sp.getString("style", "sky");
@@ -91,7 +103,33 @@ final class Prefs {
     }
 
     void setLook(String style, String color) {
-        sp.edit().putString("style", style).putString("color", color).remove("picture_key").apply();
+        // Both screens (the older bridge's one look): each screen's own look gives way to it.
+        sp.edit().putString("style", style).putString("color", color).remove("lock_style").remove("lock_color").remove("home_style").remove("home_color").remove("picture_key").apply();
+    }
+
+    /** Stage 11 (his decision 4): the lock screen's own look, else the look both screens shared. */
+    ScreenLook lockLook() {
+        return ScreenLook.of(sp.getString("lock_style", null), sp.getString("lock_color", null), style(), color());
+    }
+
+    /** Stage 11: the home screen's own look, else the shared one. */
+    ScreenLook homeLook() {
+        return ScreenLook.of(sp.getString("home_style", null), sp.getString("home_color", null), style(), color());
+    }
+
+    /** Stage 11: one screen's look ("lock" or "home"); the other screen keeps its own. */
+    void setScreenLook(String screen, String style, String color) {
+        String k = "home".equals(screen) ? "home" : "lock";
+        sp.edit().putString(k + "_style", style).putString(k + "_color", color).remove("picture_key").apply();
+    }
+
+    /** Stage 11 (his item 10c): when the pictures were last put on the screens (ms; 0: never). */
+    long picturesAt() {
+        return sp.getLong("pictures_at", 0L);
+    }
+
+    void setPicturesAt(long at) {
+        sp.edit().putLong("pictures_at", at).apply();
     }
 
     /** The styles the server offers (GET /api/ambient/styles), as it sent them. */
@@ -253,9 +291,43 @@ final class Prefs {
         sp.edit().putString("failure", text).putLong("failure_at", at).apply();
     }
 
+    // ── Refusals (0.5.2) ──────────────────────────────────────────────────────────────
+
+    /** Refusals counted before the app gives the connection up. */
+    static final int REFUSALS_TO_FORGET = 3;
+    /** A refusal counts only this long after the one before (a burst is one). */
+    static final long REFUSAL_GAP_MS = 30 * 60_000L;
+
+    /**
+     * The server refused the code (401). One refusal no longer ends the connection (a server restarting,
+     * a proxy, a clock): it ends after 3, each at least 30 minutes after the one before. True: give up now.
+     */
+    boolean noteRefusal(long now) {
+        long last = sp.getLong("refused_at", 0);
+        int count = sp.getInt("refusals", 0);
+        if (last > 0 && now - last < REFUSAL_GAP_MS) return count >= REFUSALS_TO_FORGET;
+        count++;
+        sp.edit().putInt("refusals", count).putLong("refused_at", now).apply();
+        return count >= REFUSALS_TO_FORGET;
+    }
+
+    /** The server answered: the count starts again. */
+    void clearRefusals() {
+        if (sp.contains("refusals")) sp.edit().remove("refusals").remove("refused_at").apply();
+    }
+
     /** The last problem, worded for him, or null when the last try worked. */
     String failure() {
         return sp.getString("failure", null);
+    }
+
+    /** 0.6.0: the plain twins' key as last fetched. */
+    String plainKey() {
+        return sp.getString("plain_key", null);
+    }
+
+    void setPlainKey(String key) {
+        sp.edit().putString("plain_key", key).apply();
     }
 
     String pictureKey() {

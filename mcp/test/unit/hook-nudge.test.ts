@@ -59,7 +59,7 @@ describe('an office folder', () => {
         const { env, calls } = setup(OFFICE);
         expect(await runHook('start', office(), env, at(10, 0))).toBe('');
         const out = await runHook('prompt', office({ prompt: 'fix the GST rounding in invoice_totals for client Acme\nmore' }), env, at(10, 12));
-        expect(out).toMatch(/^Recollect \[Mon 16 Nov, 10:12\]: before you finish this turn, if his message or your answer holds something the user would want later/);
+        expect(out).toMatch(/^Recollect \[Mon 16 Nov, 10:12\]: before you finish this turn, if their message or your answer holds something the user would want later/);
         expect(out).toContain('Never save company code, data or client names.');
         await runHook('stop', office(), env, at(10, 19));
         await runHook('prompt', office({ prompt: 'now the tests' }), env, at(10, 25));

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Later is set (0.7.0): the app's check (mockups/phone-app, i-check), tinted by the layout. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp"
+    android:height="16dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M20,6L9,17l-5,-5"
+        android:strokeWidth="2.1"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

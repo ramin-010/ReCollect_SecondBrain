@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- "Your day", 4 x 1: the one line that matters now, and the date above it. -->
+<!--
+  "Your day", 4 x 1 (0.7.0, stage 19): the card's label and title only (no button: a tap opens the item); with
+  nothing ahead, the date and the buddy's line (in the serif) or the day's words. Same ids as widget_day.xml.
+  Edit this file, then run `python widget-themes.py` in android/ for the light, dark and Paper copies.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@android:id/background"
     android:layout_width="match_parent"
@@ -11,7 +15,7 @@
     android:paddingEnd="16dp">
 
     <TextView
-        android:id="@+id/w_date"
+        android:id="@+id/w_label"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:singleLine="true"
@@ -22,9 +26,10 @@
         android:textSize="12sp" />
 
     <TextView
-        android:id="@+id/w_headline"
+        android:id="@+id/w_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
         android:singleLine="true"
         android:ellipsize="none"
         android:requiresFadingEdge="horizontal"
@@ -32,4 +37,18 @@
         android:fontFamily="sans-serif-medium"
         android:textColor="@color/w_ink_1"
         android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/w_voice"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:singleLine="true"
+        android:ellipsize="none"
+        android:requiresFadingEdge="horizontal"
+        android:fadingEdgeLength="24dp"
+        android:fontFamily="serif"
+        android:textColor="@color/w_ink_1"
+        android:textSize="15sp"
+        android:visibility="gone" />
 </LinearLayout>

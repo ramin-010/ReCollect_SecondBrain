@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * The live lock screen (0.4.0; Ramin 11-16: "notifications cover the picture; can they show as small
+ * The live lock screen (0.4.0; the owner 11-16: "notifications cover the picture; can they show as small
  * icons under it, so it feels like the phone's own lock screen?"). Android lets no app move another
  * app's notification cards, but a live wallpaper draws itself: this one draws the day's pictures (the
  * server's, as before) and, on the lock screen, the waiting notifications' small icons in the band the
@@ -40,6 +40,13 @@ final class Live {
     private static final String LOCK = "live-lock.png";
     private static final String HOME = "live-home.png";
     private static final String SLOT = "live-slot.txt";
+    /** 0.6.0: the plain twins (no words from the buddy), with the lock picture's own band. */
+    private static final String LOCK_PLAIN = "live-lock-plain.png";
+    private static final String HOME_PLAIN = "live-home-plain.png";
+    private static final String SLOT_PLAIN = "live-slot-plain.txt";
+    /** Which variant each screen draws now (Pictures decides: end times, quiet hours, answers on this phone). */
+    private static volatile boolean plainLock;
+    private static volatile boolean plainHome;
     /** At most this many apps' icons; more say "+n". */
     static final int ICONS_MAX = 7;
 
@@ -126,12 +133,37 @@ final class Live {
         }
     }
 
+    /** 0.6.0: keeps the plain twins (either may be null: kept as it was). */
+    static void savePlain(Context ctx, byte[] lockPng, String slot, byte[] homePng) throws IOException {
+        File dir = ctx.getFilesDir();
+        if (lockPng != null) write(new File(dir, LOCK_PLAIN), lockPng);
+        if (homePng != null) write(new File(dir, HOME_PLAIN), homePng);
+        if (lockPng != null) write(new File(dir, SLOT_PLAIN), (slot == null ? "" : slot).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        changed();
+    }
+
+    /** Decides again which variant each screen draws (Pictures' rule), and redraws when it changed or new files came. */
+    static void changed() {
+        main.post(() -> {
+            for (Listener l : listeners) l.onPicturesChanged();
+        });
+    }
+
+    /** The rule for each screen now (called before a frame is drawn on screen-on, and by Pictures.apply). */
+    static void decide(Context ctx) {
+        Ambient a = Prefs.of(ctx).ambient();
+        java.util.Calendar now = java.util.Calendar.getInstance();
+        // The plain twin only when the day has words there that may not show now (a day without words: its own picture).
+        plainLock = Pictures.hasWords(a, true) && !Pictures.lockWords(ctx, a, now) && new File(ctx.getFilesDir(), LOCK_PLAIN).exists();
+        plainHome = Pictures.hasWords(a, false) && !Pictures.homeWords(ctx, a, now) && new File(ctx.getFilesDir(), HOME_PLAIN).exists();
+    }
+
     static boolean hasPictures(Context ctx) {
         return new File(ctx.getFilesDir(), LOCK).exists();
     }
 
     static Slot slot(Context ctx) {
-        File f = new File(ctx.getFilesDir(), SLOT);
+        File f = new File(ctx.getFilesDir(), plainLock ? SLOT_PLAIN : SLOT);
         if (!f.exists()) return null;
         try {
             return Slot.parse(new String(java.nio.file.Files.readAllBytes(f.toPath()), java.nio.charset.StandardCharsets.UTF_8).trim());
@@ -142,7 +174,7 @@ final class Live {
 
     /** The lock or home picture, decoded once per change. */
     static Bitmap picture(Context ctx, boolean lock) {
-        String name = lock ? LOCK : HOME;
+        String name = lock ? (plainLock ? LOCK_PLAIN : LOCK) : (plainHome ? HOME_PLAIN : HOME);
         File f = new File(ctx.getFilesDir(), name);
         if (!f.exists()) f = new File(ctx.getFilesDir(), lock ? HOME : LOCK); // one screen's picture for both until the other comes
         if (!f.exists()) return null;
@@ -192,7 +224,7 @@ final class Live {
 
     /**
      * The icons in a row centred on (cx, cy): each app once, newest first, "+n" past ICONS_MAX. Each app's
-     * own icon in colour (0.4.1, Ramin: the notification symbols looked like placeholders), a little larger
+     * own icon in colour (0.4.1, the owner: the notification symbols looked like placeholders), a little larger
      * than the band's symbol size; an app without one shows its notification symbol in the picture's ink.
      */
     static void drawIcons(Context ctx, Canvas c, List<NotifIcons.Item> icons, float cx, float cy, float band, int ink) {
@@ -213,7 +245,7 @@ final class Live {
             if (d != null) {
                 boolean app = Boolean.TRUE.equals(iconIsApp.get(iconKey(item)));
                 if (app) {
-                    // Round (0.4.2, Ramin: "more rounded, less like default icons"): an adaptive icon's own
+                    // Round (0.4.2, the owner: "more rounded, less like default icons"): an adaptive icon's own
                     // layers drawn full bleed inside a circle; any other icon cut to the circle.
                     d.setTintList(null);
                     c.save();

@@ -9,7 +9,7 @@ import { zId, zSubjectName } from '../schemas.js';
 import { resolveSubject } from '../subjects.js';
 import { CHANGES, READ_ONLY, defineTool, type ToolContext } from '../tool.js';
 import { nextUpLine } from './paths.js';
-import { zNote } from './buddy.js';
+import { pictureItem, type PictureLine } from './buddy.js';
 import type { NextUp, PathStatus } from '../types.js';
 
 type Kind = 'study' | 'practice' | 'build' | 'review';
@@ -45,7 +45,7 @@ export interface Brief {
     recent: BriefSession[];
     recall: { days: number; finished: number; weakTopics: Array<{ title: string; weak: number }> };
     project: { key: string; name: string; nextStep: string | null; lastSession: { day: string; minutes: number | null; title: string } | null } | null;
-    /** The buddy (BUDDY_MEMORY_PLAN §3.4): its portrait of him, the memories this chat starts with, a note. */
+    /** The buddy (BUDDY_MEMORY_PLAN §3.4): its portrait of the user, the memories this chat starts with, a note. */
     buddy?: {
         who: string | null;
         heading: string | null;
@@ -57,8 +57,14 @@ export interface Brief {
         noteId?: string | null;
         noteDay?: string | null;
     };
-    /** The work log (B9): his own chats get yesterday's lines; a work folder's chat, its project's last days. */
+    /** The work log (B9): their own chats get yesterday's lines; a work folder's chat, its project's last days. */
     work?: { days: Array<{ day: string; projects: Array<{ project: string; minutes: number; lines: string[] }> }> } | null;
+    /** The buddy's open questions for the user (a server before stage 4 has none). */
+    asks?: Array<{ _id: string; text: string; answers: string[]; until: string; threadId?: string | null }>;
+    /** The words endpoint's protocol (2: message numbers); absent on an older server. */
+    capture?: number;
+    /** What is on their mind: the threads their buddy follows (a server before stage 5 has none). */
+    onMind?: Array<{ title: string; stage: string }>;
     session: { key: string };
 }
 
@@ -104,12 +110,18 @@ export function briefText(b: Brief): string {
     const lines = [`Brief · ${b.now.weekday} ${b.now.day} ${b.now.time} (${b.now.timezone})`];
     if (b.profile) lines.push(`About the user: ${b.profile}`);
     const buddy = b.buddy;
-    if (buddy?.who) lines.push(`Who he is: ${buddy.who}`);
-    if (buddy?.heading) lines.push(`Where he is heading: ${buddy.heading}`);
+    if (buddy?.who) lines.push(`Who they are: ${buddy.who}`);
+    if (buddy?.heading) lines.push(`Where they are heading: ${buddy.heading}`);
     if (buddy?.now) lines.push(`Right now: ${buddy.now}`);
-    if (buddy?.memories.length) lines.push(`His buddy knows: ${buddy.memories.map((m) => `${m.text} (${m.kind})`).join('; ')}`);
-    if (buddy?.note) lines.push(`From his buddy (pass it on in a sentence at a natural pause): ${buddy.note}`);
-    if (buddy?.followUp) lines.push(`Ask him at a good moment: ${buddy.followUp}`);
+    if (buddy?.memories.length) lines.push(`Their buddy knows: ${buddy.memories.map((m) => `${m.text} (${m.kind})`).join('; ')}`);
+    if (buddy?.note) lines.push(`From their buddy (pass it on in a sentence at a natural pause): ${buddy.note}`);
+    if (b.onMind?.length) lines.push(`On their mind (their buddy follows these): ${b.onMind.map((t) => quote(t.title, 80)).join('; ')}`);
+    if (buddy?.followUp && !b.asks?.length) lines.push(`Ask them at a good moment: ${buddy.followUp}`);
+    for (const a of b.asks ?? []) {
+        const quick = a.answers.length ? ` (their quick answers: ${a.answers.join(' / ')})` : '';
+        const passOn = a.threadId ? `pass the answer on with update_memory, on ${a.threadId}` : 'pass it on with remember, kind thread, naming the question';
+        lines.push(`Their buddy's question for them (ask it once, in your words, at a natural pause; if they answer, ${passOn}): ${quote(a.text, 200)}${quick}`);
+    }
     for (const g of b.goals) {
         const pace = g.forecast?.status ? ` · ${g.forecast.status.replace('_', ' ')}${g.forecast.behindDays ? ` by ${g.forecast.behindDays} days` : ''}` : '';
         const next = g.nextMilestone ? ` · next: ${quote(g.nextMilestone.title, 60)}${g.nextMilestone.dueDay ? ` (due ${g.nextMilestone.dueDay})` : ''}` : '';
@@ -125,12 +137,12 @@ export function briefText(b: Brief): string {
         const items = b.week.targets.map((t) => `${t.done ? '[x]' : '[ ]'} ${quote(t.text, 60)}${t.progress && !t.done ? ` (${t.progress.done}/${t.progress.total})` : ''}`);
         lines.push(`Week: ${done}/${b.week.targets.length} done · ${items.join(' · ')}`);
     } else if (b.week?.reviewDue) {
-        lines.push("Week: no targets yet (his weekly review waits on Home; plan it with him if he asks)");
+        lines.push("Week: no targets yet (their weekly review waits on Home; plan it with them if they ask)");
     }
     if (b.tasks && (b.tasks.dueToday || b.tasks.overdue)) {
         lines.push(`Tasks: ${b.tasks.dueToday} due today${b.tasks.overdue ? `, ${b.tasks.overdue} overdue` : ''} · ${b.tasks.titles.map((t) => quote(t, 50)).join('; ')}`);
     }
-    if (b.decisions?.due.length) lines.push(`Look again today (his decisions): ${b.decisions.due.map((d) => `${quote(d.title, 60)} [${d._id}]`).join('; ')}`);
+    if (b.decisions?.due.length) lines.push(`Look again today (their decisions): ${b.decisions.due.map((d) => `${quote(d.title, 60)} [${d._id}]`).join('; ')}`);
     const r = b.today.revisions;
     const focus = b.today.focus.length ? ` · focus: ${b.today.focus.map((f) => `${f.done ? '[x]' : '[ ]'} ${f.text}`).join('; ')}` : '';
     lines.push(`Today: ${plural(r.planned, 'revision')} planned (~${r.estMinutes} min), ${r.done} done${r.waiting ? `, ${r.waiting} waiting` : ''}${focus}`);
@@ -151,15 +163,52 @@ export function briefText(b: Brief): string {
         lines.push(`Project ${b.project.name}${b.project.nextStep ? ` · next: ${b.project.nextStep}` : ''}${last}`);
     }
     for (const d of b.decisions?.project ?? []) lines.push(`Decided ${d.day}: ${quote(d.title, 70)} because ${quote(d.why, 90)}`);
-    // The work log (B9): what he did, in his words for a standup.
+    // The work log (B9): what they did, in their words for a standup.
     if (b.work?.days.length) {
         const one = b.work.days.length === 1 && b.work.days[0]!.day !== b.now.day;
-        lines.push(one ? 'His work yesterday:' : 'His work here lately:');
+        lines.push(one ? 'Their work yesterday:' : 'Their work here lately:');
         for (const d of b.work.days) {
             for (const p of d.projects) lines.push(`- ${one ? '' : `${d.day} · `}${p.project}${p.minutes ? ` (${p.minutes} min)` : ''}: ${p.lines.map((l) => quote(l, 120)).join('; ')}`);
         }
     }
     lines.push(`Session key: ${b.session.key} (pass it to checkpoint)`);
+    return lines.join('\n');
+}
+
+/** MCP_MEMORY_PLAN §4.6: the small buddy brief (the web's get_brief). */
+export interface BuddyView {
+    now: { day: string; weekday: string; time: string; timezone: string };
+    who: string | null;
+    inMotion: Array<{ _id: string; type: 'thread' | 'memory'; text: string; stage?: string; kind?: string; last: { day: string; kind: string; text: string } | null; now?: { day: string; text: string } | null }>;
+    savedLately: Array<{ text: string; day: string; app: string; update: string | null }>;
+    asks: Array<{ _id: string; threadId: string | null; text: string; answers: string[] }>;
+    howTo: string[];
+    /** ECOSYSTEM_V2_PLAN stage 12 (newer servers): their work as this chat sees it; null while the work log is off. */
+    work?: { open: PictureLine[]; today: PictureLine[]; projects: string[] } | null;
+}
+
+/** The brief's Work part (stage 12): what is open, what was logged today (ids), the project names to reuse. */
+export function workPartText(w: NonNullable<BuddyView['work']>): string[] {
+    const lines = ['Work (their log, from every chat and app):'];
+    if (w.open.length) lines.push(...w.open.map((l) => `- open: ${pictureItem(l)}`));
+    if (w.today.length) lines.push(...w.today.map((l) => `- today: ${pictureItem(l)}`));
+    if (!w.open.length && !w.today.length) lines.push('- nothing open, nothing logged today');
+    if (w.projects.length) lines.push(`Their projects: ${w.projects.join(', ')}`);
+    return lines;
+}
+
+/** The buddy brief as text: about 1,400 characters at most (the threads, then the habits and aims kept as memories), plus the Work part while their work log is on. */
+export function buddyViewText(v: BuddyView): string {
+    const lines = [`Today: ${v.now.weekday} ${v.now.day} ${v.now.time} (${v.now.timezone})`];
+    if (v.who) lines.push(`Who they are: ${v.who}`);
+    if (v.inMotion.length) {
+        lines.push('In motion (their buddy follows these; ids for update_memory):');
+        for (const x of v.inMotion) lines.push(`- ${quote(x.text, 80)}${x.now ? ` (now, since ${x.now.day}: ${quote(x.now.text, 90)})` : ''} · id ${x._id}${x.last ? ` · ${x.last.day} ${x.last.kind}` : ''}`);
+    }
+    if (v.savedLately.length) lines.push(`Saved lately: ${v.savedLately.map((s) => `${quote(s.text, 70)} (${s.day}, ${s.app})`).join('; ')}`);
+    for (const a of v.asks) lines.push(`Their buddy's question (ask once at a natural pause; pass the answer with update_memory${a.threadId ? ` on ${a.threadId}` : ''}): ${quote(a.text, 140)}${a.answers.length ? ` (${a.answers.join(' / ')})` : ''}`);
+    if (v.work) lines.push(...workPartText(v.work));
+    lines.push(...v.howTo);
     return lines.join('\n');
 }
 
@@ -172,15 +221,26 @@ export function registerRecordTools(server: McpServer, ctx: ToolContext): void {
         'get_brief',
         {
             title: 'Brief: where the user stands',
+            // The web's brief is the small buddy brief (MCP_MEMORY_PLAN §4.6), with its Work part since stage 12.
             description:
-                'Start every working chat here: his profile, goals and pace, today, each path’s next topic with its last session and weak spots, recent sessions, Recall’s weak topics, and a session key for checkpoint.',
+                ctx.set === 'web'
+                    ? 'Call first in every chat: who the user is, what their buddy follows (ids for update_memory) and, while their work log is on, its Work part: what is open and logged today (ids for log_work).'
+                    : 'Call first in every chat: who the user is and what their buddy follows (ids). Their profile, goals, today, each path’s next topic and weak spots, recent sessions, what their buddy follows (with ids for update_memory), and a session key for checkpoint.',
             input: {
-                project: z.string().trim().min(1).max(200).optional().describe('The project (repo folder) this chat is in, to add its last session and next step.'),
-                key: z.string().trim().max(80).optional().describe('A session key you already have (a Claude Code session’s cc_…); else a new one.'),
+                project: z.string().trim().min(1).max(200).optional().describe('The project (repo folder) this chat is in.'),
+                key: z.string().trim().max(80).optional().describe('A session key you have (Claude Code’s cc_…); else a new one.'),
             },
             annotations: READ_ONLY,
         },
-        async ({ project, key }) => briefText(await api.get<Brief>('/api/brief', { project, key, ...(ctx.workMode ? { work: '1' } : {}) }))
+        // MCP_MEMORY_PLAN §4.2: the brief only reads (its `about` wrote, so it went; the API still takes it from older builds).
+        async ({ project, key }) => {
+            // The web (claude.ai, ChatGPT): the small buddy brief (§4.6). An older server answers the full brief: printed as before.
+            if (ctx.set === 'web') {
+                const v = await api.get<BuddyView | Brief>('/api/brief', { view: 'buddy' });
+                return 'inMotion' in v ? buddyViewText(v) : briefText(v);
+            }
+            return briefText(await api.get<Brief>('/api/brief', { project, key, ...(ctx.workMode ? { work: '1' } : {}) }));
+        }
     );
 
     defineTool(
@@ -190,28 +250,29 @@ export function registerRecordTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Checkpoint the session',
             description:
-                'Write this chat’s session record (the key from get_brief). Call it after each part of the work, not only at the end: the same key updates the same session, so a closed tab loses nothing. ' +
-                'Send what is new: a quiz score, weak spots found or cleared, the topic’s status, the next step. Minutes are counted for you.',
+                'Write this chat’s session record (the key from get_brief), after each part of the work: the same key updates the same session. ' +
+                'Send what is new: a score, weak spots found or cleared, the topic’s status, the next step (a problem they stop before solving: no outcome, and where they got to in nextStep). Minutes are counted. What they say about their own life goes to remember or update_memory.',
             input: {
                 key: z.string().trim().min(1).max(80).describe('The session key get_brief gave.'),
-                title: z.string().trim().min(1).max(200).optional().describe('What was done, e.g. "Cache invalidation and stampedes".'),
+                title: z.string().trim().min(1).max(200).optional().describe('What was done.'),
                 kind: z.enum(['study', 'practice', 'build', 'review']).optional().describe('Default study.'),
                 subject: zSubjectName.optional(),
                 topicId: zId('topic').optional().describe('The path topic (get_brief, get_path).'),
                 project: z.string().trim().max(200).optional(),
                 minutes: z.number().int().min(0).max(600).optional(),
-                score: z.object({ done: z.number().int().min(0), total: z.number().int().min(1).max(100) }).optional().describe('Quiz result, e.g. {done: 7, total: 10}.'),
+                score: z.object({ done: z.number().int().min(0), total: z.number().int().min(1).max(100) }).optional().describe('Quiz result.'),
                 outcome: z.enum(['alone', 'hints', 'after_answer']).optional().describe('practice: how the problem was solved.'),
                 problem: z.string().trim().max(200).optional().describe('practice: the problem’s name.'),
                 url: z.string().trim().max(500).optional(),
-                weakSpots: z.array(z.string().trim().min(1).max(160)).max(10).optional().describe('What he got wrong or found shaky (Recall asks about these first).'),
-                cleared: z.array(z.string().trim().min(1).max(160)).max(20).optional().describe('Weak spots he now gets right (their text or id).'),
+                weakSpots: z.array(z.string().trim().min(1).max(160)).max(10).optional().describe('What they got wrong or found shaky.'),
+                cleared: z.array(z.string().trim().min(1).max(160)).max(20).optional().describe('Weak spots they now get right.'),
                 topicStatus: z.enum(['planned', 'in_progress', 'done', 'skipped']).optional(),
                 nextStep: z.string().trim().max(300).optional().describe('What to do next on the topic (or the project).'),
-                learned: z.array(zNote).max(3).optional().describe('What you learned about the user (see remember).'),
             },
             annotations: CHANGES,
         },
+        // MCP_MEMORY_PLAN §4.2: one way in for what they say about themselves (remember, update_memory): `said` and
+        // `learned` went from here (the API still takes them from older builds for one release).
         async ({ key, subject, ...rest }) => {
             const resolved = subject ? await resolveSubject(api, subject) : null;
             const body = { ...rest, ...(resolved ? { subjectId: resolved.id } : {}) };
@@ -224,7 +285,6 @@ export function registerRecordTools(server: McpServer, ctx: ToolContext): void {
             ];
             if (w.topic) lines.push(`Topic: ${w.topic.position}. ${w.topic.title} · ${w.topic.status.replace('_', ' ')}${w.topic.nextStep ? ` · next step: ${w.topic.nextStep}` : ''}`);
             if (w.weakSpots.length) lines.push(`Open weak spots: ${w.weakSpots.map((x) => x.text).join('; ')}`);
-            if (w.learned) lines.push(w.learned.paused ? 'Learned: not kept (the user has paused his buddy).' : `Learned: ${plural(w.learned.saved, 'new memory', 'new memories')}${w.learned.seen ? `, ${w.learned.seen} already known` : ''}${w.learned.skipped ? `, ${w.learned.skipped} not kept` : ''}.`);
             const text = lines.join('\n');
             return w.topicEditId ? withUndo(text) : text;
         }
@@ -236,7 +296,7 @@ export function registerRecordTools(server: McpServer, ctx: ToolContext): void {
         'list_sessions',
         {
             title: 'Sessions',
-            description: 'What the user did, day by day: minutes per kind (study, practice, build, review) and each session. For "where did my week go" or before planning.',
+            description: 'What the user did, day by day: minutes per kind and each session. For "where did my week go" or before planning.',
             input: {
                 days: z.number().int().min(1).max(90).optional().describe('How many days back, today included (default 7).'),
                 kind: z.enum(['study', 'practice', 'build', 'review']).optional(),

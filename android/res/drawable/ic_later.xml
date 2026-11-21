@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Later (0.7.0): the app's clock (mockups/phone-app, i-clock), tinted by the layout. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp"
+    android:height="16dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M2,12a10,10 0,1 0,20 0a10,10 0,1 0,-20 0"
+        android:strokeWidth="1.9"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M12,6v6l4,2"
+        android:strokeWidth="1.9"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

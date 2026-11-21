@@ -19,18 +19,25 @@ async function main(): Promise<void> {
         log,
         debug: config.debug,
     });
-    // A work folder (the hooks' config says brief: false for it): his brief stays personal here too.
+    // A work folder (the hooks' config says brief: false for it): the user's brief stays personal here too.
+    // MCP_MEMORY_PLAN §4.9 (R13): a folder whose rule is "off" is excluded everywhere: no tools, not only no hooks.
     const hooks = loadHookConfig();
-    const workMode = !!hooks && folderRule(process.cwd(), hooks.allow)?.brief === false;
+    const rule = hooks ? folderRule(process.cwd(), hooks.allow) : null;
+    const excluded = rule?.mode === 'off';
+    const workMode = !excluded && rule?.brief === false;
     const workProject = workMode && hooks ? projectOf(process.cwd(), hooks.allow) : undefined;
     // B10: where the hooks act, log_work reads their clock for this folder's project.
     const clockProject = hooks && isAllowed(process.cwd(), hooks.allow) ? projectOf(process.cwd(), hooks.allow) : undefined;
+    // §4.9: saves carry the folder's project (the digest's "already saved" hint, the memory's tags).
+    const project = hooks ? projectOf(process.cwd(), hooks.allow) : undefined;
     const server = createRecollectServer({
         api,
         agentName: config.agentName,
         problem: config.problem,
         groups: groupsFrom(config.tools),
         workMode,
+        ...(excluded ? { set: 'excluded' as const } : {}),
+        ...(project ? { project } : {}),
         ...(workProject ? { workProject } : {}),
         ...(clockProject ? { clockProject } : {}),
     });

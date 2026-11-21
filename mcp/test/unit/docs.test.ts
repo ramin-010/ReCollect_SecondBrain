@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { TOKEN, UNDO, UUID_RE, connect, fail, lastLine, ok, type Harness } from './harness.js';
 import { subjects } from './fixtures.js';
+import { STUDY_NOTE_LINE } from '../../src/tools/docs.js';
 
 let h: Harness | undefined;
 afterEach(async () => {
@@ -62,7 +63,28 @@ describe('read_doc', () => {
             }),
         });
         const res = await h.call('read_doc', { docId: 'docA' });
-        expect(res.text).toBe('Doc docA · "Postgres locks" · subject Backend · updated 2026-11-10 · editable\n\n## Summary\n\nRow locks.');
+        // Stage 14: a doc they can edit ends with the rule for offering a note (the moment it matters).
+        expect(res.text).toBe(`Doc docA · "Postgres locks" · subject Backend · updated 2026-11-10 · editable\n\n## Summary\n\nRow locks.\n\n---\n${STUDY_NOTE_LINE}`);
+    });
+
+    it('stage 14: append_to_doc with a heading adds a note inside that section; a repeat, an older server and after alone said plainly', async () => {
+        h = await connect({
+            'POST /api/agent/docs/docA/append': [
+                ok({ id: 'docA', heading: 'Why it works', placed: 'after', appended: 2, editId: 'e1' }),
+                ok({ id: 'docA', heading: 'Why it works', placed: 'section_end', appended: 2, editId: 'e2' }),
+                ok({ id: 'docA', heading: 'Why it works', already: true, placed: null, appended: 0, editId: null }),
+                ok({ id: 'docA', appended: 2, editId: 'e3' }),
+            ],
+        });
+        const add = (args: Record<string, unknown>) => h!.call('append_to_doc', { docId: 'docA', markdown: '**Conveyor belt:** a worker at each end.', ...args });
+        const first = await add({ heading: 'Why it works', after: 'start one pointer' });
+        expect(h.requests[0]!.body).toEqual({ markdown: '**Conveyor belt:** a worker at each end.', heading: 'Why it works', after: 'start one pointer' });
+        expect(first.text).toMatch(/^Added a note under "Why it works" in doc docA, right after the paragraph you quoted, with the day and your app under it\./);
+        expect((await add({ heading: 'Why it works' })).text).toMatch(/at the end of that section/);
+        expect((await add({ heading: 'Why it works' })).text).toBe('Already in that section ("Why it works"): not added again.');
+        expect((await add({ heading: 'Why it works' })).text).toMatch(/^Appended 2 blocks to the end of doc docA \(this Recollect server is older/);
+        expect((await add({ after: 'start one pointer' })).isError).toBe(true);
+        expect(h.requests).toHaveLength(4);
     });
 
     it('says when the doc is read-only or empty', async () => {
@@ -193,13 +215,18 @@ describe('create_doc', () => {
         expect(res.text).toBe('The Recollect token lacks the "docs:write" scope this tool needs. Make a token with "docs:write" in Settings → Agents.');
     });
 
-    it('describes the Markdown dialect for agents, and when to use a canvas or mermaid', async () => {
+    it('describes the Markdown dialect in short; guide: true answers the whole guide and creates nothing (MCP_MEMORY_PLAN §4.10)', async () => {
         h = await connect({});
         const { tools } = await h.client.listTools();
         const description = tools.find((t) => t.name === 'create_doc')!.description!;
-        for (const part of ['[!NOTE]', '[!CAUTION]', '<details><summary>', '```mermaid', '```canvas', 'flowchart LR', 'subgraph api [API tier]', ':::blue', 'note for db:', '@{ kind: queue }', 'gateway, lb, auth', 'sequence, ER, state', '- [ ]', '###']) {
-            expect(description).toContain(part);
+        for (const part of ['[!TIP]', '<details>', '```mermaid', '```canvas', 'guide: true']) expect(description).toContain(part);
+        const guide = await h.call('create_doc', { guide: true });
+        for (const part of ['[!NOTE]', '[!CAUTION]', '<details><summary>', '```mermaid', '```canvas', 'flowchart LR', 'subgraph api [API tier]', ':::blue', 'note for db:', '@{ kind: queue }', 'gateway, lb, auth', 'sequence, ER, state', '- [ ]', '###', 'note_recipe']) {
+            expect(guide.text).toContain(part);
         }
+        expect(h.requests).toHaveLength(0);
+        const missing = await h.call('create_doc', { title: 'T' });
+        expect(missing).toEqual({ text: 'Send title and markdown (or only guide: true for the writing guide).', isError: true });
     });
 
     it('answers with a line per canvas it made: size, zoom in a doc, and what to check', async () => {

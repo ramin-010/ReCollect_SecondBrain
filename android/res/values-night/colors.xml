@@ -29,4 +29,13 @@
     <color name="w_ink_1">@color/w_dark_ink_1</color>
     <color name="w_ink_2">@color/w_dark_ink_2</color>
     <color name="w_ink_3">@color/w_dark_ink_3</color>
+    <color name="w_line_strong">@color/w_dark_line_strong</color>
+    <color name="w_set">@color/w_dark_set</color>
+    <color name="wp_ground">@color/wp_dark_ground</color>
+    <color name="wp_ring">@color/wp_dark_ring</color>
+    <color name="wp_ink_1">@color/wp_dark_ink_1</color>
+    <color name="wp_ink_2">@color/wp_dark_ink_2</color>
+    <color name="wp_ink_3">@color/wp_dark_ink_3</color>
+    <color name="wp_line_strong">@color/wp_dark_line_strong</color>
+    <color name="wp_set">@color/wp_dark_set</color>
 </resources>

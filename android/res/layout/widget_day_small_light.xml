@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Made from widget_day_small.xml with the light steps by widget-themes.py: edit widget_day_small.xml, then run it. -->
+<!-- Made from widget_day_small.xml (light) by widget-themes.py: edit widget_day_small.xml, then run it. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@android:id/background"
     android:layout_width="match_parent"
@@ -11,7 +11,7 @@
     android:paddingEnd="16dp">
 
     <TextView
-        android:id="@+id/w_date"
+        android:id="@+id/w_label"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:singleLine="true"
@@ -22,9 +22,10 @@
         android:textSize="12sp" />
 
     <TextView
-        android:id="@+id/w_headline"
+        android:id="@+id/w_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
         android:singleLine="true"
         android:ellipsize="none"
         android:requiresFadingEdge="horizontal"
@@ -32,4 +33,18 @@
         android:fontFamily="sans-serif-medium"
         android:textColor="@color/w_light_ink_1"
         android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/w_voice"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:singleLine="true"
+        android:ellipsize="none"
+        android:requiresFadingEdge="horizontal"
+        android:fadingEdgeLength="24dp"
+        android:fontFamily="serif"
+        android:textColor="@color/w_light_ink_1"
+        android:textSize="15sp"
+        android:visibility="gone" />
 </LinearLayout>

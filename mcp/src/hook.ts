@@ -20,6 +20,13 @@
 // Code: every call has a 3 s limit, every failure is one line in ~/.recollect/hook.log, and the exit
 // code is always 0. The transcript is never read (its format is internal): his words come from the
 // prompt hook's own input, the reply from the Stop hook's last_assistant_message.
+// Stage 4 (ECOSYSTEM_V2_PLAN §4.11, §4.15): a server that says `capture: 2` (in the brief or in a words
+// answer; kept in ~/.recollect/server.json) gets every message with its own number in the session, sent
+// at each prompt by a detached flush, the last message already read coming along as context with the end
+// of the agent's reply; it answers how far it has read, so a lost answer loses and doubles nothing. While
+// the person's AI is paused it answers 503 AI_PAUSED and the words wait on the PC; words a failed close
+// left are sent at the next start; nothing older than 14 days is sent. While one of the buddy's questions
+// is open in the session, a reply under 3 words is read too. An older server gets exactly today's pieces.
 // Test knobs: RECOLLECT_HOOKS_HOME (instead of ~/.recollect), RECOLLECT_HOOKS_CONFIG,
 // RECOLLECT_HOOKS_MIN_MINUTES (default 2), RECOLLECT_HOOKS_MIN_PROMPTS (default 2),
 // RECOLLECT_HOOKS_FLUSH=inline (the stop hook flushes in its own process: tests).
@@ -28,7 +35,7 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSyn
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { RecollectApi } from './api.js';
+import { ApiError, RecollectApi } from './api.js';
 import { briefText, type Brief } from './tools/record.js';
 
 export type FolderMode = 'full' | 'light' | 'off';
@@ -77,14 +84,19 @@ export interface OpenSession {
     endedAt?: string;
     /** The buddy's notes already shown in this session (each is shown once). */
     notesShown?: string[];
+    /** Stage 4: the buddy's open questions in this session's brief (a short reply is read while one is open). */
+    asks?: Array<{ id: string; until: string }>;
+    /** Stage 4: the session line is logged; only its words still wait to be sent (the next start sends them). */
+    logged?: boolean;
 }
 
-/** One line of a session's words file: his words, or the start of the agent's reply to them. */
-type WordsLine = { at: string; text: string } | { at: string; reply: string };
-/** What the flush has sent of a session's words file. */
+/** One line of a session's words file: his words, or the agent's reply to them (its start, and its end when longer). */
+type WordsLine = { at: string; text: string } | { at: string; reply: string; tail?: string };
+/** What the flush has sent of a session's words file (`read`: how far the server has read, by message number). */
 interface FlushState {
     sent: number;
     seq: number;
+    read?: number;
 }
 
 /** A note from the buddy for his chats (GET /api/buddy/note), kept in ~/.recollect/note.json. */
@@ -101,6 +113,14 @@ type Env = Record<string, string | undefined>;
 const GAP_MAX_MS = 5 * 60_000;
 const STALE_MS = 30 * 60_000;
 const NET_TIMEOUT_MS = 3000;
+/** The most minutes the server takes for one session (backend MINUTES_MAX). */
+export const SESSION_MINUTES_MAX = 600;
+/** Stage 4: a server that speaks the second protocol takes a whole day. */
+export const SESSION_MINUTES_DAY = 1440;
+/** Words wait on the PC at most this long (a paused AI, a failed close). */
+export const HOLD_MS = 14 * 86_400_000;
+/** The protocol of message numbers. */
+export const CAPTURE_V2 = 2;
 /** A piece of words is sent when this much is waiting, or when its first words are this old. */
 export const FLUSH_CHARS = 2000;
 export const FLUSH_AGE_MS = 30 * 60_000;
@@ -154,7 +174,7 @@ const lineCount = (text: string) => text.split(/\r?\n/).length;
  * reply under 3 words ("yes", "go on"). Pasted blocks and code become a marker with their size; the
  * IDE's attachments go; at most 4,000 characters (the start and the end of a long one).
  */
-export function promptWords(prompt: unknown): string | null {
+export function promptWords(prompt: unknown, opts: { short?: boolean } = {}): string | null {
     if (typeof prompt !== 'string') return null;
     let t = prompt
         .replace(/<(system-reminder|ide_selection|ide_opened_file|ide_diagnostics|command-[a-z-]+|local-command-[a-z-]+)\b[^>]*>[\s\S]*?<\/\1>/g, ' ')
@@ -164,7 +184,8 @@ export function promptWords(prompt: unknown): string | null {
         .replace(/ *\n */g, '\n')
         .trim();
     if (!t || t.startsWith('/')) return null;
-    if ((t.match(/[\p{L}\p{N}]+/gu) ?? []).length < 3) return null;
+    // A short reply ("yes", "did it") is read only while one of the buddy's questions is open (stage 4).
+    if ((t.match(/[\p{L}\p{N}]+/gu) ?? []).length < (opts.short ? 1 : 3)) return null;
     if (t.length > TEXT_MAX) t = `${t.slice(0, 3000)} […] ${t.slice(-800)}`;
     return t;
 }
@@ -395,7 +416,7 @@ export function clockText(project: string, day: string, lines: readonly ClockLin
     const shown = turns.slice(-60);
     const spans = clockSpans(lines);
     return [
-        `${project}, ${dayLabel(new Date(`${day}T12:00:00`))} (the hook's clock, this PC's time; each turn: when he wrote → when the reply ended):`,
+        `${project}, ${dayLabel(new Date(`${day}T12:00:00`))} (the hook's clock, this PC's time; each turn: when they wrote → when the reply ended):`,
         ...(turns.length > shown.length ? [`(${turns.length - shown.length} earlier turns left out)`] : []),
         ...shown.map((t) => `${localTime(t.at)}${t.head ? ` "${t.head}"` : ''}${t.end ? ` → ${localTime(t.end)}` : ''}`),
         spans.length ? `Worked ${spans.map((s) => `${localTime(s.from)}–${localTime(s.to)} (${hoursText(s.minutes)})`).join(', ')}.` : '',
@@ -423,8 +444,8 @@ function pruneClocks(env: Env, now: Date): void {
 /** The reminder to save, with the clock (a `nudge` folder's every prompt). */
 export function nudgeText(now: Date): string {
     return (
-        `Recollect [${dayLabel(now)}, ${localTime(now)}]: before you finish this turn, if his message or your answer holds something the user would want later ` +
-        "(something about him, a reminder or dated to-do, an idea or insight), save it quietly with the recollect tools and say nothing about it in your reply. " +
+        `Recollect [${dayLabel(now)}, ${localTime(now)}]: before you finish this turn, if their message or your answer holds something the user would want later ` +
+        "(something about their own life, a reminder or dated to-do, an idea or insight), save it quietly with the recollect tools and say nothing about it in your reply. " +
         'Most turns have nothing. Never save company code, data or client names.'
     );
 }
@@ -453,7 +474,7 @@ export function logReminders(project: string, now: Date, firstToday: boolean, en
     }
     const minuteOfDay = now.getHours() * 60 + now.getMinutes();
     if (minuteOfDay >= EVENING_AT_MIN && !isLogged(project, today, env) && !hasMark(project, today, 'asked-evening', env) && workMinutes(readClock(project, today, env)) >= EVENING_WORK_MIN) {
-        out.push("It is past 5:30 pm and today's work here is not logged: at a natural pause, ask him once if he wants it logged (/log-work).");
+        out.push("It is past 5:30 pm and today's work here is not logged: at a natural pause, ask them once if they want it logged (/log-work).");
         setMark(project, today, 'asked-evening', env);
     }
     return out;
@@ -485,6 +506,42 @@ function readWords(dir: string, sessionId: string): WordsLine[] {
 }
 
 const appendWords = (dir: string, sessionId: string, line: WordsLine) => appendFileSync(wordsFile(dir, sessionId), `${JSON.stringify(line)}\n`);
+
+/** What the server speaks (stage 4): ~/.recollect/server.json { url, capture }, for the configured url only. */
+const capFile = (env: Env) => path.join(hooksHome(env), 'server.json');
+export function serverCapture(config: Pick<HookConfig, 'url'>, env: Env = process.env): number {
+    const c = readJson<{ url?: string; capture?: number }>(capFile(env));
+    return c?.url === config.url && typeof c.capture === 'number' ? c.capture : 0;
+}
+export function noteCapture(config: Pick<HookConfig, 'url'>, env: Env, capture: unknown): void {
+    const n = typeof capture === 'number' && Number.isInteger(capture) ? capture : 0;
+    if (serverCapture(config, env) === n) return;
+    try {
+        writeFileSync(capFile(env), JSON.stringify({ url: config.url, capture: n }));
+    } catch {
+        // The next answer says it again.
+    }
+}
+
+/** His messages with their numbers in the session (1, 2, …) and the end of the agent's reply to each. */
+export function numberedMessages(lines: readonly WordsLine[]): Array<{ n: number; at: string; text: string; tail?: string }> {
+    const out: Array<{ n: number; at: string; text: string; tail?: string }> = [];
+    for (const l of lines) {
+        if ('text' in l) out.push({ n: out.length + 1, at: l.at, text: l.text });
+        else if (out.length && !out[out.length - 1]!.tail) out[out.length - 1]!.tail = (l.tail ?? l.reply).slice(-REPLY_MAX);
+    }
+    return out;
+}
+
+/** The text lines among the first `sent` lines (a session that moves to message numbers midway). */
+const textsIn = (lines: readonly WordsLine[], sent: number) => lines.slice(0, sent).filter((l) => 'text' in l).length;
+
+/** What still waits to be sent: by number (the second protocol) or by line. */
+export function leftover(lines: readonly WordsLine[], state: FlushState | null, v2: boolean): number {
+    if (!v2) return unsentMessages(lines, state?.sent ?? 0).length;
+    const read = state?.read ?? textsIn(lines, state?.sent ?? 0);
+    return numberedMessages(lines).filter((m) => m.n > read).length;
+}
 
 /** The lines not sent yet, as messages (a reply joins the words before it). */
 export function unsentMessages(lines: readonly WordsLine[], sent: number): Array<{ at: string; text: string; reply?: string }> {
@@ -527,15 +584,19 @@ function takeLock(dir: string, sessionId: string): boolean {
  * Send the session's waiting words (POST /api/buddy/words, 50 at most per piece), then fetch the
  * buddy's note for his chats. Moves on only after a 2xx; a failure waits for the next flush.
  */
-export async function flushWords(api: RecollectApi, dir: string, sessionId: string, env: Env): Promise<void> {
-    if (!takeLock(dir, sessionId)) return;
+export async function flushWords(api: RecollectApi, dir: string, sessionId: string, env: Env, now: Date = new Date()): Promise<void> {
+    if (!(await waitForLock(dir, sessionId, env))) return;
     try {
         const session = readJson<OpenSession>(path.join(dir, `${sessionId}.json`));
         const state = readJson<FlushState>(flushFile(dir, sessionId)) ?? { sent: 0, seq: 0 };
         // A work folder (brief: false): its words are office work (B9: the work log keeps them apart).
-        const config = session ? loadHookConfig(env) : null;
+        const config = loadHookConfig(env);
         const office = !!session && !!config && folderRule(session.cwd, config.allow)?.brief === false;
         const lines = readWords(dir, sessionId);
+        if (config && serverCapture(config, env) >= CAPTURE_V2) {
+            await sendNumbered(api, dir, sessionId, session, config, env, lines, state, office, now);
+            return;
+        }
         let { sent, seq } = state;
         while (sent < lines.length) {
             // The lines of one piece: up to 50 messages (their replies come along).
@@ -547,7 +608,9 @@ export async function flushWords(api: RecollectApi, dir: string, sessionId: stri
             }
             const messages = unsentMessages(lines.slice(0, end), sent);
             if (messages.length) {
-                await api.post('/api/buddy/words', { sessionKey: session?.key ?? `cc_${sessionId}`, seq: seq + 1, project: session?.project ?? null, ...(office ? { office: true } : {}), messages });
+                const answer = await api.post<{ capture?: number }>('/api/buddy/words', { sessionKey: session?.key ?? `cc_${sessionId}`, seq: seq + 1, project: session?.project ?? null, ...(office ? { office: true } : {}), messages });
+                // A server that speaks message numbers says so: the next sends use them.
+                if (config) noteCapture(config, env, answer?.capture);
                 seq++;
             }
             sent = end;
@@ -566,9 +629,81 @@ export async function flushWords(api: RecollectApi, dir: string, sessionId: stri
     }
 }
 
+/** The lock, waited for a little in a detached flush (two prompts close together); at once in a test. */
+async function waitForLock(dir: string, sessionId: string, env: Env): Promise<boolean> {
+    for (let i = 0; i < 6; i++) {
+        if (takeLock(dir, sessionId)) return true;
+        if (env['RECOLLECT_HOOKS_FLUSH'] === 'inline') return false;
+        await new Promise((r) => setTimeout(r, 300));
+    }
+    return false;
+}
+
+/**
+ * The second protocol (stage 4): the messages past what the server has read, each with its number, the
+ * last one it read as context (with the end of the agent's reply); 50 at most per send. The server's
+ * answer says how far it has read. 503 AI_PAUSED: the words wait. A server that refuses the fields
+ * (an older release came back) is forgotten, and the next flush sends today's pieces.
+ */
+async function sendNumbered(
+    api: RecollectApi,
+    dir: string,
+    sessionId: string,
+    session: OpenSession | null,
+    config: HookConfig,
+    env: Env,
+    lines: readonly WordsLine[],
+    state: FlushState,
+    office: boolean,
+    now: Date
+): Promise<void> {
+    const all = numberedMessages(lines);
+    let read = state.read ?? textsIn(lines, state.sent);
+    let seq = state.seq;
+    const save = () => writeFileSync(flushFile(dir, sessionId), JSON.stringify({ sent: lines.length, seq, read }));
+    // Nothing older than 14 days is sent (held words, a close that failed long ago).
+    const stale = all.filter((m) => m.n > read && now.getTime() - Date.parse(m.at) > HOLD_MS);
+    if (stale.length) {
+        read = Math.max(read, ...stale.map((m) => m.n));
+        log(env, `dropped ${stale.length} words of ${sessionId} older than 14 days`);
+        save();
+    }
+    while (true) {
+        const fresh = all.filter((m) => m.n > read).slice(0, WORDS_PER_POST);
+        if (!fresh.length) break;
+        const before = [...all].reverse().find((m) => m.n <= read);
+        const messages = [...(before ? [{ ...msgOf(before), context: true }] : []), ...fresh.map(msgOf)];
+        let answer: { read?: number; capture?: number } | null;
+        try {
+            answer = await api.post<{ read?: number; capture?: number }>('/api/buddy/words', {
+                sessionKey: session?.key ?? `cc_${sessionId}`,
+                seq: fresh[0]!.n,
+                project: session?.project ?? null,
+                ...(office ? { office: true } : {}),
+                v: CAPTURE_V2,
+                canHold: true,
+                messages,
+            });
+        } catch (err) {
+            if (err instanceof ApiError && err.code === 'AI_PAUSED') {
+                log(env, `held ${fresh.length} words of ${sessionId}: the AI is paused`);
+                return;
+            }
+            if (err instanceof ApiError && err.status === 400) noteCapture(config, env, 0);
+            throw err;
+        }
+        noteCapture(config, env, answer?.capture ?? CAPTURE_V2);
+        seq++;
+        read = Math.max(read, typeof answer?.read === 'number' ? answer.read : fresh[fresh.length - 1]!.n);
+        save();
+    }
+}
+
+const msgOf = (m: { n: number; at: string; text: string; tail?: string }) => ({ n: m.n, at: m.at, text: m.text, ...(m.tail ? { reply: m.tail } : {}) });
+
 /** Starts a flush that outlives this hook (Claude Code never waits for the network). */
-function startFlush(api: RecollectApi, dir: string, sessionId: string, env: Env): Promise<void> | void {
-    if (env['RECOLLECT_HOOKS_FLUSH'] === 'inline') return flushWords(api, dir, sessionId, env);
+function startFlush(api: RecollectApi, dir: string, sessionId: string, env: Env, now: Date = new Date()): Promise<void> | void {
+    if (env['RECOLLECT_HOOKS_FLUSH'] === 'inline') return flushWords(api, dir, sessionId, env, now);
     try {
         const child = spawn(process.execPath, [fileURLToPath(import.meta.url), 'flush', sessionId], { detached: true, stdio: 'ignore', windowsHide: true, env: process.env });
         child.unref();
@@ -613,18 +748,24 @@ function holdWords(dir: string, sessionId: string, env: Env): void {
  * changed mid-session holds: a work folder (`brief: false`) is titled by its project, never his
  * words; `commits: false` sends no branch or commit subjects; a folder no longer allowed sends nothing.
  */
-async function close(api: RecollectApi, file: string, endedAt: string, env: Env): Promise<void> {
+async function close(api: RecollectApi, file: string, endedAt: string, env: Env, now: Date = new Date()): Promise<void> {
     const dir = path.dirname(file);
     const sessionId = path.basename(file, '.json');
     const opened = readJson<OpenSession>(file);
     const config = loadHookConfig(env);
     const rule = opened && config ? folderRule(opened.cwd, config.allow) : null;
+    let wordsLeft = false;
     if (existsSync(wordsFile(dir, sessionId))) {
         if (!rule || rule.mode !== 'full') holdWords(dir, sessionId, env);
         else {
-            await flushWords(api, dir, sessionId, env);
-            const left = unsentMessages(readWords(dir, sessionId), readJson<FlushState>(flushFile(dir, sessionId))?.sent ?? 0);
-            if (!left.length) dropWords(dir, sessionId);
+            await flushWords(api, dir, sessionId, env, now);
+            const v2 = !!config && serverCapture(config, env) >= CAPTURE_V2;
+            if (!leftover(readWords(dir, sessionId), readJson<FlushState>(flushFile(dir, sessionId)), v2)) dropWords(dir, sessionId);
+            else if (now.getTime() - Date.parse(opened?.endedAt ?? endedAt) > HOLD_MS) {
+                // Waited 14 days (a server that never answered): dropped, one line in the log.
+                dropWords(dir, sessionId);
+                log(env, `dropped the words of ${sessionId}: unsent for 14 days`);
+            } else wordsLeft = true;
         }
     }
     const s = readJson<OpenSession>(file);
@@ -632,10 +773,20 @@ async function close(api: RecollectApi, file: string, endedAt: string, env: Env)
         rmSync(file, { force: true });
         return;
     }
+    // Logged already (a close whose words could not all be sent): only the words wait, for the next start.
+    if (s.logged) {
+        if (!wordsLeft) rmSync(file, { force: true });
+        return;
+    }
+    // Words left unsent: the session file stays (marked logged once its line is in) so the next start sends them.
+    const keep = (logged: boolean) => (wordsLeft ? writeFileSync(file, JSON.stringify({ ...s, endedAt: s.endedAt ?? endedAt, ...(logged ? { logged: true } : {}) })) : rmSync(file, { force: true }));
     const end = s.endedAt ?? endedAt;
-    const minutes = activeMinutes([...s.stamps, end]);
+    // The server takes at most SESSION_MINUTES_MAX (600) a session: a longer one was refused at every start and never
+    // logged (two in his hook log on 11-17). It is logged with the most the server takes (ECOSYSTEM_V2_PLAN stage 4).
+    const most = config && serverCapture(config, env) >= CAPTURE_V2 ? SESSION_MINUTES_DAY : SESSION_MINUTES_MAX;
+    const minutes = Math.min(most, activeMinutes([...s.stamps, end]));
     if (!worthLogging(s, minutes, env)) {
-        rmSync(file, { force: true });
+        keep(true);
         return;
     }
     const withCommits = rule?.commits !== false;
@@ -652,7 +803,7 @@ async function close(api: RecollectApi, file: string, endedAt: string, env: Env)
             ...(titleIfNew ? { titleIfNew } : {}),
             details: withCommits ? { ...(branch ? { branch } : {}), commits } : {},
         });
-        rmSync(file, { force: true });
+        keep(true);
     } catch (err) {
         writeFileSync(file, JSON.stringify({ ...s, endedAt: end }));
         log(env, `could not close ${s.key}: ${err instanceof Error ? err.message : String(err)}`);
@@ -672,7 +823,7 @@ async function sweep(api: RecollectApi, dir: string, current: string, env: Env, 
         if (file === current) continue;
         const s = readJson<OpenSession>(file);
         const last = s ? Math.max(...s.stamps.map((x) => Date.parse(x)).filter((n) => Number.isFinite(n)), 0) : 0;
-        if (!s || s.endedAt || now.getTime() - last > STALE_MS) await close(api, file, s?.endedAt ?? new Date(last || now.getTime()).toISOString(), env);
+        if (!s || s.endedAt || now.getTime() - last > STALE_MS) await close(api, file, s?.endedAt ?? new Date(last || now.getTime()).toISOString(), env, now);
     }
 }
 
@@ -751,10 +902,13 @@ export async function runHook(event: string, input: Record<string, unknown>, env
         // His words (a "full" folder): what he typed, and the start of the agent's answer to it.
         if (rule.mode === 'full') {
             if (event === 'prompt') {
-                const text = promptWords(input['prompt']);
+                const askOpen = (s.asks ?? []).some((a) => Date.parse(a.until) > now.getTime());
+                const text = promptWords(input['prompt'], { short: askOpen });
                 if (text) appendWords(dir, sessionId, { at, text });
             } else if (typeof input['last_assistant_message'] === 'string' && input['last_assistant_message'].trim()) {
-                appendWords(dir, sessionId, { at, reply: input['last_assistant_message'].replace(/\s+/g, ' ').trim().slice(0, REPLY_MAX) });
+                // Its start, and its end when it is longer (a question to him usually sits at the end).
+                const reply = input['last_assistant_message'].replace(/\s+/g, ' ').trim();
+                appendWords(dir, sessionId, { at, reply: reply.slice(0, REPLY_MAX), ...(reply.length > REPLY_MAX ? { tail: reply.slice(-REPLY_MAX) } : {}) });
             }
         }
         // The buddy's note, once, where he gets his brief (never in a work folder).
@@ -770,18 +924,23 @@ export async function runHook(event: string, input: Record<string, unknown>, env
                 ...(note ? { notesShown: [...(s.notesShown ?? []), note.id].slice(-20) } : {}),
             })
         );
-        if (event === 'stop' && rule.mode === 'full') {
+        // A server that speaks message numbers gets each message as it is typed (a detached send; the
+        // server reads a session's messages together a little later, or at once while a question is open).
+        // An older one gets today's pieces: when 2,000 characters or 30 minutes wait, after a reply.
+        const numbered = serverCapture(config, env) >= CAPTURE_V2;
+        if (rule.mode === 'full' && ((event === 'prompt' && numbered) || (event === 'stop' && !numbered))) {
             const lines = readWords(dir, sessionId);
-            if (flushDue(lines, readJson<FlushState>(flushFile(dir, sessionId))?.sent ?? 0, now)) await startFlush(api, dir, sessionId, env);
+            const state = readJson<FlushState>(flushFile(dir, sessionId));
+            if (numbered ? leftover(lines, state, true) > 0 : flushDue(lines, state?.sent ?? 0, now)) await startFlush(api, dir, sessionId, env, now);
         }
         // B10: in a `nudge` folder every prompt reminds the agent to save quietly (with the clock), and once a day to offer to log the work.
         const nudge = event === 'prompt' && rule.nudge ? [nudgeText(now), ...logReminders(clockProject, now, firstToday, env)] : [];
-        return [note ? `Recollect, from the user's buddy (pass it on in one sentence at a natural pause; skip it if he is in the middle of something): ${note.text}` : '', ...nudge]
+        return [note ? `Recollect, from the user's buddy (pass it on in one sentence at a natural pause; skip it if they are in the middle of something): ${note.text}` : '', ...nudge]
             .filter(Boolean)
             .join('\n');
     }
     if (event === 'end') {
-        if (existsSync(file)) await close(api, file, at, env);
+        if (existsSync(file)) await close(api, file, at, env, now);
         return '';
     }
     if (event !== 'start') return '';
@@ -798,6 +957,13 @@ export async function runHook(event: string, input: Record<string, unknown>, env
     if (!config.brief || !rule.brief) return '';
     try {
         const brief = await api.get<Brief>('/api/brief', { project: session.project, key: session.key });
+        // Stage 4: what the server speaks, and the buddy's open questions (a short reply is read while one is open).
+        noteCapture(config, env, brief.capture);
+        const asks = (brief.asks ?? []).map((a) => ({ id: a._id, until: a.until }));
+        if (asks.length) {
+            session = { ...session, asks };
+            writeFileSync(file, JSON.stringify(session));
+        }
         // The brief carries the buddy's newest note: it counts as shown in this session, and it is the
         // note file's note from now on (so a prompt never repeats it, or brings back an older one).
         const b = brief.buddy;
@@ -808,7 +974,7 @@ export async function runHook(event: string, input: Record<string, unknown>, env
         return [
             `Recollect (session-start hook): where the user stands. This Claude Code session is logged by the hook (key ${session.key}, project "${session.project}"). ` +
                 `When you finish a piece of work here, call checkpoint once with that key, project "${session.project}", a short title and the nextStep, so the project's next step stays current. ` +
-                'If you study or practise with him, checkpoint as the recollect-study skill says, with the same key.',
+                'If you study or practise with them, checkpoint as the recollect-study skill says, with the same key.',
             briefText(brief),
         ].join('\n');
     } catch (err) {

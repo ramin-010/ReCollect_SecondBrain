@@ -2,10 +2,10 @@
 // tests connect an in-memory client).
 import { McpServer, type RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { ListToolsRequestSchema, type ListToolsResult } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type ListToolsResult } from '@modelcontextprotocol/sdk/types.js';
 import type { RecollectApi } from './api.js';
 import { registerPrompts } from './prompts.js';
-import { READ_ONLY, defineTool, type ToolContext } from './tool.js';
+import { READ_ONLY, defineTool, errorResult, type ToolContext } from './tool.js';
 import { registerContextTools } from './tools/context.js';
 import { registerDayTools } from './tools/day.js';
 import { registerDocTools } from './tools/docs.js';
@@ -26,25 +26,107 @@ import { registerBuddyTools } from './tools/buddy.js';
 export const SERVER_NAME = 'recollect';
 export const SERVER_VERSION = '0.1.0';
 
+/** Claude Code's instructions (the `code` set) and Ask AI's (`all`). */
 export const INSTRUCTIONS = [
-    "Recollect is the user's personal learning app and the record of his work: Docs (his notes, in Markdown), subjects with paths (topics in course order), spaced revision (reviews 1, 3, 7 and 21 days after a doc is scheduled), goals with dated milestones, a week of up to 5 targets, up to 3 focus lines a day, personal tasks, and work sessions.",
-    'Start a working chat with get_brief (where he stands, and a session key), then checkpoint as you go: after each part, not only at the end. Save quietly, without asking or mentioning it, what he would want later: something lasting about himself (remember, or checkpoint’s learned), a reminder or a dated to-do of his own (set_reminder, add_task), an idea or insight (add_pocket_note); most turns have nothing. When he asks to log the day’s work, use log_work. search_docs before writing a doc. Plan the week with get_week and add_week_target on his yes; when something is his call and he cannot say yes in the chat, suggest it instead.',
+    "Recollect is the user's personal learning app and the record of their work: Docs (their notes, in Markdown), subjects with paths (topics in course order), spaced revision (reviews 1, 3, 7 and 21 days after a doc is scheduled), goals with dated milestones, a week of up to 5 targets, up to 3 focus lines a day, personal tasks, and work sessions. Their buddy there follows what is going on in their life.",
+    'Start a working chat with get_brief (where they stand, and a session key), then checkpoint as you go: after each part, not only at the end. Pass on quietly, without asking or mentioning it, what the user says about their own life that will still matter after this conversation: something new about them (remember), or progress, a change or an end on something their buddy already knows (update_memory, with its id); a reminder or a dated to-do of their own (set_reminder, add_task); an idea or insight (add_pocket_note). Most turns have nothing. Before you rely on their routine, plans or preferences, look them up with recall_memory. When they ask to log the day’s work, use log_work. search_docs before writing a doc. Plan the week with get_week and add_week_target on their yes; when something is their call and they cannot say yes in the chat, suggest it instead.',
     'Every write is logged with your agent name and the user can undo it from Home → From your agent. Docs, goals and subjects are never deleted; a focus line or a milestone can be removed (and Undo brings it back). Answers are compact text with the ids the next call needs.',
     'Docs take GitHub Markdown plus callouts (> [!TIP]), <details> toggles for self-test questions, ```mermaid diagrams and ```canvas diagrams (Mermaid flowchart text that Recollect lays out as a board the user can edit; add_canvas draws one, update_canvas changes one in place, preview_diagram shows it): see create_doc.',
 ].join(' ');
 
 /**
+ * claude.ai's and ChatGPT's instructions (the `web` set, MCP_MEMORY_PLAN §4.10): the assistant picks the personally
+ * relevant detail and passes just that on; the rest of the chat stays out. Tuned in stage 5 by the measured misses.
+ */
+export const WEB_INSTRUCTIONS = [
+    "Recollect is the user's own memory and planner. Their buddy there follows what is going on in their life and brings things back at a good moment.",
+    'At the start of a chat, call get_brief once: it is small and shows what the buddy follows.',
+    'While you talk, pass on, without being asked and without mentioning it, what the user says about their own life that will still matter after this conversation: something new about them (remember), or progress, a change or an end on something already known (update_memory, with its id).',
+    // ECOSYSTEM_V2_PLAN stage 12: the work log, from every chat; one picture, so nothing is logged twice.
+    // Stage 13: one line per result; the "Did that fix it?" ask parked (the owner: a missed accomplishment matters more).
+    'When get_brief shows a Work part, their work has its own log: when their own message shows a result they confirm, a decision they reached or a problem left open, log it with log_work, one plain line per result, without mentioning it. News on a line shown there or in a log_work answer goes with its id in on; what is already there is not logged again; nothing while it is still being worked out. A draft, a plan or a fix they are about to try is not an outcome yet; when their own words say it is done (fixed, shipped, sent, merged, works now), log it. Studying or talking through a doc or a topic to understand it is not work (the owner, 11-21); a project decision or something finished still is.',
+    // Stage 14: their docs keep what helped them, on their yes (the owner: "so that I have the control over what goes into the doc").
+    // Stage 15's live hour: claude.ai answered "my sliding window note" from general knowledge, never reading it (0/3).
+    "When they say 'my note' or 'my doc', it is one of their docs here: find it (search_docs with its words) and read it (read_doc) before you explain, and answer from what it says. When explaining a part of it took real work, offer once to add it to that doc under its heading; add only on their yes. A quick answer needs no offer.",
+    'Leave the rest in the chat: the task at hand, questions, suggestions not yet tried, the details of the work, other people’s private things. An interest is not a task: add a task or a reminder only when they ask for one. Most messages need nothing.',
+    'Before you rely on their routine, plans or preferences, look them up with recall_memory.',
+].join(' ');
+
+/**
  * A work folder's instructions (B10, BUDDY_MEMORY_PLAN §12.5): nothing from an office chat reaches
- * Recollect unless the agent saves it; it saves his own things quietly and never the company's.
+ * Recollect unless the agent saves it; it saves the user's own things quietly and never the company's.
  */
 export const OFFICE_INSTRUCTIONS = [
     "Recollect is the user's own notebook, not this company's. This is a work folder: nothing from this chat reaches Recollect unless you save it.",
-    'Save quietly what he would want later: something about himself (remember), a reminder or a dated to-do of his own (set_reminder, add_task), an idea or insight (add_pocket_note). Don’t ask first, and say nothing about it in your reply unless he asked for it. One thing a call; most turns have nothing. Never save company code, data, clients or colleagues’ names.',
-    'When he asks to log the day’s work ("log today’s work", /log-work), use log_work. Call get_brief or get_work_log only when he asks what was done here before.',
+    'Save quietly what they would want later: something about their own life (remember), a reminder or a dated to-do of their own (set_reminder, add_task), an idea or insight (add_pocket_note). Don’t ask first, and say nothing about it in your reply unless they asked for it. One thing a call; most turns have nothing. Never save company code, data, clients or colleagues’ names.',
+    'When they ask to log the day’s work ("log today’s work", /log-work), use log_work. Call get_brief or get_work_log only when they ask what was done here before.',
 ].join(' ');
+
+/** A folder the user excluded (MCP_MEMORY_PLAN §4.9, R13): no tools, and this one line. */
+export const EXCLUDED_INSTRUCTIONS = 'This folder is excluded by the user: nothing here is saved to Recollect or read from it, so no Recollect tools are listed.';
 
 /** What a work folder lists (B10): the saving tools and this project's work log, nothing else. */
 export const OFFICE_TOOLS = ['get_brief', 'remember', 'add_task', 'set_reminder', 'add_pocket_note', 'log_work', 'get_work_log'] as const;
+
+/**
+ * MCP_MEMORY_PLAN §4.1: what claude.ai and ChatGPT list (the remote door). No more_tools: each request there builds a
+ * fresh server, so nothing can be turned on for the next one. Canvas and block editing, goal and week editing stay
+ * with Claude Code and Recollect itself.
+ */
+export const WEB_TOOLS = [
+    // The buddy
+    'get_brief',
+    'remember',
+    'update_memory',
+    'recall_memory',
+    'forget',
+    // Tasks and reminders
+    'add_task',
+    'update_task',
+    'list_tasks',
+    'set_reminder',
+    'list_reminders',
+    'cancel_reminder',
+    // The lock screen
+    'show_on_lock_screen',
+    'clear_lock_line',
+    // Quick capture
+    'add_pocket_note',
+    // The plan, to read
+    'get_today',
+    'get_week',
+    'list_goals',
+    'list_due',
+    'get_learning_overview',
+    'list_subjects',
+    // Studying
+    'get_path',
+    'update_topic',
+    'schedule_revision',
+    'complete_revision',
+    'checkpoint',
+    // Docs
+    'search_docs',
+    'read_doc',
+    'create_doc',
+    'append_to_doc',
+    // The work log (ECOSYSTEM_V2_PLAN stage 12): one outcome a call, the app's own line, the picture to read.
+    'log_work',
+    'update_work_line',
+    'get_work_log',
+] as const;
+
+/**
+ * The tool set of each door (MCP_MEMORY_PLAN §4.1): `web` the remote /mcp (claude.ai, ChatGPT); `code` Claude Code
+ * (the default groups, more_tools for the rest); `office` a work folder; `excluded` a folder whose rule is off (no
+ * tools); `all` Ask AI, inside the app.
+ */
+export const TOOL_SETS = ['web', 'code', 'office', 'excluded', 'all'] as const;
+export type ToolSet = (typeof TOOL_SETS)[number];
+
+/** A call to a removed field (a host that cached an older list): it still runs, and the answer says to reconnect. */
+const REMOVED_FIELDS: Readonly<Record<string, readonly string[]>> = { checkpoint: ['said', 'learned'], get_brief: ['about'] };
+const RECONNECT = 'This app’s list of Recollect tools is out of date: reconnect the Recollect connector. What the user says about themselves goes to remember or update_memory.';
 
 /** Every tool, in the order they are listed. */
 export const TOOL_NAMES = [
@@ -105,6 +187,8 @@ export const TOOL_NAMES = [
     'list_suggestions',
     'set_reminder',
     'list_reminders',
+    'show_on_lock_screen',
+    'clear_lock_line',
     'cancel_reminder',
     'get_recall',
     'get_sharing',
@@ -117,12 +201,15 @@ export const TOOL_NAMES = [
     'update_block',
     'move_blocks',
     'delete_blocks',
-    // The buddy's memory (BUDDY_MEMORY_PLAN): remember is listed with the record; look up and forget on more_tools.
+    // The buddy's memory (BUDDY_MEMORY_PLAN; MCP_MEMORY_PLAN §4.1: saving, finding and correcting are listed together).
     'remember',
+    'update_memory',
     'recall_memory',
     // The work log (BUDDY_MEMORY_PLAN §11.2, B9): what he did, per project and day; B10: an agent logs it on his word.
     'get_work_log',
     'log_work',
+    // Stage 12: an app folds, rewords, links or removes its own work line.
+    'update_work_line',
     'forget',
 ] as const;
 
@@ -191,6 +278,8 @@ export const TOOL_LEVELS: Readonly<Record<ToolName, 1 | 2 | 3>> = {
     set_reminder: 2,
     list_reminders: 1,
     cancel_reminder: 2,
+    show_on_lock_screen: 2,
+    clear_lock_line: 2,
     get_recall: 1,
     get_sharing: 1,
     // Sharing leaves the app: both only ask (the publish_doc and share_doc actions).
@@ -204,10 +293,12 @@ export const TOOL_LEVELS: Readonly<Record<ToolName, 1 | 2 | 3>> = {
     move_blocks: 2,
     delete_blocks: 2,
     remember: 2,
+    update_memory: 2,
     recall_memory: 1,
     forget: 2,
     get_work_log: 1,
     log_work: 2,
+    update_work_line: 2,
 };
 
 export const TOOL_GROUP_NAMES = ['core', 'docs', 'plan', 'record', 'manage'] as const;
@@ -219,10 +310,11 @@ export const DEFAULT_GROUPS: readonly ToolGroup[] = ['core', 'docs', 'plan', 're
 export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     get_brief: 'core',
     checkpoint: 'core',
-    list_sessions: 'core',
+    // MCP_MEMORY_PLAN §4.1: moved to manage to make room for finding and correcting memories.
+    list_sessions: 'manage',
     suggest: 'core',
     get_today: 'core',
-    get_learning_overview: 'core',
+    get_learning_overview: 'manage',
     add_pocket_note: 'core',
     recent_agent_edits: 'manage',
     more_tools: 'core',
@@ -275,6 +367,9 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     set_reminder: 'record',
     list_reminders: 'manage',
     cancel_reminder: 'manage',
+    // Stage 7 (V1): his words on the lock screen for a window.
+    show_on_lock_screen: 'manage',
+    clear_lock_line: 'manage',
     get_recall: 'manage',
     get_sharing: 'manage',
     publish_doc: 'manage',
@@ -289,13 +384,17 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     move_blocks: 'manage',
     delete_blocks: 'docs',
     // The buddy (2026-11-16): remember is listed with the record; update_goal moved to manage to make room.
+    // MCP_MEMORY_PLAN §4.1: finding and correcting belong with saving.
     remember: 'record',
-    recall_memory: 'manage',
-    forget: 'manage',
+    update_memory: 'record',
+    recall_memory: 'record',
+    forget: 'record',
     // B9 (2026-11-16): the default groups are at their 40,000 characters; the manager has every group.
     get_work_log: 'manage',
     // B10: every chat can log the day's work when he asks (recent_agent_edits and list_decisions moved to manage to make room).
     log_work: 'record',
+    // Stage 12: listed on the web; Claude Code rewrites its own list with log_work, so it waits on more_tools.
+    update_work_line: 'manage',
 };
 
 /** RECOLLECT_TOOLS: "all", or groups separated by commas ("core,docs,manage"); else the default. */
@@ -313,26 +412,37 @@ export interface ServerOptions {
     problem?: string | null;
     /** Pocket note ids (tests pass a fixed one). */
     newId?: () => string;
-    /** The tool groups listed from the start (default DEFAULT_GROUPS; the manager passes them all). */
+    /** The tool groups listed from the start in the `code` set (default DEFAULT_GROUPS). */
     groups?: readonly ToolGroup[];
-    /** A work folder: the brief and the buddy's memory stay personal (BUDDY_MEMORY_PLAN §4.3). */
+    /** The door's tool set (MCP_MEMORY_PLAN §4.1); default `office` with workMode, else `code`. */
+    set?: ToolSet;
+    /** A work folder: the brief and the buddy's memory stay personal (BUDDY_MEMORY_PLAN §4.3); the `office` set. */
     workMode?: boolean;
     /** The work folder's project key (get_work_log answers for it alone). */
     workProject?: string;
     /** B10: the folder's project when Recollect's hooks act in it (log_work reads the hook's clock for it). */
     clockProject?: string;
+    /** MCP_MEMORY_PLAN §4.9: Claude Code's folder, sent with remember and update_memory. */
+    project?: string;
+    /** Stage 5's connector simulation: each tool call with its answer, in order (never the token). */
+    trace?: (call: { tool: string; args: unknown; answer?: string }) => void;
 }
 
+const INSTRUCTIONS_OF: Readonly<Record<ToolSet, string>> = { web: WEB_INSTRUCTIONS, code: INSTRUCTIONS, office: OFFICE_INSTRUCTIONS, excluded: EXCLUDED_INSTRUCTIONS, all: INSTRUCTIONS };
+
 export function createRecollectServer(options: ServerOptions): McpServer {
-    const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: options.workMode ? OFFICE_INSTRUCTIONS : INSTRUCTIONS });
+    const set: ToolSet = options.set ?? (options.workMode ? 'office' : 'code');
+    const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: INSTRUCTIONS_OF[set] });
     const registry = new Map<string, RegisteredTool>();
     const ctx: ToolContext = {
         api: options.api,
         problem: options.problem ?? null,
         registry,
-        ...(options.workMode ? { workMode: true } : {}),
+        ...(set === 'office' ? { workMode: true } : {}),
+        set,
         ...(options.workProject ? { workProject: options.workProject } : {}),
         ...(options.clockProject ? { clockProject: options.clockProject } : {}),
+        ...(options.project ? { project: options.project } : {}),
     };
     registerRecordTools(server, ctx);
     registerWeekTools(server, ctx);
@@ -351,17 +461,55 @@ export function createRecollectServer(options: ServerOptions): McpServer {
     registerManageTools(server, ctx);
     registerBlockTools(server, ctx);
     registerBuddyTools(server, ctx);
-    registerPrompts(server);
+    registerPrompts(server, set);
     leanToolList(server);
-    if (options.workMode) {
-        // A work folder lists the saving tools and its own work log only (no more_tools).
-        const office = new Set<string>(OFFICE_TOOLS);
-        for (const [name, tool] of registry) if (!office.has(name)) tool.disable();
+    guardCalls(server, registry, set, options.trace);
+    if (set === 'all') return server;
+    if (set === 'code') {
+        const listed = new Set(options.groups ?? DEFAULT_GROUPS);
+        for (const [name, tool] of registry) if (!listed.has(TOOL_GROUPS[name as ToolName])) tool.disable();
         return server;
     }
-    const listed = new Set(options.groups ?? DEFAULT_GROUPS);
-    for (const [name, tool] of registry) if (!listed.has(TOOL_GROUPS[name as ToolName])) tool.disable();
+    // A work folder lists the saving tools and its own work log; the web its set; an excluded folder nothing (no more_tools).
+    const shown = new Set<string>(set === 'office' ? OFFICE_TOOLS : set === 'web' ? WEB_TOOLS : []);
+    for (const [name, tool] of registry) if (!shown.has(name)) tool.disable();
     return server;
+}
+
+/**
+ * A call to a tool this door doesn't list answers one clear line, never the SDK's "disabled" (MCP_MEMORY_PLAN §4.1);
+ * a call that still sends a removed field (a host's cached list) runs, and its answer says to reconnect.
+ */
+function guardCalls(server: McpServer, registry: Map<string, RegisteredTool>, set: ToolSet, trace?: ServerOptions['trace']): void {
+    const handlers = (server.server as unknown as { _requestHandlers: Map<string, (req: unknown, extra: unknown) => Promise<CallToolResult>> })._requestHandlers;
+    const original = handlers.get('tools/call');
+    if (!original) return;
+    server.server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
+        const name = req.params.name;
+        const answer = async (): Promise<CallToolResult> => {
+            const tool = registry.get(name);
+            if (tool && !tool.enabled) {
+                if (set === 'excluded') return errorResult(EXCLUDED_INSTRUCTIONS);
+                if (set === 'code') return errorResult(`${name} is in the ${TOOL_GROUPS[name as ToolName]} group: call more_tools first, then call it again.`);
+                return errorResult(`${name} is not available in this app: use Recollect itself, or Claude Code.`);
+            }
+            const removed = (REMOVED_FIELDS[name] ?? []).filter((f) => Object.prototype.hasOwnProperty.call(req.params.arguments ?? {}, f));
+            const result = await original(req, extra);
+            if (!removed.length) return result;
+            return { ...result, content: [...(result.content ?? []), { type: 'text' as const, text: `${removed.join(' and ')} ${removed.length > 1 ? 'were' : 'was'} not passed on. ${RECONNECT}` }] };
+        };
+        if (!trace) return answer();
+        // The simulation's trace keeps each call with the record's answer, so a report can say what was filed and how.
+        const args = req.params.arguments ?? {};
+        try {
+            const result = await answer();
+            trace({ tool: name, args, answer: (result.content ?? []).map((c) => (c.type === 'text' ? c.text : `[${c.type}]`)).join('\n') });
+            return result;
+        } catch (err) {
+            trace({ tool: name, args, answer: `error: ${err instanceof Error ? err.message : String(err)}` });
+            throw err;
+        }
+    });
 }
 
 /** more_tools: turns a group on for this chat (the client is told the list changed). */
@@ -372,7 +520,7 @@ function registerMoreTools(server: McpServer, ctx: ToolContext, registry: Map<st
         'more_tools',
         {
             title: 'More tools',
-            description: "Turn on the manage tools: the trash, mark a review done or move it, settings, projects, goal edits, the mirror, decisions, agents' edits, his buddy's memory, what waits for the user's tap.",
+            description: "Turn on the manage tools: the trash, mark a review done or move it, settings, projects, goal edits, the mirror, decisions, sessions, agents' edits, reminders, what waits for the user's tap.",
             input: { group: z.enum(['manage']).optional() },
             annotations: READ_ONLY,
         },

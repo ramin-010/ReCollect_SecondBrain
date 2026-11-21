@@ -42,7 +42,7 @@ export function registerMirrorTools(server: McpServer, ctx: ToolContext): void {
         'get_mirror',
         {
             title: 'Where the user stands',
-            description: 'Where he stands, worked out by the app: each goal path’s pace against its deadline and the smallest fix, hours per week, per-subject quiz scores, weak spots, practice. Quote these numbers.',
+            description: 'Where the user stands, worked out by the app: each goal path’s pace against its deadline and the smallest fix, hours per week, per-subject quiz scores, weak spots, practice. Quote these numbers.',
             input: {
                 goal: z.string().trim().max(120).optional().describe('Only this goal (its title or a part of it).'),
                 subject: z.string().trim().max(100).optional().describe('Only this subject.'),

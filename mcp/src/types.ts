@@ -70,6 +70,11 @@ export interface DocAppended {
     canvases?: CanvasReport[];
 }
 
+/** Stage 14: append_to_doc with a heading (a note inside that section); `already` when the section holds it. */
+export type NoteAdded =
+    | { id: string; heading: string; placed: 'after' | 'section_end'; appended: number; editId: string; canvases?: CanvasReport[] }
+    | { id: string; heading: string; already: true; placed: null; appended: 0; editId: null };
+
 /** POST /api/agent/docs/:id/canvas/:canvasId */
 export interface CanvasUpdated {
     id: string;

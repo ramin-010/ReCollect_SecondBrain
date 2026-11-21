@@ -25,6 +25,11 @@
 
     <style name="Theme.Recollect" parent="Base.Recollect" />
 
+    <!-- The shell (0.7.0): no preview window, so the first frame is the look's own ground, never another colour. -->
+    <style name="Theme.Recollect.Shell" parent="Theme.Recollect">
+        <item name="android:windowDisablePreview">true</item>
+    </style>
+
     <style name="Dialog.Recollect" parent="android:Theme.Material.Light.Dialog.Alert">
         <item name="android:colorAccent">@color/accent</item>
         <item name="android:buttonBarButtonStyle">@style/DialogButton</item>

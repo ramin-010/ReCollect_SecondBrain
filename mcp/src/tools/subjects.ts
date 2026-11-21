@@ -15,7 +15,7 @@ export function registerSubjectTools(server: McpServer, ctx: ToolContext): void 
         'list_subjects',
         {
             title: 'List subjects',
-            description: "The user's subjects (how his docs are grouped for revision), oldest first, with their ids and how many docs (topics) each holds.",
+            description: "The user's subjects (how their docs are grouped for revision), oldest first, with their ids and how many docs (topics) each holds.",
             input: {},
             annotations: READ_ONLY,
         },

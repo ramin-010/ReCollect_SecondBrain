@@ -20,7 +20,12 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const BUILD = path.join(ROOT, 'build');
 const KEYS = path.join(ROOT, 'keys');
-const VERSION = '0.5.1';
+/**
+ * The test app is the next version (0.7.0: the shell, the new screens; 0.7.1: stage 19's widget card with Later); his
+ * app stays 0.6.0 until his OK, and gets all of it as 0.7.0 after his deploy.
+ */
+const QA_BUILD = process.argv.includes('--qa');
+const VERSION = QA_BUILD ? '0.7.1' : '0.6.0';
 const MIN_SDK = 26;
 const TARGET_SDK = 34;
 /** Grows with every build (minutes since 2026-01-01), so `adb install -r` always takes the new one. */
@@ -108,7 +113,46 @@ function signingKey(jdk) {
     return { store, pass };
 }
 
+/**
+ * Every component the manifest names (the activity, receivers, services) must be a public class: Android makes
+ * them by reflection, and a package-private one crashes the app the first time it is used (0.6.0 on his phone,
+ * 11-18: the picture switch's alarm, and the questions' quick answers would have too).
+ */
+function checkComponents() {
+    const manifest = fs.readFileSync(path.join(ROOT, 'AndroidManifest.xml'), 'utf8');
+    const names = [...new Set([...manifest.matchAll(/android:name="\.([A-Za-z0-9_$]+)"/g)].map((m) => m[1]))];
+    const bad = names.filter((n) => {
+        const f = path.join(ROOT, 'src', 'app', 'recollect', 'phone', `${n}.java`);
+        return !fs.existsSync(f) || !new RegExp(`^public\\s+(final\\s+|abstract\\s+)*class\\s+${n}\\b`, 'm').test(fs.readFileSync(f, 'utf8'));
+    });
+    if (bad.length) {
+        console.error(`The manifest names classes that are missing or not public (Android makes them by reflection): ${bad.join(', ')}`);
+        process.exit(1);
+    }
+    console.log(`Manifest components public: ${names.length}`);
+}
+
+// --test (0.6.0): the pure rules' tests on the PC, no Android needed (which picture now, when the next switch is),
+// and the manifest's components public.
+if (process.argv.includes('--test')) {
+    checkComponents();
+    const bin = findJdk();
+    const out = path.join(BUILD, 'test-classes');
+    fs.rmSync(out, { recursive: true, force: true });
+    fs.mkdirSync(out, { recursive: true });
+    run(path.join(bin, exe('javac')), ['--release', '11', '-encoding', 'UTF-8', '-d', out, path.join(ROOT, 'src', 'app', 'recollect', 'phone', 'ShowRule.java'), path.join(ROOT, 'test', 'ShowRuleTest.java')]);
+    run(path.join(bin, exe('java')), ['-cp', out, 'app.recollect.phone.ShowRuleTest']);
+    // Stage 11: each screen its own look, the plain wallpaper's visible crop, the permissions checklist.
+    run(path.join(bin, exe('javac')), ['--release', '11', '-encoding', 'UTF-8', '-d', out, path.join(ROOT, 'src', 'app', 'recollect', 'phone', 'ScreenLook.java'), path.join(ROOT, 'test', 'ScreenLookTest.java')]);
+    run(path.join(bin, exe('java')), ['-cp', out, 'app.recollect.phone.ScreenLookTest']);
+    // Stage 19 (0.7.0): the widget's card: its size by height, the Later row, a Later kept here, the look.
+    run(path.join(bin, exe('javac')), ['--release', '11', '-encoding', 'UTF-8', '-d', out, path.join(ROOT, 'src', 'app', 'recollect', 'phone', 'CardRule.java'), path.join(ROOT, 'test', 'CardRuleTest.java')]);
+    run(path.join(bin, exe('java')), ['-cp', out, 'app.recollect.phone.CardRuleTest']);
+    process.exit(0);
+}
+
 const started = Date.now();
+checkComponents();
 const { tools, androidJar } = findSdk();
 const jdk = findJdk();
 console.log(`SDK build tools: ${tools}\nPlatform: ${androidJar}\nJDK: ${jdk}`);
@@ -137,7 +181,29 @@ if (QA) {
     run(aapt2, ['compile', '--dir', path.join(BUILD, 'qa-res'), '-o', path.join(BUILD, 'qa.zip')]);
     qaRes.push('--rename-manifest-package', 'app.recollect.phone.qa', '-R', path.join(BUILD, 'qa.zip'));
 }
-run(aapt2, ['link', '-o', path.join(BUILD, 'base.apk'), '-I', androidJar, '--manifest', path.join(ROOT, 'AndroidManifest.xml'), '--java', path.join(BUILD, 'gen'), '--custom-package', 'app.recollect.phone',
+// The test app's manifest (0.7.0): the shell is its launcher and the share target; MainActivity (the settings
+// screen) stays, opened from the shell. His app's manifest is the file as it is.
+let manifest = path.join(ROOT, 'AndroidManifest.xml');
+if (QA) {
+    let text = fs.readFileSync(manifest, 'utf8');
+    const launcher = /( *)<!-- qa:launcher [^\n]*\n\s*<intent-filter>\s*<action android:name="android\.intent\.action\.MAIN" \/>\s*<category android:name="android\.intent\.category\.LAUNCHER" \/>\s*<\/intent-filter>\n/;
+    if (!launcher.test(text) || !text.includes('<!-- qa:shell -->')) throw new Error('The manifest lost its qa: markers (build.mjs --qa needs them).');
+    text = text.replace(launcher, '');
+    text = text.replace('<!-- qa:shell -->', [
+        '<intent-filter>',
+        '                <action android:name="android.intent.action.MAIN" />',
+        '                <category android:name="android.intent.category.LAUNCHER" />',
+        '            </intent-filter>',
+        '            <intent-filter>',
+        '                <action android:name="android.intent.action.SEND" />',
+        '                <category android:name="android.intent.category.DEFAULT" />',
+        '                <data android:mimeType="text/plain" />',
+        '            </intent-filter>',
+    ].join('\n'));
+    manifest = path.join(BUILD, 'AndroidManifest.xml');
+    fs.writeFileSync(manifest, text);
+}
+run(aapt2, ['link', '-o', path.join(BUILD, 'base.apk'), '-I', androidJar, '--manifest', manifest, '--java', path.join(BUILD, 'gen'), '--custom-package', 'app.recollect.phone',
     '--min-sdk-version', String(MIN_SDK), '--target-sdk-version', String(TARGET_SDK), '--version-code', String(VERSION_CODE), '--version-name', VERSION, ...(DEBUG ? ['--debug-mode'] : []), path.join(BUILD, 'res.zip'), ...qaRes]);
 
 // 3. Java → classes (Java 11 class files; string concatenation without invokedynamic, for d8)
@@ -158,7 +224,7 @@ const apksigner = path.join(tools, 'lib', 'apksigner.jar');
 const apk = path.join(BUILD, QA ? 'recollect-qa.apk' : 'recollect.apk');
 run(path.join(jdk, exe('java')), ['-jar', apksigner, 'sign', '--ks', key.store, '--ks-key-alias', 'recollect', '--ks-pass', `file:${key.pass}`, '--out', apk, path.join(BUILD, 'aligned.apk')]);
 run(path.join(jdk, exe('java')), ['-jar', apksigner, 'verify', apk]);
-for (const f of ['base.apk', 'unaligned.apk', 'aligned.apk', 'res.zip', 'qa.zip', 'classes.jar', 'sources.txt']) fs.rmSync(path.join(BUILD, f), { force: true });
+for (const f of ['base.apk', 'unaligned.apk', 'aligned.apk', 'res.zip', 'qa.zip', 'classes.jar', 'sources.txt', 'AndroidManifest.xml']) fs.rmSync(path.join(BUILD, f), { force: true });
 fs.rmSync(path.join(BUILD, 'qa-res'), { recursive: true, force: true });
 
 console.log(`\nBuilt ${path.relative(process.cwd(), apk)}: ${(fs.statSync(apk).size / 1024).toFixed(0)} KB, version ${VERSION} (${VERSION_CODE}), in ${((Date.now() - started) / 1000).toFixed(1)} s`);

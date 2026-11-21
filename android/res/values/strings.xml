@@ -4,7 +4,7 @@
     <!-- "Your day", like the widget: the web app installed on the phone is "Recollect". -->
     <string name="app_name">Your day</string>
     <string name="widget_name">Your day</string>
-    <string name="widget_description">The day\'s lines from Recollect: what today holds, the focus, what\'s next.</string>
+    <string name="widget_description">One thing from Recollect to pick up or coming up, with Later to bring it back when you can act; or your day.</string>
     <string name="subtitle">Recollect\'s picture of your day, on this phone.</string>
 
     <!-- Not connected -->
@@ -29,6 +29,7 @@
     <string name="bad_link">This link isn\'t a Recollect connect link. Make a new code in Settings → Phone app.</string>
     <string name="bad_link_http">For an address on the internet, Recollect needs https. Check the address in Settings → Phone app.</string>
     <string name="fail_unreachable">Couldn\'t reach Recollect at %1$s. Until Recollect is online, the phone needs your computer on and the same Wi-Fi or hotspot, or the USB cable.</string>
+    <string name="fail_refused">Recollect didn\'t accept this phone\'s code just now. The app keeps it and tries again; if it keeps happening, make a new one on your computer in Settings → Phone app.</string>
     <string name="fail_revoked">This phone\'s code was ended. Make a new one on your computer in Settings → Phone app.</string>
     <string name="fail_forbidden">This code can\'t read the picture. Make a new one in Settings → Phone app.</string>
     <string name="fail_server">Recollect answered with an error (%1$d). The app tries again in 15 minutes.</string>
@@ -118,6 +119,12 @@
     <string name="note_private">Your buddy left you a note. Open the app to read it.</string>
     <string name="channel_name">Notes from your buddy</string>
     <string name="channel_description">When your buddy leaves you a new note: at most two a day, never in quiet hours.</string>
+    <!-- 0.6.0: the buddy's questions, silent, with their quick answers and a reply box. -->
+    <string name="ask_channel_name">Questions from your buddy</string>
+    <string name="ask_channel_description">A question now and then, without a sound: answer with a tap or a few words, or let it go. It leaves by itself at its time and in quiet hours.</string>
+    <string name="ask_private">Your buddy has a question. Open the app to see it.</string>
+    <string name="ask_reply">Reply</string>
+    <string name="ask_reply_hint">Your answer</string>
 
     <!-- The pictures' style -->
     <string name="style">Style</string>
@@ -128,6 +135,10 @@
     <string name="widget_connect">Connect Recollect</string>
     <string name="widget_connect_line">Open the app to connect this phone.</string>
     <string name="widget_stale">Updated %1$s</string>
+    <!-- 0.7.0 (stage 19): Later on the widget's card. -->
+    <string name="later_button">Later</string>
+    <string name="later_button_description">Later: bring this back at a time you can act on it</string>
+    <string name="later_set_description">Later is set</string>
     <string name="preview_label">The picture of your day</string>
     <!-- 0.4.0: the screen's sections, and the live lock screen (the picture drawn by the app, with the phone's notification icons). -->
     <string name="your_picture">Your picture</string>
@@ -144,4 +155,8 @@
     <string name="live_allow">Allow access</string>
     <string name="live_set">Set as wallpaper</string>
     <string name="live_preview_title">Live lock screen (QA app)</string>
+    <!-- The shell (0.7.0): the page could not load. -->
+    <string name="shell_offline_title">Can\'t reach Recollect</string>
+    <string name="shell_offline_body">This test app reads the web app on your computer over the USB cable. Check the cable, then try again.</string>
+    <string name="shell_retry">Try again</string>
 </resources>

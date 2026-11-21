@@ -7,7 +7,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { RecollectApi } from './api.js';
-import { createRecollectServer, TOOL_GROUP_NAMES, TOOL_LEVELS, type ToolName } from './server.js';
+import { createRecollectServer, TOOL_LEVELS, type ToolName } from './server.js';
 
 export interface CatalogueTool {
     name: string;
@@ -32,12 +32,15 @@ export interface CatalogueOptions {
     /** Every write is logged under this name ("Ask AI"). */
     agentName: string;
     timeoutMs?: number;
+    /** Stage 5's connector simulation: each tool call on the remote door (off unless the backend passes it). */
+    trace?: (call: { tool: string; args: unknown; answer?: string }) => void;
 }
 
 /**
  * Remote MCP (ALWAYS_ON_SPEC 6.5): one Streamable HTTP request, stateless. A fresh server per request
  * on the caller's own token, so the API's token rules, scopes and edit log apply exactly as for the
- * stdio server. The default tool groups are listed, with more_tools for the rest (as on stdio).
+ * stdio server. It lists the `web` set (MCP_MEMORY_PLAN §4.1): no more_tools, since nothing turned on in one
+ * request could last to the next.
  */
 export async function handleMcpHttp(
     req: IncomingMessage & { body?: unknown },
@@ -45,7 +48,7 @@ export async function handleMcpHttp(
     options: CatalogueOptions,
 ): Promise<void> {
     const api = new RecollectApi({ baseUrl: options.baseUrl, token: options.token, agentName: options.agentName, timeoutMs: options.timeoutMs ?? 30_000, log: () => {} });
-    const server = createRecollectServer({ api, agentName: options.agentName, problem: null });
+    const server = createRecollectServer({ api, agentName: options.agentName, problem: null, set: 'web', ...(options.trace ? { trace: options.trace } : {}) });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on('close', () => {
         void transport.close();
@@ -57,7 +60,7 @@ export async function handleMcpHttp(
 
 export async function openCatalogue(options: CatalogueOptions): Promise<Catalogue> {
     const api = new RecollectApi({ baseUrl: options.baseUrl, token: options.token, agentName: options.agentName, timeoutMs: options.timeoutMs ?? 30_000, log: () => {} });
-    const server = createRecollectServer({ api, agentName: options.agentName, problem: null, groups: TOOL_GROUP_NAMES });
+    const server = createRecollectServer({ api, agentName: options.agentName, problem: null, set: 'all' });
     const client = new Client({ name: 'recollect-manager', version: '1.0.0' });
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     await Promise.all([server.connect(serverSide), client.connect(clientSide)]);

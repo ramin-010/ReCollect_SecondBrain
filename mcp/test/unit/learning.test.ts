@@ -235,7 +235,7 @@ describe('get_learning_overview', () => {
     });
 
     it('counts per subject from the statuses, plus the budget', async () => {
-        h = await connect(routes());
+        h = await connect(routes(), { set: 'web' });
         expect((await h.call('get_learning_overview')).text).toBe(
             [
                 'Learning overview: 5 topics in 3 subjects · 1 due now · 2 waiting (1 due within 7 days) · 1 mastered · 1 unscheduled',
@@ -250,7 +250,7 @@ describe('get_learning_overview', () => {
     });
 
     it("with subject: that subject's topics, due first", async () => {
-        h = await connect(routes());
+        h = await connect(routes(), { set: 'web' });
         expect((await h.call('get_learning_overview', { subject: 'dsa' })).text).toBe(
             [
                 'DSA · 4 topics: 1 due, 2 waiting, 1 mastered · id subjDsa1',
@@ -263,14 +263,14 @@ describe('get_learning_overview', () => {
     });
 
     it('an unknown subject lists the real ones', async () => {
-        h = await connect(routes());
+        h = await connect(routes(), { set: 'web' });
         const res = await h.call('get_learning_overview', { subject: 'Rust' });
         expect(res.isError).toBe(true);
         expect(res.text).toBe('No subject named "Rust". Subjects: "DSA", "System Design", "AI".');
     });
 
     it('ends write results with the Undo line, read results without it', async () => {
-        h = await connect(routes());
+        h = await connect(routes(), { set: 'web' });
         expect(lastLine((await h.call('get_learning_overview')).text)).not.toBe(UNDO);
     });
 });
