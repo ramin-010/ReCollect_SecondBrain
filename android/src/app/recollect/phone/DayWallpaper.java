@@ -24,10 +24,6 @@ public final class DayWallpaper extends WallpaperService {
         return new DayEngine();
     }
 
-    /** 0.6.0: at most one check of the day per this long, when the screen turns on. */
-    static final long CHECK_EVERY_MS = 3 * 60_000L;
-    private static volatile long lastCheck;
-
     private final class DayEngine extends Engine implements Live.Listener, NotifIcons.Listener {
         private final Handler main = new Handler(Looper.getMainLooper());
         private boolean visible;
@@ -42,26 +38,14 @@ public final class DayWallpaper extends WallpaperService {
                 else if (Intent.ACTION_USER_PRESENT.equals(a)) locked = false;
                 else if (Intent.ACTION_SCREEN_ON.equals(a)) {
                     locked = keyguardLocked();
-                    // 0.6.0: the words go the moment their time has passed (no network needed), and the small
-                    // day JSON is read at most once per 3 minutes: an answer given elsewhere goes at once.
+                    // 0.6.0: the words go the moment their time has passed (no network needed); 11-23: the day is
+                    // read again when the last good refresh is more than 5 minutes old (ScreenOn).
                     Live.decide(ctx);
-                    check(ctx.getApplicationContext());
+                    ScreenOn.check(ctx, () -> main.post(DayEngine.this::draw));
                 }
                 draw();
             }
         };
-
-        /** The check when the screen turns on (0.6.0): the day's JSON, at most once per 3 minutes; new pictures follow. */
-        private void check(Context app) {
-            long now = System.currentTimeMillis();
-            if (now - lastCheck < CHECK_EVERY_MS) return;
-            lastCheck = now;
-            new Thread(() -> {
-                Refresher.run(app, false);
-                Live.decide(app);
-                main.post(this::draw);
-            }, "recollect-screen-on").start();
-        }
 
         @Override
         public void onCreate(SurfaceHolder holder) {

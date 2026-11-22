@@ -123,6 +123,20 @@ final class Prefs {
         sp.edit().putString(k + "_style", style).putString(k + "_color", color).remove("picture_key").apply();
     }
 
+    /**
+     * 11-22 (the owner): each screen's layout, his choice on Look: "classic" (the words on the picture), "glass" (one frosted
+     * panel) or "stack" (a frosted card each). The lock screen starts on glass, the home screen on classic.
+     */
+    String layout(String screen) {
+        String v = sp.getString(("home".equals(screen) ? "home" : "lock") + "_layout", null);
+        if ("classic".equals(v) || "glass".equals(v) || "stack".equals(v)) return v;
+        return "home".equals(screen) ? "classic" : "glass";
+    }
+
+    void setLayout(String screen, String layout) {
+        sp.edit().putString(("home".equals(screen) ? "home" : "lock") + "_layout", layout).remove("picture_key").apply();
+    }
+
     /** Stage 11 (his item 10c): when the pictures were last put on the screens (ms; 0: never). */
     long picturesAt() {
         return sp.getLong("pictures_at", 0L);

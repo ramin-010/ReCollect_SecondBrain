@@ -24,6 +24,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * downloads), group summaries, silent ones, those an app hides from the lock screen, and our own.
  */
 public final class NotifIcons extends NotificationListenerService {
+    private android.content.BroadcastReceiver screenOn;
+
+    @Override
+    public void onDestroy() {
+        ScreenOn.unregister(this, screenOn);
+        screenOn = null;
+        super.onDestroy();
+    }
     /** One app with notifications waiting. */
     static final class Item {
         final String pkg;
@@ -75,6 +83,8 @@ public final class NotifIcons extends NotificationListenerService {
     public void onListenerConnected() {
         connected = true;
         refresh();
+        // 11-23: this service stays bound all day, so it hears the screen come on (a refresh if the day is stale).
+        if (screenOn == null) screenOn = ScreenOn.register(this);
         // 0.5.1: the system keeps this service bound and binds it again after it stops the app (a
         // stop cancels the refresh chain and the reminders' alarms), so both come back from here.
         Context app = getApplicationContext();
@@ -85,6 +95,8 @@ public final class NotifIcons extends NotificationListenerService {
     @Override
     public void onListenerDisconnected() {
         connected = false;
+        ScreenOn.unregister(this, screenOn);
+        screenOn = null;
         items = Collections.emptyList();
         changed();
     }

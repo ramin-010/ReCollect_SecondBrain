@@ -632,6 +632,13 @@ public final class Shell extends Activity {
                 o.put("lockColor", lockLook.color == null ? JSONObject.NULL : lockLook.color);
                 o.put("homeStyle", homeLook.style);
                 o.put("homeColor", homeLook.color == null ? JSONObject.NULL : homeLook.color);
+                // 11-22: each screen's layout (classic, glass or stack).
+                o.put("lockLayout", p.layout("lock"));
+                // The widget: whether one is on a home screen, and whether this launcher can add one with a tap.
+                o.put("widgetPlaced", DayWidget.placed(Shell.this));
+                android.appwidget.AppWidgetManager widgets = getSystemService(android.appwidget.AppWidgetManager.class);
+                o.put("widgetCanAdd", widgets != null && widgets.isRequestPinAppWidgetSupported());
+                o.put("homeLayout", p.layout("home"));
                 // Stage 11 (his item 10c): the permissions checklist and when things last happened.
                 o.put("permissions", permissions());
                 o.put("picturesAt", p.picturesAt());
@@ -733,6 +740,27 @@ public final class Shell extends Activity {
             if (!trusted() || !("lock".equals(screen) || "home".equals(screen)) || !ScreenLook.valid(style) || (color != null && !ScreenLook.valid(color))) return;
             Prefs.of(Shell.this).setScreenLook(screen, style, color);
             main.post(Shell.this::refreshInBackground);
+        }
+
+        /** 11-22: one screen's layout and look together (Look's Apply): "classic", "glass" or "stack", then its style and colour. */
+        @JavascriptInterface
+        public void setScreenDesign(String screen, String layout, String style, String color) {
+            if (!trusted() || !("lock".equals(screen) || "home".equals(screen)) || !("classic".equals(layout) || "glass".equals(layout) || "stack".equals(layout))
+                    || !ScreenLook.valid(style) || (color != null && !ScreenLook.valid(color))) return;
+            Prefs p = Prefs.of(Shell.this);
+            p.setLayout(screen, layout);
+            p.setScreenLook(screen, style, color);
+            main.post(Shell.this::refreshInBackground);
+        }
+
+        /** The home screen widget (optional, for Later): Android asks the person to place it; nothing is added without their tap. */
+        @JavascriptInterface
+        public void addWidget() {
+            if (!trusted()) return;
+            main.post(() -> {
+                android.appwidget.AppWidgetManager widgets = getSystemService(android.appwidget.AppWidgetManager.class);
+                if (widgets != null && widgets.isRequestPinAppWidgetSupported()) widgets.requestPinAppWidget(new android.content.ComponentName(Shell.this, DayWidget.class), null, null);
+            });
         }
 
         /** Stage 11 (his item 10c): opens the system's own screen for one permission of the checklist. */

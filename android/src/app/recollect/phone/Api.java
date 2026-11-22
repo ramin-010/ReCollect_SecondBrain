@@ -91,6 +91,7 @@ final class Api {
                 + (zoom > 1.001f ? "&zoom=" + String.format(java.util.Locale.ROOT, "%.3f", zoom) : "")
                 + (icons ? "&icons=1" : "") + "&app=" + BuildConfig.VERSION + (plain ? "&plain=1" : "")
                 + (withoutCard && "home".equals(screen) ? "&card=0" : "")
+                + layoutParam(screen)
                 // 0.7.3: WebP, a tenth of the PNG's size (a full-screen PNG is about 3 MB); BitmapFactory decodes it the same.
                 + "&format=webp";
         lastIcons = null;
@@ -175,6 +176,20 @@ final class Api {
 
     /** Stage 19: the home picture without the widget's item (`card=0`) while a widget is on a home screen. */
     private boolean withoutCard;
+    /** 11-22: each screen's layout ("classic" sends nothing). */
+    private String lockLayout = "classic";
+    private String homeLayout = "classic";
+
+    Api withLayouts(String lock, String home) {
+        lockLayout = lock == null ? "classic" : lock;
+        homeLayout = home == null ? "classic" : home;
+        return this;
+    }
+
+    private String layoutParam(String screen) {
+        String l = "home".equals(screen) ? homeLayout : lockLayout;
+        return "glass".equals(l) || "stack".equals(l) ? "&layout=" + l : "";
+    }
 
     Api withoutCard(boolean on) {
         withoutCard = on;

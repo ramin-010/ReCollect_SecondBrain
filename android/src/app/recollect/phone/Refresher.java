@@ -63,9 +63,10 @@ final class Refresher {
         String server = p.server();
         String token = p.token();
         if (server == null || token == null) return new Outcome(false, null, false);
-        // 0.7.0 (stage 19): with a widget on a home screen, the home picture leaves the widget's item out (card=0).
-        boolean placed = DayWidget.placed(ctx);
-        Api api = new Api(server, token).withoutCard(placed);
+        // 0.7.3 (the owner, 11-22: the widget is optional): the home picture shows everything, the widget's item too; the
+        // widget is there for its Later button. (0.7.0 left the widget's item off the picture with card=0.)
+        boolean placed = false;
+        Api api = new Api(server, token).withoutCard(placed).withLayouts(p.layout("lock"), p.layout("home"));
         boolean titles = !p.hideTitles();
         long now = System.currentTimeMillis();
         long started = System.currentTimeMillis();
@@ -104,6 +105,7 @@ final class Refresher {
                 ScreenLook homeLook = p.homeLook();
                 // 0.7.0: which item the home picture leaves out (the widget's card) is one of them too.
                 String choices = theme + "|" + size[0] + "x" + size[1] + "|" + titles + "|" + p.home() + "|" + p.lock() + "|" + ScreenLook.key(lockLook, homeLook) + "|" + zoom + "|" + live
+                        + "|layout:" + p.layout("lock") + "/" + p.layout("home")
                         + "|card:" + (placed ? (a.next != null ? a.next.id : "-") : "off");
                 String key = a.pictureKey() + "|" + choices;
                 // 0.5.2: pictures are fetched only when they changed (the server's key, his choices), even for
@@ -116,7 +118,7 @@ final class Refresher {
                 boolean plainChanged = words && plainKey != null && !plainKey.equals(p.plainKey());
                 if (live && changed) {
                     // Both at once, each on its own connection (the lock call's icon band stays its own).
-                    byte[][] lockAndHome = both(api, new Api(server, token).withoutCard(placed),size, theme, titles, lockLook, homeLook, 1f, true, true, true);
+                    byte[][] lockAndHome = both(api, new Api(server, token).withoutCard(placed).withLayouts(p.layout("lock"), p.layout("home")),size, theme, titles, lockLook, homeLook, 1f, true, true, true);
                     fetched = 2;
                     byte[] lockPng = lockAndHome[0];
                     String slot = api.lastIcons;
@@ -126,7 +128,7 @@ final class Refresher {
                     p.setPictureKey(key);
                 }
                 if (live && plainChanged) {
-                    Api plainApi = new Api(server, token).withoutCard(placed);
+                    Api plainApi = new Api(server, token).withoutCard(placed).withLayouts(p.layout("lock"), p.layout("home"));
                     byte[] lockPlain = plainApi.wallpaper(size[0], size[1], theme, titles, "lock", lockLook.style, lockLook.color, 1f, true, true);
                     String plainSlot = plainApi.lastIcons;
                     byte[] homePlain = plainApi.wallpaper(size[0], size[1], theme, titles, "home", homeLook.style, homeLook.color, 1f, false, true);
@@ -138,11 +140,11 @@ final class Refresher {
                     // 0.7.3 (the owner: a new look took too long to show): only the screen whose own key changed is fetched,
                     // the wallpapers are set as soon as those pictures are in, and the plain twins come after, side by side.
                     String common = theme + "|" + size[0] + "x" + size[1] + "|" + titles + "|" + a.pictureKey();
-                    String lockKey = common + "|" + lockLook.style + ":" + lockLook.color;
-                    String homeKey = common + "|" + homeLook.style + ":" + homeLook.color + "|" + zoom + "|card:" + (placed ? (a.next != null ? a.next.id : "-") : "off");
+                    String lockKey = common + "|" + lockLook.style + ":" + lockLook.color + "|" + p.layout("lock") + "|" + zoom;
+                    String homeKey = common + "|" + homeLook.style + ":" + homeLook.color + "|" + p.layout("home") + "|" + zoom + "|card:" + (placed ? (a.next != null ? a.next.id : "-") : "off");
                     boolean lockNew = p.lock() && (changed && !lockKey.equals(p.screenKey("lock")) || !Pictures.has(ctx, Pictures.LOCK));
                     boolean homeNew = p.home() && (changed && !homeKey.equals(p.screenKey("home")) || !Pictures.has(ctx, Pictures.HOME));
-                    byte[][] lockAndHome = lockNew || homeNew ? both(api, new Api(server, token).withoutCard(placed), size, theme, titles, lockLook, homeLook, zoom, lockNew, homeNew, false) : new byte[2][];
+                    byte[][] lockAndHome = lockNew || homeNew ? both(api, new Api(server, token).withoutCard(placed).withLayouts(p.layout("lock"), p.layout("home")), size, theme, titles, lockLook, homeLook, zoom, lockNew, homeNew, false) : new byte[2][];
                     Pictures.keep(ctx, Pictures.LOCK, lockAndHome[0]);
                     Pictures.keep(ctx, Pictures.HOME, lockAndHome[1]);
                     fetched = (lockAndHome[0] == null ? 0 : 1) + (lockAndHome[1] == null ? 0 : 1);
@@ -156,16 +158,19 @@ final class Refresher {
                     Pictures.forget(ctx);
                     Pictures.apply(ctx);
                     if (words && (plainChanged || lockNew || homeNew)) {
-                        byte[][] plain = bothPlain(new Api(server, token).withoutCard(placed), new Api(server, token).withoutCard(placed), size, theme, titles, lockLook, homeLook, zoom, p.lock() && (plainChanged || lockNew), p.home() && (plainChanged || homeNew));
+                        byte[][] plain = bothPlain(new Api(server, token).withoutCard(placed).withLayouts(p.layout("lock"), p.layout("home")), new Api(server, token).withoutCard(placed).withLayouts(p.layout("lock"), p.layout("home")), size, theme, titles, lockLook, homeLook, zoom, p.lock() && (plainChanged || lockNew), p.home() && (plainChanged || homeNew));
                         Pictures.keep(ctx, Pictures.LOCK_PLAIN, plain[0]);
                         Pictures.keep(ctx, Pictures.HOME_PLAIN, plain[1]);
                         fetched += (plain[0] == null ? 0 : 1) + (plain[1] == null ? 0 : 1);
                         if (plainKey != null) p.setPlainKey(plainKey);
+                        // The twins' files changed under the same names: the apply below sets them again (a screen showing
+                        // its twin, in quiet hours or after its words' end, kept the old one: found on his phone, 11-22).
+                        Pictures.forget(ctx);
                     }
                 } else if (!live && changed) {
                     // Each screen its own picture: the lock screen the ring and the buddy's line, the home screen the day in numbers.
                     // The QA app also keeps the live lock picture (with its band) for its preview.
-                    byte[][] lockAndHome = both(api, new Api(server, token).withoutCard(placed),size, theme, titles, lockLook, homeLook, zoom, p.lock() || previewOnly, p.home() || previewOnly, previewOnly);
+                    byte[][] lockAndHome = both(api, new Api(server, token).withoutCard(placed).withLayouts(p.layout("lock"), p.layout("home")),size, theme, titles, lockLook, homeLook, zoom, p.lock() || previewOnly, p.home() || previewOnly, previewOnly);
                     byte[] lockPng = lockAndHome[0];
                     byte[] homePng = lockAndHome[1];
                     fetched = (lockPng == null ? 0 : 1) + (homePng == null ? 0 : 1);
@@ -229,7 +234,9 @@ final class Refresher {
             }, "recollect-home-picture");
             second.start();
         }
-        if (lock) out[0] = lockApi.wallpaper(size[0], size[1], theme, titles, "lock", lockLook.style, lockLook.color, 1f, lockIcons);
+        // 0.7.3 (his phone, 11-22): the lock screen now shows its picture zoomed as the home screen does (the words reached
+        // the edges), so its words are drawn for the same zoom; the live wallpaper draws itself at 1.
+        if (lock) out[0] = lockApi.wallpaper(size[0], size[1], theme, titles, "lock", lockLook.style, lockLook.color, lockIcons ? 1f : homeZoom, lockIcons);
         if (second != null) {
             try {
                 second.join();
@@ -257,7 +264,7 @@ final class Refresher {
             }, "recollect-home-plain");
             second.start();
         }
-        if (lock) out[0] = lockApi.wallpaper(size[0], size[1], theme, titles, "lock", lockLook.style, lockLook.color, 1f, false, true);
+        if (lock) out[0] = lockApi.wallpaper(size[0], size[1], theme, titles, "lock", lockLook.style, lockLook.color, homeZoom, false, true);
         if (second != null) {
             try {
                 second.join();

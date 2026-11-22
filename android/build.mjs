@@ -25,7 +25,7 @@ const KEYS = path.join(ROOT, 'keys');
  * app stays 0.6.0 until his OK, and gets all of it as 0.7.0 after his deploy.
  */
 const QA_BUILD = process.argv.includes('--qa');
-const VERSION = '0.7.3';
+const VERSION = '0.7.4';
 const MIN_SDK = 26;
 const TARGET_SDK = 34;
 /** Grows with every build (minutes since 2026-01-01), so `adb install -r` always takes the new one. */
