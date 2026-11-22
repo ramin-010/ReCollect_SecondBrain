@@ -62,8 +62,11 @@ import java.util.concurrent.Executors;
  *   adb shell am start -n app.recollect.phone.qa/app.recollect.phone.Shell -d <url> --ez overLock true   (tests)
  */
 public final class Shell extends Activity {
-    /** The web app on this computer, over USB (adb reverse tcp:3005 tcp:3005; its API on 8002, live editing on 1234). */
-    static final String HOME = "http://localhost:3005";
+    /**
+     * The web app: re-collect.in in his app (11-21, the release); in the test app, the one on this computer over USB (adb
+     * reverse tcp:3005 tcp:3005; its API on 8002, live editing on 1234).
+     */
+    static final String HOME = BuildConfig.QA ? "http://localhost:3005" : "https://re-collect.in";
     private static final int ASK_VOICE = 21;
     private static final int ASK_NOTIFY = 22;
     /** Paper's ground in light (mockups/phone-app/tokens.css): the default look's, until the page says another. */
@@ -88,10 +91,6 @@ public final class Shell extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        if (!BuildConfig.QA) {
-            finish();
-            return;
-        }
         kept = getSharedPreferences("shell", MODE_PRIVATE);
         // Tests run with his phone locked: the test app may show over the lock screen (it never unlocks it), on ask only.
         if (getIntent().getBooleanExtra("overLock", false) && Build.VERSION.SDK_INT >= 27) {
@@ -115,6 +114,17 @@ public final class Shell extends Activity {
         // The API is the same computer on another port (the same site): its sign-in cookie must ride along.
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
         web.setWebViewClient(new Client());
+        // Google's sign-in opens a pop-up, which Google refuses inside an app's web view: say what works instead (11-21:
+        // email and password; "Forgot password" sets one for an account made with Google).
+        s.setSupportMultipleWindows(true);
+        s.setJavaScriptCanOpenWindowsAutomatically(true);
+        web.setWebChromeClient(new android.webkit.WebChromeClient() {
+            @Override
+            public boolean onCreateWindow(WebView v, boolean dialog, boolean userGesture, android.os.Message result) {
+                android.widget.Toast.makeText(Shell.this, R.string.shell_no_google, android.widget.Toast.LENGTH_LONG).show();
+                return false;
+            }
+        });
         web.addJavascriptInterface(new Bridge(), "RcShell");
         root.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         offline = offlineView();

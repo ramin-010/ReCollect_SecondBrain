@@ -120,10 +120,13 @@ final class Reminders {
         List<Alarm> kept = new ArrayList<>();
         // Exact on Android 11 and below (his phone); from 12 only when the system allows it, else close to the time.
         boolean exact = Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms();
+        // Alarm-clock mode (the owner, 11-21): booked as a user's alarm, so no battery saver delays it, the status bar
+        // shows the alarm icon and "Next alarm" shows its time; tapping that opens the app.
+        PendingIntent show = PendingIntent.getActivity(ctx, 7, new Intent(ctx, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         for (Alarm a : alarms) {
             if (a.at <= now) continue;
             PendingIntent pi = intent(ctx, a.id, a.text, PendingIntent.FLAG_UPDATE_CURRENT);
-            if (exact) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, a.at, pi);
+            if (exact) am.setAlarmClock(new AlarmManager.AlarmClockInfo(a.at, show), pi);
             else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, a.at, pi);
             kept.add(a);
             held.add(a.id);

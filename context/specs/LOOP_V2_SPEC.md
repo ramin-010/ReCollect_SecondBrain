@@ -144,3 +144,9 @@ These come from worker G1, the backend. The frontend client (G2) matches them.
 - add the goal's `createdDay` and `busyUntil` to `/api/today`
 - in busy mode, the minimum-3 rule can exceed the 10-min cap
 - add a "next due day" when nothing is due
+
+### 2026-11-21 evening (Home rethought on dev, not committed; HISTORY bl, `recollect/DESIGN.md` design log)
+- **The slip (§2)** is no longer a card: an open list under a one-line label ("Revise · 0 of 7 · 60-min budget"). Rows carry no minutes; **the budget is a session the user starts** (Start; the dashed line fills with the time; "N min over"; "done in N min"), kept per day in the browser. Rows read "Title · Subject", "2/4", "41d late". A doc's row opens the doc and its check asks Complete or Quiz me on it; a note unfolds and edits in place; a calendar moves any row. A row ticked now strikes through from the centre and moves to the end, faded.
+- **Focus (§3)** sits inside "Today's focus" under the tasks due (or, with none due, each path's next topic), with "Add a focus" last (a focus line, never a task).
+- **Tasks on Home** come right under the buddy, before the slip.
+

@@ -156,7 +156,8 @@
     <string name="live_set">Set as wallpaper</string>
     <string name="live_preview_title">Live lock screen (QA app)</string>
     <!-- The shell (0.7.0): the page could not load. -->
+    <string name="shell_no_google">Google sign-in can\'t open inside the app. Sign in with your email and password (on the website, Forgot password sets one).</string>
     <string name="shell_offline_title">Can\'t reach Recollect</string>
-    <string name="shell_offline_body">This test app reads the web app on your computer over the USB cable. Check the cable, then try again.</string>
+    <string name="shell_offline_body">Recollect needs the internet. Check your connection, then try again.</string>
     <string name="shell_retry">Try again</string>
 </resources>
