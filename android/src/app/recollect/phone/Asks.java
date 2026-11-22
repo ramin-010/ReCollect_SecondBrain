@@ -69,7 +69,7 @@ public final class Asks extends BroadcastReceiver {
 
     private static Notification build(Context ctx, Ambient a, Ambient.Ask q, long now) {
         String title = a.buddy != null ? a.buddy.title(ctx) : ctx.getString(R.string.buddy_title);
-        Intent open = new Intent(ctx, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        Intent open = new Intent(ctx, Shell.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         Notification.Builder b = new Notification.Builder(ctx, CHANNEL)
                 .setSmallIcon(R.drawable.ic_stat_buddy)
                 .setColor(ctx.getColor(R.color.accent_fill))

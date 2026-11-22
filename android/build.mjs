@@ -25,7 +25,7 @@ const KEYS = path.join(ROOT, 'keys');
  * app stays 0.6.0 until his OK, and gets all of it as 0.7.0 after his deploy.
  */
 const QA_BUILD = process.argv.includes('--qa');
-const VERSION = QA_BUILD ? '0.7.2' : '0.7.0';
+const VERSION = '0.7.3';
 const MIN_SDK = 26;
 const TARGET_SDK = 34;
 /** Grows with every build (minutes since 2026-01-01), so `adb install -r` always takes the new one. */
@@ -181,28 +181,8 @@ if (QA) {
     run(aapt2, ['compile', '--dir', path.join(BUILD, 'qa-res'), '-o', path.join(BUILD, 'qa.zip')]);
     qaRes.push('--rename-manifest-package', 'app.recollect.phone.qa', '-R', path.join(BUILD, 'qa.zip'));
 }
-// Both apps (the test app since 0.7.0, his since 11-21): the shell is the launcher and the share target; MainActivity
-// (the settings screen, and the connect link) stays, opened from the shell.
-let manifest = path.join(ROOT, 'AndroidManifest.xml');
-{
-    let text = fs.readFileSync(manifest, 'utf8');
-    const launcher = /( *)<!-- qa:launcher [^\n]*\n\s*<intent-filter>\s*<action android:name="android\.intent\.action\.MAIN" \/>\s*<category android:name="android\.intent\.category\.LAUNCHER" \/>\s*<\/intent-filter>\n/;
-    if (!launcher.test(text) || !text.includes('<!-- qa:shell -->')) throw new Error('The manifest lost its qa: markers (build.mjs --qa needs them).');
-    text = text.replace(launcher, '');
-    text = text.replace('<!-- qa:shell -->', [
-        '<intent-filter>',
-        '                <action android:name="android.intent.action.MAIN" />',
-        '                <category android:name="android.intent.category.LAUNCHER" />',
-        '            </intent-filter>',
-        '            <intent-filter>',
-        '                <action android:name="android.intent.action.SEND" />',
-        '                <category android:name="android.intent.category.DEFAULT" />',
-        '                <data android:mimeType="text/plain" />',
-        '            </intent-filter>',
-    ].join('\n'));
-    manifest = path.join(BUILD, 'AndroidManifest.xml');
-    fs.writeFileSync(manifest, text);
-}
+// The manifest as it is: the shell is the launcher, the share target and the connect link's (0.7.3: the old settings screen is gone).
+const manifest = path.join(ROOT, 'AndroidManifest.xml');
 run(aapt2, ['link', '-o', path.join(BUILD, 'base.apk'), '-I', androidJar, '--manifest', manifest, '--java', path.join(BUILD, 'gen'), '--custom-package', 'app.recollect.phone',
     '--min-sdk-version', String(MIN_SDK), '--target-sdk-version', String(TARGET_SDK), '--version-code', String(VERSION_CODE), '--version-name', VERSION, ...(DEBUG ? ['--debug-mode'] : []), path.join(BUILD, 'res.zip'), ...qaRes]);
 

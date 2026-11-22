@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   "Your day", 4 x 2 under 140 dp tall (0.7.0, stage 19; CardRule.SHORT_BELOW_DP): the card without the line under
-  the title, the title on one line (fading at the edge), Later kept. With nothing ahead: the date and the buddy's line
+  the title, the title on up to two lines (0.7.3, the owner: it didn't wrap), Later kept. With nothing ahead: the date and the buddy's line
   (two lines) or the day's words. Same ids as widget_day.xml.
   Edit this file, then run `python widget-themes.py` in android/ for the light, dark and Paper copies.
 -->
@@ -51,10 +51,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:singleLine="true"
-        android:ellipsize="none"
-        android:requiresFadingEdge="horizontal"
-        android:fadingEdgeLength="24dp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:lineSpacingMultiplier="1.05"
         android:fontFamily="sans-serif-medium"
         android:textColor="@color/w_ink_1"
         android:textSize="17sp" />

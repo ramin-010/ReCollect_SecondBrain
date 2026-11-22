@@ -46,10 +46,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:singleLine="true"
-        android:ellipsize="none"
-        android:requiresFadingEdge="horizontal"
-        android:fadingEdgeLength="24dp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:lineSpacingMultiplier="1.05"
         android:fontFamily="sans-serif-medium"
         android:textColor="@color/w_dark_ink_1"
         android:textSize="17sp" />

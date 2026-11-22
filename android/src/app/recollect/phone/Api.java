@@ -90,9 +90,11 @@ final class Api {
                 + (style == null ? "" : "&style=" + style) + (color == null ? "" : "&color=" + color)
                 + (zoom > 1.001f ? "&zoom=" + String.format(java.util.Locale.ROOT, "%.3f", zoom) : "")
                 + (icons ? "&icons=1" : "") + "&app=" + BuildConfig.VERSION + (plain ? "&plain=1" : "")
-                + (withoutCard && "home".equals(screen) ? "&card=0" : "");
+                + (withoutCard && "home".equals(screen) ? "&card=0" : "")
+                // 0.7.3: WebP, a tenth of the PNG's size (a full-screen PNG is about 3 MB); BitmapFactory decodes it the same.
+                + "&format=webp";
         lastIcons = null;
-        return call("GET", "/api/ambient/wallpaper.png" + q, "image/png");
+        return call("GET", "/api/ambient/wallpaper.png" + q, "image/webp");
     }
 
     /** The last picture's band for the notification icons ("cy,size,#AARRGGBB"), or null. */

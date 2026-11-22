@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- The switch: a 46 x 28 pill, the accent when on. -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <corners android:radius="14dp" />
-    <size android:width="46dp" android:height="28dp" />
-    <solid android:color="@color/switch_track_color" />
-</shape>

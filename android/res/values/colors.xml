@@ -6,8 +6,6 @@
     <color name="surface">#FFFFFF</color>
     <color name="surface_2">#EFEEEA</color>
     <color name="card_ring">#E7E5E0</color>
-    <color name="line">#ECEAE6</color>
-    <color name="line_strong">#DCDAD4</color>
     <color name="ink_1">#1A1A1C</color>
     <color name="ink_2">#55545A</color>
     <color name="ink_3">#6B6970</color>
@@ -16,11 +14,6 @@
     <color name="accent_fill">#5866EE</color>
     <color name="accent_soft">#E6E8FD</color>
     <color name="main">#1A1A1C</color>
-    <color name="on_main">#FFFFFF</color>
-    <color name="danger">#B8433A</color>
-    <color name="attention">#8A4F1C</color>
-    <color name="attention_tint">#FBEBDE</color>
-    <color name="good">#2A6B47</color>
     <color name="switch_off">#D8D6D0</color>
     <color name="press">#141A1A1C</color>
     <color name="press_on_main">#2EFFFFFF</color>

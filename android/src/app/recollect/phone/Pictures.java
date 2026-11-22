@@ -50,6 +50,11 @@ public final class Pictures extends BroadcastReceiver {
         }, "recollect-switch").start();
     }
 
+    /** Whether a screen's picture is kept (0.7.3: a missing one is fetched even when its key says it is current). */
+    static boolean has(Context ctx, String name) {
+        return new File(ctx.getFilesDir(), name).exists();
+    }
+
     /** Keeps a screen's picture (`png` null: unchanged). */
     static void keep(Context ctx, String name, byte[] png) throws IOException {
         if (png == null) return;

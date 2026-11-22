@@ -208,39 +208,4 @@ final class Wallpapers {
         File dir = ctx.getFilesDir();
         for (String name : new String[] {OLD_HOME, OLD_LOCK, HOME_BUILT_IN, STARTED}) new File(dir, name).delete();
     }
-
-    // ── The preview the settings screen shows ─────────────────────────────────────────
-
-    static File preview(Context ctx) {
-        return new File(ctx.getFilesDir(), "preview.png");
-    }
-
-    static void savePreview(Context ctx, byte[] png) {
-        savePreview(ctx, png, 1f);
-    }
-
-    /**
-     * The preview, as the screen shows the picture: a home picture drawn for the phone's zoom is
-     * cropped to its middle 1/zoom (what the home screen shows), so the preview is what he gets.
-     */
-    static void savePreview(Context ctx, byte[] png, float zoom) {
-        File tmp = new File(ctx.getFilesDir(), "preview.png.tmp");
-        try (OutputStream out = new FileOutputStream(tmp)) {
-            Bitmap whole = zoom > 1.001f ? android.graphics.BitmapFactory.decodeByteArray(png, 0, png.length) : null;
-            if (whole == null) {
-                out.write(png);
-            } else {
-                int w = Math.round(whole.getWidth() / zoom);
-                int h = Math.round(whole.getHeight() / zoom);
-                Bitmap seen = Bitmap.createBitmap(whole, (whole.getWidth() - w) / 2, (whole.getHeight() - h) / 2, w, h);
-                seen.compress(Bitmap.CompressFormat.PNG, 100, out);
-                if (seen != whole) seen.recycle();
-                whole.recycle();
-            }
-        } catch (IOException | RuntimeException e) {
-            tmp.delete();
-            return;
-        }
-        if (!tmp.renameTo(preview(ctx))) tmp.delete();
-    }
 }

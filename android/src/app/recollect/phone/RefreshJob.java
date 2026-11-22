@@ -12,7 +12,7 @@ public final class RefreshJob extends JobService {
         new Thread(() -> {
             try {
                 Refresher.Outcome out = Refresher.run(app, false);
-                if (out.revoked) MainActivity.forget(app);
+                if (out.revoked) Session.forget(app);
             } finally {
                 // Finish first: scheduling the same job id while it still runs would stop it.
                 jobFinished(params, false);

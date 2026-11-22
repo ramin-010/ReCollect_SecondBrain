@@ -83,7 +83,7 @@ final class Refresher {
             Asks.flush(ctx, api);
             Asks.show(ctx, a);
             // A new note from the buddy: one notification (quiet hours and the day's limit allowing).
-            if (!MainActivity.inFront) Notes.maybeNotify(ctx, a);
+            if (!Session.inFront) Notes.maybeNotify(ctx, a);
             // 0.5.0: the reminders to come ring on this phone; the server is told which, so no email goes for them.
             reminders(ctx, p, api, data);
             boolean anywhere = p.home() || p.lock();
@@ -123,7 +123,6 @@ final class Refresher {
                     byte[] homePng = lockAndHome[1];
                     Live.save(ctx, lockPng, slot, homePng);
                     Wallpapers.clearLock(ctx);
-                    Wallpapers.savePreview(ctx, lockPng);
                     p.setPictureKey(key);
                 }
                 if (live && plainChanged) {
@@ -136,24 +135,33 @@ final class Refresher {
                     p.setPlainKey(plainKey);
                 } else if (!live && (changed || plainChanged) && !previewOnly) {
                     // 0.6.0: all four pictures are kept; Pictures shows the right one now and switches at the next end time.
-                    byte[][] lockAndHome = changed ? both(api, new Api(server, token).withoutCard(placed),size, theme, titles, lockLook, homeLook, zoom, p.lock(), p.home(), false) : new byte[2][];
+                    // 0.7.3 (the owner: a new look took too long to show): only the screen whose own key changed is fetched,
+                    // the wallpapers are set as soon as those pictures are in, and the plain twins come after, side by side.
+                    String common = theme + "|" + size[0] + "x" + size[1] + "|" + titles + "|" + a.pictureKey();
+                    String lockKey = common + "|" + lockLook.style + ":" + lockLook.color;
+                    String homeKey = common + "|" + homeLook.style + ":" + homeLook.color + "|" + zoom + "|card:" + (placed ? (a.next != null ? a.next.id : "-") : "off");
+                    boolean lockNew = p.lock() && (changed && !lockKey.equals(p.screenKey("lock")) || !Pictures.has(ctx, Pictures.LOCK));
+                    boolean homeNew = p.home() && (changed && !homeKey.equals(p.screenKey("home")) || !Pictures.has(ctx, Pictures.HOME));
+                    byte[][] lockAndHome = lockNew || homeNew ? both(api, new Api(server, token).withoutCard(placed), size, theme, titles, lockLook, homeLook, zoom, lockNew, homeNew, false) : new byte[2][];
                     Pictures.keep(ctx, Pictures.LOCK, lockAndHome[0]);
                     Pictures.keep(ctx, Pictures.HOME, lockAndHome[1]);
                     fetched = (lockAndHome[0] == null ? 0 : 1) + (lockAndHome[1] == null ? 0 : 1);
-                    if (plainChanged) {
-                        Api plainApi = new Api(server, token).withoutCard(placed);
-                        if (p.lock()) Pictures.keep(ctx, Pictures.LOCK_PLAIN, plainApi.wallpaper(size[0], size[1], theme, titles, "lock", lockLook.style, lockLook.color, 1f, false, true));
-                        if (p.home()) Pictures.keep(ctx, Pictures.HOME_PLAIN, plainApi.wallpaper(size[0], size[1], theme, titles, "home", homeLook.style, homeLook.color, zoom, false, true));
-                        fetched += (p.lock() ? 1 : 0) + (p.home() ? 1 : 0);
-                        p.setPlainKey(plainKey);
-                    }
                     if (changed) {
                         Wallpapers.beforeFirstPicture(ctx, p.keepCopy());
-                        if (lockAndHome[0] != null) Wallpapers.savePreview(ctx, lockAndHome[0]);
-                        else Wallpapers.savePreview(ctx, lockAndHome[1], zoom);
+                        if (lockNew) p.setScreenKey("lock", lockKey);
+                        if (homeNew) p.setScreenKey("home", homeKey);
                         p.setPictureKey(key);
                     }
+                    // On the screens now (the twins may still be the old look's for a moment: they follow next).
                     Pictures.forget(ctx);
+                    Pictures.apply(ctx);
+                    if (words && (plainChanged || lockNew || homeNew)) {
+                        byte[][] plain = bothPlain(new Api(server, token).withoutCard(placed), new Api(server, token).withoutCard(placed), size, theme, titles, lockLook, homeLook, zoom, p.lock() && (plainChanged || lockNew), p.home() && (plainChanged || homeNew));
+                        Pictures.keep(ctx, Pictures.LOCK_PLAIN, plain[0]);
+                        Pictures.keep(ctx, Pictures.HOME_PLAIN, plain[1]);
+                        fetched += (plain[0] == null ? 0 : 1) + (plain[1] == null ? 0 : 1);
+                        if (plainKey != null) p.setPlainKey(plainKey);
+                    }
                 } else if (!live && changed) {
                     // Each screen its own picture: the lock screen the ring and the buddy's line, the home screen the day in numbers.
                     // The QA app also keeps the live lock picture (with its band) for its preview.
@@ -173,10 +181,6 @@ final class Refresher {
                     if (lockPicture != null && !previewOnly) Wallpapers.set(ctx, lockPicture, false, true);
                     if (lockPicture != null) lockPicture.recycle();
                     if (homePicture != null && previewOnly) homePicture.recycle();
-                    // The app's own preview shows the lock picture when it is on (he sees it most); a home
-                    // picture as the home screen shows it (its zoom).
-                    if (lockPng != null && !previewOnly) Wallpapers.savePreview(ctx, lockPng);
-                    else Wallpapers.savePreview(ctx, homePng, zoom);
                     p.setPictureKey(key);
                 }
             }
@@ -226,6 +230,34 @@ final class Refresher {
             second.start();
         }
         if (lock) out[0] = lockApi.wallpaper(size[0], size[1], theme, titles, "lock", lockLook.style, lockLook.color, 1f, lockIcons);
+        if (second != null) {
+            try {
+                second.join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new Api.Failure(Api.Failure.UNREACHABLE, 0, e);
+            }
+            if (homeFailed[0] != null) throw homeFailed[0];
+        }
+        return out;
+    }
+
+    /** The plain twins (no words from the buddy) of both screens at once; null for a screen not wanted. */
+    private static byte[][] bothPlain(Api lockApi, Api homeApi, int[] size, String theme, boolean titles, ScreenLook lockLook, ScreenLook homeLook, float homeZoom, boolean lock, boolean home) throws Api.Failure {
+        final byte[][] out = new byte[2][];
+        final Api.Failure[] homeFailed = new Api.Failure[1];
+        Thread second = null;
+        if (home) {
+            second = new Thread(() -> {
+                try {
+                    out[1] = homeApi.wallpaper(size[0], size[1], theme, titles, "home", homeLook.style, homeLook.color, homeZoom, false, true);
+                } catch (Api.Failure f) {
+                    homeFailed[0] = f;
+                }
+            }, "recollect-home-plain");
+            second.start();
+        }
+        if (lock) out[0] = lockApi.wallpaper(size[0], size[1], theme, titles, "lock", lockLook.style, lockLook.color, 1f, false, true);
         if (second != null) {
             try {
                 second.join();

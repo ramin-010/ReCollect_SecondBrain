@@ -122,7 +122,7 @@ final class Reminders {
         boolean exact = Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms();
         // Alarm-clock mode (the owner, 11-21): booked as a user's alarm, so no battery saver delays it, the status bar
         // shows the alarm icon and "Next alarm" shows its time; tapping that opens the app.
-        PendingIntent show = PendingIntent.getActivity(ctx, 7, new Intent(ctx, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent show = PendingIntent.getActivity(ctx, 7, new Intent(ctx, Shell.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         for (Alarm a : alarms) {
             if (a.at <= now) continue;
             PendingIntent pi = intent(ctx, a.id, a.text, PendingIntent.FLAG_UPDATE_CURRENT);
@@ -177,7 +177,7 @@ final class Reminders {
         channel(ctx, nm);
         String title = ctx.getString(R.string.reminder_title);
         String body = text == null || text.isEmpty() ? ctx.getString(R.string.reminder_plain) : text;
-        Intent open = new Intent(ctx, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        Intent open = new Intent(ctx, Shell.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         Notification publicVersion = new Notification.Builder(ctx, CHANNEL)
                 .setSmallIcon(R.drawable.ic_stat_buddy)
                 .setContentTitle(title)

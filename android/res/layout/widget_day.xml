@@ -4,7 +4,7 @@
   The label says what it is and when ("Pick up", "Coming up · Sun"), the title is the item, the line under it where
   they stopped; Later brings it back at a time they can act. With nothing ahead: the date, the buddy's line (in the
   serif, as everywhere the buddy speaks) or the day's words, and the day in numbers. The phone's own sans: bundled fonts
-  aren't safe in a launcher. Long lines fade at the edge instead of "…".
+  aren't safe in a launcher. The title and the line under it wrap to two lines (0.7.3); the label fades at the edge.
   Edit this file, then run `python widget-themes.py` in android/ for the light, dark and Paper copies.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -78,10 +78,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:singleLine="true"
-        android:ellipsize="none"
-        android:requiresFadingEdge="horizontal"
-        android:fadingEdgeLength="24dp"
+        android:maxLines="2"
+        android:ellipsize="end"
         android:textColor="@color/w_ink_2"
         android:textSize="14sp" />
 

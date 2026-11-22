@@ -42,29 +42,9 @@
         android:supportsRtl="true"
         android:usesCleartextTraffic="true">
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:launchMode="singleTask"
-            android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
-            <!-- qa:launcher (the QA build gives the launcher to the shell in the test app) -->
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-            <!-- recollect://connect?server=…&token=… (the server's /phone/connect page opens it) -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="recollect" android:host="connect" />
-            </intent-filter>
-        </activity>
-
-        <!-- The shell (PHONE_APP_REDESIGN_PLAN §7 step 5): the web app's phone world in a WebView, with the phone's
-             own parts through a bridge. In the test app only for now, where the QA build makes it the launcher and
-             the share target; his app closes it at once. Exported so adb can open it with a page. -->
+        <!-- The app (0.7.3, the owner 11-22: no old screen left): the web app's phone world (/m/...) in a WebView, with
+             the phone's own parts through a bridge. The launcher, the share target (a text opens the chat with it), and
+             the connect link the server's /phone/connect page opens (recollect://connect?server=...&token=...). -->
         <activity
             android:name=".Shell"
             android:exported="true"
@@ -72,7 +52,21 @@
             android:theme="@style/Theme.Recollect.Shell"
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density">
-            <!-- qa:shell -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="recollect" android:host="connect" />
+            </intent-filter>
         </activity>
 
         <service

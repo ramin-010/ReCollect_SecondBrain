@@ -45,7 +45,7 @@ final class Prefs {
 
     /** Forgets the server's side; his choices (screens, theme, quiet hours) stay for next time. */
     void disconnect() {
-        sp.edit().remove("server").remove("token").remove("ambient").remove("ok_at").remove("failure").remove("failure_at").remove("picture_key").remove("refusals").remove("refused_at").apply();
+        sp.edit().remove("server").remove("token").remove("ambient").remove("ok_at").remove("failure").remove("failure_at").remove("picture_key").remove("lock_key").remove("home_key").remove("plain_key").remove("refusals").remove("refused_at").apply();
     }
 
     // ── His choices ───────────────────────────────────────────────────────────────────
@@ -336,5 +336,14 @@ final class Prefs {
 
     void setPictureKey(String key) {
         sp.edit().putString("picture_key", key).apply();
+    }
+
+    /** 0.7.3: each screen's picture key as last fetched ("lock" or "home"), so a change to one screen fetches only its picture. */
+    String screenKey(String screen) {
+        return sp.getString(screen + "_key", null);
+    }
+
+    void setScreenKey(String screen, String key) {
+        sp.edit().putString(screen + "_key", key).apply();
     }
 }

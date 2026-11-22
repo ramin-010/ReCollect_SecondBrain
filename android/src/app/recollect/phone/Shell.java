@@ -50,7 +50,8 @@ import java.util.concurrent.Executors;
  * WebView, with the phone's own parts reached through a small bridge (window.RcShell): the system bars in the look's
  * colours, the app's own settings (the lock screen's style, what shows on the screens, quiet hours, notifications,
  * the connection), and voice for the mic. The native parts (refresh, alarms, questions, the pictures, the widget)
- * work as before; the old settings screen opens from Settings › More on this phone.
+ * work as before. 0.7.3 (the owner, 11-22): it is the whole app; the old settings screen is gone, and the connect
+ * link (recollect://connect) comes here.
  *
  * Its first frame is the last look's ground colour (kept here), so it never opens blank or in the wrong colour. Back
  * closes a sheet first; on a tab it goes to Today, and on Today it leaves; a page under a tab goes back one page
@@ -131,13 +132,36 @@ public final class Shell extends Activity {
         root.addView(offline, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
         paint(kept.getInt("ground", PAPER), kept.getBoolean("dark_icons", true));
+        // 0.5.2: a screen Android recreates (or one opened from Recents) never replays the link it was first opened with.
+        boolean replay = state != null || (getIntent().getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0;
+        if (!replay) connectLink(getIntent());
         web.loadUrl(urlFor(getIntent()));
+    }
+
+    /** recollect://connect?server=…&token=… (the server's /phone/connect page): connects this phone, then shows Settings. */
+    private boolean connectLink(Intent i) {
+        Uri data = i == null ? null : i.getData();
+        if (data == null || !"recollect".equals(data.getScheme())) return false;
+        i.setData(null);
+        try {
+            ConnectLink link = ConnectLink.parse(data.toString());
+            Prefs p = Prefs.of(this);
+            // The link this phone already holds is no news.
+            if (!(p.connected() && link.server.equals(p.server()) && link.token.equals(p.token()))) connect(link);
+        } catch (ConnectLink.Refused r) {
+            Toast.makeText(this, r.needsHttps ? R.string.bad_link_http : R.string.bad_link, Toast.LENGTH_LONG).show();
+        }
+        return true;
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        if (connectLink(intent)) {
+            if (web != null) web.loadUrl(origin + "/m/settings");
+            return;
+        }
         boolean share = Intent.ACTION_SEND.equals(intent.getAction());
         if (web != null && (share || intent.getData() != null)) web.loadUrl(urlFor(intent));
     }
@@ -145,12 +169,14 @@ public final class Shell extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        // The old settings screen may have changed something while it was open.
+        Session.inFront = true;
+        // A system screen (notification access, the live wallpaper's picker, a permission) may have changed something.
         emit("changed", null);
     }
 
     @Override
     protected void onPause() {
+        Session.inFront = false;
         CookieManager.getInstance().flush();
         super.onPause();
     }
@@ -344,7 +370,7 @@ public final class Shell extends Activity {
         });
     }
 
-    // ── The app's own settings, as the old screen sets them (MainActivity) ─────────────
+    // ── The app's own settings ─────────────────────────────────────────────────────────
 
     private void refreshInBackground() {
         final Context app = getApplicationContext();
@@ -352,7 +378,7 @@ public final class Shell extends Activity {
         emit("changed", null);
         work.execute(() -> {
             Refresher.Outcome out = Refresher.run(app, true);
-            if (out.revoked) MainActivity.forget(app);
+            if (out.revoked) Session.forget(app);
             refreshing = false;
             emit("changed", null);
         });
@@ -402,6 +428,10 @@ public final class Shell extends Activity {
                 tries.add(new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
                 break;
             case "notificationAccess":
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    tries.add(new Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
+                        .putExtra(android.provider.Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, new android.content.ComponentName(this, NotifIcons.class).flattenToString()));
+                }
                 tries.add(new Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
                 break;
             case "autoStart":
@@ -474,6 +504,16 @@ public final class Shell extends Activity {
         });
     }
 
+    private void openLivePicker() {
+        Intent i = new Intent(android.app.WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
+        i.putExtra(android.app.WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, new android.content.ComponentName(this, DayWallpaper.class));
+        try {
+            startActivity(i);
+        } catch (ActivityNotFoundException e) {
+            startActivity(new Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER));
+        }
+    }
+
     private boolean mayNotify() {
         return Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
     }
@@ -499,6 +539,7 @@ public final class Shell extends Activity {
             String failedWhy = null;
             try {
                 JSONObject data = new Api(link.server, link.token).widget(!p.hideTitles()); // the code works
+                p.setKeepCopy(Wallpapers.offerCopy(app) && Wallpapers.mayRead(app));
                 p.connect(link.server, link.token);
                 p.saveAmbient(data, System.currentTimeMillis());
             } catch (Api.Failure f) {
@@ -536,9 +577,28 @@ public final class Shell extends Activity {
             Asks.clear(app);
             Laters.clear(app);
             Pictures.clear(app);
-            MainActivity.forget(app);
-            main.post(() -> Toast.makeText(app, R.string.disconnected, Toast.LENGTH_SHORT).show());
-            emit("changed", null);
+            Session.forget(app);
+            main.post(() -> {
+                Toast.makeText(app, R.string.disconnected, Toast.LENGTH_SHORT).show();
+                signOut();
+            });
+        });
+    }
+
+    /**
+     * The web sign-in ends too (0.7.3, the owner: Disconnect logs out): the page's own sign-out has already asked the
+     * server to end the session; the cookies and the pages' storage go, and the login opens with nothing to go back to.
+     */
+    private void signOut() {
+        if (web == null || isDestroyed()) return;
+        CookieManager cookies = CookieManager.getInstance();
+        cookies.removeAllCookies(done -> {
+            cookies.flush();
+            android.webkit.WebStorage.getInstance().deleteAllData();
+            web.clearCache(false);
+            web.clearHistory();
+            lastWasLogin = true;
+            web.loadUrl(origin + "/login?redirect=" + Uri.encode("/m/today"));
         });
     }
 
@@ -583,6 +643,10 @@ public final class Shell extends Activity {
                 o.put("reminders", p.remindersOn());
                 o.put("voice", voice);
                 o.put("busy", refreshing);
+                // 0.7.3: what the old screen alone set: the pictures' light or dark, and the live lock screen's steps.
+                o.put("theme", p.theme());
+                o.put("liveAllowed", NotifIcons.allowed(Shell.this));
+                o.put("liveActive", Live.active(Shell.this));
             } catch (JSONException e) {
                 return "{}";
             }
@@ -637,6 +701,16 @@ public final class Shell extends Activity {
                     case "quiet":
                         p.setQuiet(on);
                         Schedule.next(Shell.this);
+                        break;
+                    case "live":
+                        // The live lock screen (notification icons under the words): Android's two steps, one at a time.
+                        p.setLive(on);
+                        if (!on) {
+                            refreshInBackground();
+                            if (!p.home()) takeOff(true, false);
+                        } else if (!NotifIcons.allowed(Shell.this)) openPermission("notificationAccess");
+                        else if (!Live.active(Shell.this)) openLivePicker();
+                        else refreshInBackground();
                         break;
                     default:
                         return;
@@ -722,11 +796,24 @@ public final class Shell extends Activity {
             main.post(Shell.this::disconnect);
         }
 
-        /** The old settings screen: the widget, the live lock screen, the pictures' theme, the phone's own steps. */
+        /** The pictures' light or dark: "light", "dark" or "system" (the phone's own). */
         @JavascriptInterface
-        public void openSettings() {
+        public void setPictureTheme(String theme) {
+            if (!trusted() || !(Prefs.THEME_LIGHT.equals(theme) || Prefs.THEME_DARK.equals(theme) || Prefs.THEME_SYSTEM.equals(theme))) return;
+            main.post(() -> {
+                Prefs p = Prefs.of(Shell.this);
+                if (theme.equals(p.theme())) return;
+                p.setTheme(theme);
+                DayWidget.updateAll(getApplicationContext());
+                refreshInBackground();
+            });
+        }
+
+        /** The live lock screen's second step: Android's picker with our live wallpaper. */
+        @JavascriptInterface
+        public void openLivePicker() {
             if (!trusted()) return;
-            main.post(() -> startActivity(new Intent(Shell.this, MainActivity.class)));
+            main.post(Shell.this::openLivePicker);
         }
 
         /** Android's own speech recognizer; the words come back as window.__rcShell('heard', text). */

@@ -107,11 +107,6 @@ public final class DayWidget extends AppWidgetProvider {
         manager.updateAppWidget(id, views(ctx, CardRule.size(heightDp(ctx, manager, id))));
     }
 
-    /** The QA app's preview (MainActivity): the full card or the one-row widget. */
-    static RemoteViews views(Context ctx, boolean small) {
-        return views(ctx, small ? CardRule.Size.ONE_ROW : CardRule.Size.FULL);
-    }
-
     /** The widget's views at one size. */
     static RemoteViews views(Context ctx, CardRule.Size size) {
         Prefs p = Prefs.of(ctx);
@@ -236,7 +231,7 @@ public final class DayWidget extends AppWidgetProvider {
      */
     private static PendingIntent open(Context ctx, Prefs p, Ambient a, String link) {
         Intent shell = shell(ctx);
-        String app = a == null ? null : MainActivity.appUrl(a.appUrl, p.server());
+        String app = a == null ? null : Session.appUrl(a.appUrl, p.server());
         Intent open;
         if (link != null) {
             // A link the server built from its own address is reached through this phone's address for the web app.
@@ -245,7 +240,7 @@ public final class DayWidget extends AppWidgetProvider {
             open = shell != null && app != null && here.startsWith(app) ? new Intent(ctx, Shell.class).setAction(Intent.ACTION_VIEW).setData(u) : new Intent(Intent.ACTION_VIEW, u);
         } else if (shell != null) open = shell;
         else if (app != null) open = new Intent(Intent.ACTION_VIEW, Uri.parse(app));
-        else open = new Intent(ctx, MainActivity.class);
+        else open = new Intent(ctx, Shell.class);
         open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         return PendingIntent.getActivity(ctx, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }

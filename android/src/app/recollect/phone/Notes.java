@@ -39,7 +39,7 @@ final class Notes {
         channel(ctx, nm);
         String title = a.buddy.title(ctx);
         String text = note.lockOk ? note.text : ctx.getString(R.string.note_private);
-        Intent open = new Intent(ctx, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        Intent open = new Intent(ctx, Shell.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         Notification n = new Notification.Builder(ctx, CHANNEL)
                 .setSmallIcon(R.drawable.ic_stat_buddy)
                 .setColor(ctx.getColor(R.color.accent_fill))
