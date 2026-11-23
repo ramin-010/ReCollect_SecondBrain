@@ -209,6 +209,15 @@ fs.rmSync(path.join(BUILD, 'qa-res'), { recursive: true, force: true });
 
 console.log(`\nBuilt ${path.relative(process.cwd(), apk)}: ${(fs.statSync(apk).size / 1024).toFixed(0)} KB, version ${VERSION} (${VERSION_CODE}), in ${((Date.now() - started) / 1000).toFixed(1)} s`);
 
+// The release build rides with the backend (the owner, 11-23 night): backend/assets/phone/recollect.apk is committed in
+// the backend's repo, so every backend deploy carries the newest app and Settings > Phone app offers it. Never the QA one.
+if (!QA) {
+    const served = path.join(ROOT, '..', 'backend', 'assets', 'phone', 'recollect.apk');
+    fs.mkdirSync(path.dirname(served), { recursive: true });
+    fs.copyFileSync(apk, served);
+    console.log(`Copied to ${path.relative(process.cwd(), served)}: commit it in the backend repo; its next deploy serves it.`);
+}
+
 if (process.argv.includes('--install')) {
     run('adb', ['install', '-r', apk]);
     console.log('Installed on the phone.');
