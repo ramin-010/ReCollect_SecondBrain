@@ -106,3 +106,8 @@ _Superseded 11-15 by "Built lean" above (Java, no Gradle/Kotlin/AndroidX, the SD
 - the system bars in the look's ground.
 
 The first frame is the last look's ground (no preview window). A page that can't load shows the shell's own offline screen. Back follows the page's answer. The native parts (refresh, alarms, questions, the pictures, the widget) are unchanged. The device pass was on his phone; the QA build is installed there for him to try.
+
+### As built 0.7.3-0.7.5 (11-22 night to 11-23)
+- **0.7.3:** one screen (the shell; the old settings screen gone), Disconnect signs out, Look's Apply, pictures as WebP, the widget's words wrap (HISTORY bo).
+- **0.7.4:** lock and home layouts per screen (Classic, Glass, Stack; lock starts on Glass, home on Classic), the lock words drawn for the phone's zoom, the home picture shows everything, a refresh when the screen comes on and the last one is over 5 minutes old (`ScreenOn`, heard by the live wallpaper and the notification listener).
+- **0.7.5 (his ask: a real alarm):** a reminder that rings is a full-screen alarm over the lock screen: `AlarmService` (a foreground service, `mediaPlayback`) plays the phone's alarm sound looping on the alarm stream with vibration and posts the alarm notification with a full-screen intent; `AlarmActivity` shows the time, the words, Snooze 10 min and Dismiss; quiet after 10 minutes, leaving the plain reminder notification; any failure falls back to that notification. Not Clock-app entries (Android adds them only while the app is open, without a date, and the app can't remove them). Installed fresh on his phone 11-23; not yet heard ringing.

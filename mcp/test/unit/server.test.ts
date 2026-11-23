@@ -55,7 +55,7 @@ describe('the server', () => {
     it('offers the note recipe as a prompt: the skill’s text, plus the topic', async () => {
         h = await connect({});
         const { prompts } = await h.client.listPrompts();
-        expect(prompts.map((p) => p.name)).toEqual(['catch_up', 'note_recipe']);
+        expect(prompts.map((p) => p.name)).toEqual(['study', 'personal', 'work', 'catch_up', 'note_recipe']);
         // E4: the catch-up for a chat with no hooks names the tools it uses.
         const catchUp = await h.client.getPrompt({ name: 'catch_up', arguments: {} });
         const words = (catchUp.messages[0]!.content as { text: string }).text;
@@ -135,9 +135,9 @@ describe('a tool set per door (MCP_MEMORY_PLAN §4.1)', () => {
         expect(h.requests).toHaveLength(0);
     });
 
-    it('all (Ask AI): every tool', async () => {
+    it('all (Ask AI): every tool but set_folder and set_chat (it runs in no folder: EASY_SETUP_PLAN)', async () => {
         h = await connect({}, { set: 'all' });
-        expect((await names()).sort()).toEqual([...TOOL_NAMES].sort());
+        expect((await names()).sort()).toEqual(TOOL_NAMES.filter((n) => n !== 'set_folder' && n !== 'set_chat').sort());
     });
 });
 

@@ -1,35 +1,58 @@
-# Recollect MCP server
+# re-collect: Recollect for your AI coding tools
 
-"Recollect for agents": a small local MCP server on stdio. A coding agent (Claude Code, on the user's subscription) uses it to read and write his Recollect docs and learning data (subjects, revisions, goals, focus lines, pocket notes) through the Recollect REST API, with a personal access token.
+Recollect keeps what you learn and what you work on: notes with real diagrams, study paths and spaced revision, goals, a work log, and a buddy that remembers what you tell it across chats. This package connects your AI coding tools to it: the Recollect MCP server (the tools an agent calls), Claude Code's hooks (chats log their own time), and the skills.
 
-Plan: `context/specs/HOME_DOCS_AGENT_PLAN.md` §3. The API side: `backend/src/routers/agent.routes.ts` and `backend/src/services/apiTokens/tokenRoutes.ts` (the endpoints a token may call).
+## Set up (one command)
 
-## Set up
+Needs Node.js 22 or newer and an account on [re-collect.in](https://re-collect.in).
+
+```sh
+npx re-collect setup
+```
+
+1. It shows a code and opens re-collect.in: check that the page shows the same code and press **Approve** (no token to copy).
+2. It installs the app in `~/.recollect/app` and adds Recollect to every AI tool it finds on this computer:
+   - **Claude Code:** the tools (user scope), four hooks (each chat logs its own time; your words reach your buddy where the folder allows it), and the skills `/log-work`, `/recollect-study`, `/recollect-notes`, `/study`, `/personal`, `/work`.
+   - **Antigravity:** the tools and the skills. It has no hooks for this, so its chats log themselves through the tools (`checkpoint`).
+   - **Cursor:** the tools; its chats log themselves through the tools.
+3. Start a new chat. The first chat in a new folder asks you once what the folder is: **personal**, **study** or **work** (work time is logged for your work log, its words aren't read, and it doesn't count as progress), or to ignore it. Change any folder later in Recollect › Settings › Tracking, where you also pick what is logged (everything, the time only, nothing) and what new folders do.
+4. A chat can differ from its folder: type `/study`, `/personal` or `/work` (or just say so), and the agent may mark one itself, saying so in one line. A change in the middle of a chat splits its time there.
+
+```sh
+npx re-collect status    # what is set up, who it is signed in as
+npx re-collect update    # the newest version, set up again
+npx re-collect remove    # take it all out (the sign-in ends itself)
+```
+
+Options: `--url <server>` (default `https://api.re-collect.in`), `--login` (sign in again), `--tools claude,antigravity,cursor`, `--no-open` (print the link only). Every file it changes gets a backup beside it first, and only Recollect's own entries are touched. The token lives in `~/.recollect/config.json` only.
+
+## Set up by hand (developers)
 
 1. Build (Node 22 or newer):
 
    ```sh
-   cd E:/PERSONAL_PROJECTS/second_brain/mcp
+   cd mcp
    npm install
    npm run build
    ```
 
-2. Make a token in Recollect: **Settings → Agents**. Give it the scopes the tools need (below); all three for full use. The token (`rcl_…`) is shown once.
+2. Make a token in Recollect: **Settings → Agents**. Give it the scopes the tools need (below); all of them for full use. The token (`rcl_…`) is shown once.
 
 3. Add the server to Claude Code:
 
    ```sh
-   claude mcp add recollect -e RECOLLECT_URL=http://localhost:8002 -e RECOLLECT_TOKEN=rcl_… -- node E:/PERSONAL_PROJECTS/second_brain/mcp/dist/index.js
+   claude mcp add recollect -s user -e RECOLLECT_URL=http://localhost:8002 -e RECOLLECT_TOKEN=rcl_… -- node /path/to/mcp/dist/index.js
    ```
 
-   Add `-s user` (before `--`) to have it in every project; the default scope is the current folder only. Check it with `claude mcp list`, or `/mcp` inside Claude Code. In Windows PowerShell, type `claude.cmd` instead of `claude` (here and for `npm`, `npm.cmd`): the `.ps1` shims drop the `--`, and the command then fails.
+   Check it with `claude mcp list`, or `/mcp` inside Claude Code. In Windows PowerShell, type `claude.cmd` instead of `claude` (here and for `npm`, `npm.cmd`): the `.ps1` shims drop the `--`, and the command then fails. Without `RECOLLECT_TOKEN` the server reads `~/.recollect/config.json` (what `re-collect setup` writes).
 
 | Variable | Default | |
 |---|---|---|
-| `RECOLLECT_TOKEN` | (required) | The `rcl_…` token. Without it the server still starts, and every tool says how to fix it. |
+| `RECOLLECT_TOKEN` | `~/.recollect/config.json` | The `rcl_…` token. Without it (and no setup) the server still starts, and every tool says how to fix it. |
 | `RECOLLECT_URL` | `http://localhost:8002` | The API origin. A trailing `/` or `/api` is fine. |
 | `RECOLLECT_AGENT_NAME` (or `RECOLLECT_AGENT`) | `Claude Code` | Sent as `X-Agent-Name`; Home shows it on "From your agent". Give each connection its own, e.g. `RECOLLECT_AGENT=study-chat`. |
 | `RECOLLECT_TIMEOUT_MS` | `30000` | Per request. |
+| `RECOLLECT_FOLDERS` | on | `off`: assume no folder (a tool that doesn't start its servers in the project folder: Antigravity, Cursor). |
 | `RECOLLECT_DEBUG` | off | `1`: one stderr line per API call (method, path, status, time). |
 
 ### Over HTTP (remote MCP, stage 6)
@@ -57,14 +80,14 @@ A call without the scope it needs fails with the scope named, e.g. `The Recollec
 
 ## Tools
 
-75 tools (some rows below hold two or more), plus the `catch_up` and `note_recipe` prompts (and, on the web, `log_my_work`) and the `recollect-notes` skill (`npm run install:skill`).
+77 tools (some rows below hold two or more), plus the `study`, `personal`, `work`, `catch_up` and `note_recipe` prompts (and, on the web, `log_my_work`) and the skills (`npm run install:skill`, or `re-collect setup`).
 
 **A tool set per door** (MCP_MEMORY_PLAN §4.1, `createRecollectServer({ set })`):
 - **`code`, Claude Code (stdio):** the groups **core, docs, plan and record** from the start (the 40,000-character budget holds for these) and the **manage** group when it calls `more_tools` or the server runs with `RECOLLECT_TOOLS=all` (or a list such as `core,docs,manage`).
 - **`web`, claude.ai and ChatGPT (the remote `/mcp`):** 32 tools (`WEB_TOOLS`: the buddy, tasks and reminders, the lock screen, quick capture, the plan to read, studying, docs, and since stage 12 the work log: `log_work` one outcome a call, `update_work_line`, `get_work_log`; at most 24,000 characters) and no `more_tools`, since each request there is a fresh server. Connect the connector and set its tools to "Always allow"; nothing else is needed.
-- **`office`, a work folder (`brief: false`):** the seven saving tools; answers carry no "Related" or "In motion".
+- **`office`, a work folder (`brief: false`):** the seven saving tools, `set_folder` and `set_chat`; answers carry no "Related" or "In motion".
 - **`excluded`, a folder whose rule is `off`:** no tools.
-- **`all`, Ask AI inside the app:** every tool.
+- **`all`, Ask AI inside the app:** every tool but `set_folder` and `set_chat` (it runs in no folder).
 
 A tool a door doesn't list answers one line saying so, never "disabled". Each tool has a level (MANAGER_AND_DOCS_PLAN §3.2, `TOOL_LEVELS` in `src/server.ts`): 1 reads, 2 changes at once with an Undo, 3 only asks, and the user's tap on Home does it:
 
@@ -78,7 +101,7 @@ A tool a door doesn't list answers one line saying so, never "disabled". Each to
 | `suggest` | Propose a week target, a focus line or a profile change: it waits on Home under Suggested until the user accepts or dismisses it (agents can't accept) | `POST /api/suggestions` |
 | **manage:** `get_mirror` | Where the user stands, worked out by the app: per goal each path's pace against the deadline (and the smallest fix) and hours per week; per subject quiz scores, weak spots, practice outcomes, minutes per topic | `GET /api/mirror` |
 | `list_tasks`, `add_task`, `update_task` | The user's personal tasks (never workspace tasks, no delete): list by due window (today, week, overdue, all), add one with a due day and priority, change or tick one | `GET /api/tasks`, `POST /api/tasks`, `PATCH /api/tasks/:id` |
-| `log_decision`, **manage:** `list_decisions` | The decision journal: what was decided, why, what he expects, a day to look again (a day or 30d / 6w / 3m; Home asks "Was this right?" then); list open, reviewed or one project's | `POST /api/decisions`, `GET /api/decisions` |
+| `log_decision`, **manage:** `list_decisions` | The decision journal: what was decided, why, what they expect, a day to look again (a day or 30d / 6w / 3m; Home asks "Was this right?" then); list open, reviewed or one project's | `POST /api/decisions`, `GET /api/decisions` |
 | `get_today` | Today's plan (due revisions with doc ids), focus lines, the next topic of up to 3 paths (goal-linked first), active goals with deadline, days left, progress, forecast and next milestone | `GET /api/today` |
 | **manage:** `get_learning_overview` | Per subject: topics due / waiting / mastered / unscheduled, plus the daily budget. With `subject`: that subject's topics with next review dates | `GET /api/subjects`, `/api/topics/statuses`, `/api/learning/settings` |
 | `search_docs` | Docs by words in title or text on Postgres full-text (each word as a stem or a word's start; best match first), or the most recent; id, subject, date and snippet | `GET /api/agent/docs` |
@@ -113,18 +136,20 @@ A tool a door doesn't list answers one line saying so, never "disabled". Each to
 | **manage:** `update_work_line` | Stage 12: an app changes only a line it logged: `same_as` folds it into a line that says the same (listed once, kept), `text` rewords it today, `on` makes it news on a known line, `remove` takes it out when the user asks. Listed on the web | `PATCH /api/buddy/work/line/:id` |
 | `forget` | Close a memory that was a misunderstanding, undoable (a change goes to `update_memory`); memories the user wrote or changed are theirs (403) | `POST /api/buddy/memories/:id/close` |
 | `more_tools` | Turns the manage group on for this chat (the client is told the tool list changed) | none |
-| **manage:** `trash_doc`, `restore_doc` | Move a doc of his to the trash (30 days, then gone) or take it out; both undoable | `POST /api/agent/docs/:id/trash`, `…/restore` |
-| **manage:** `empty_trash` (level 3) | Ask to delete the trash for good: a card under Suggested on Home with "Do it"; nothing happens until he taps it | `POST /api/actions` (`empty_trash`) |
-| **manage:** `complete_revision`, `move_revision` | Mark a due review done (when he just reviewed it with you) or move a pending one to another day; both undoable | `POST /api/revisions/:id/complete`, `…/reschedule` |
-| **manage:** `get_settings`, `update_settings` | His daily budget, busy-until day, the morning email and the profile agents read; agents can't change the time zone or the old routine | `GET` / `PATCH /api/learning/settings` |
-| **manage:** `update_project` | A coding project's name, next step, goal or archive (by key or name); undoable | `GET /api/projects`, `PATCH /api/projects/:id` |
-| **manage:** `list_suggestions` | What waits under Suggested on his Home, actions that need his tap marked | `GET /api/suggestions` |
-| `set_reminder`, **manage:** `list_reminders`, `cancel_reminder` | A reminder on a task, or with a title that makes the task: silent (it shows on his phone's home screen, no sound, no email) unless he asks for an alarm or a ring (`ring: true`: the phone app rings at the time; an email only for one no phone holds); `repeat` daily, on weekdays or weekly until cancelled (cancelling ends the series); list the ones to come; cancel one (the task stays). Set and cancel are undoable | `POST /api/reminders`, `GET /api/reminders`, `POST /api/reminders/:id/cancel` |
-| **manage:** `show_on_lock_screen`, `clear_lock_line` | His own words on his phone's lock screen for a window ("until 6", weekdays, a last day; today only by default): in it they are the lock line, over the buddy's words; clear the one showing, one by id, or all | `POST /api/lock-pins`, `POST /api/lock-pins/clear` |
-| **manage:** `get_recall` | A topic's last Recall sessions: grades, the questions he missed with the grader's words, open weak spots (by topic or doc) | `GET /api/topics/:id/recall` |
-| **manage:** `get_sharing` | Who can see a doc of his: published to the web or not (its read-only link), the people added with their roles, who asks to edit | `GET /api/agent/docs/:id/sharing` |
-| **manage:** `publish_doc`, `share_doc` (level 3) | Ask to publish or unpublish a doc (a read-only link, stable until switched off), or to give someone with an account "can view" / "can edit" (or take it away): a card under Suggested on Home with "Do it"; nothing happens until he taps it | `POST /api/actions` (`publish_doc`, `share_doc`) |
-| **manage:** `spread_backlog` | Spread every overdue review over the next days by his daily budget, undoable; more than 20 at once only asks ("Do it" on Home) | `POST /api/revisions/spread` |
+| `set_folder` | The user's answer to what a folder is (a new folder asks once): personal, study, work, or ignore it (nothing logged); it holds for every chat and PC, and this PC's hooks follow it at once | `PUT /api/projects/by-key/:key` |
+| `set_chat` | What this chat is when it isn't what its folder says: `by` "user" (their words, `/study`) or "agent" (its judgement, said in one line); `from` "start" or now. With the hooks the chat's time splits there; without them its next checkpoint carries it. Their own word outweighs the agent's, and the app's switch outweighs both. In a work folder their own word that the chat is theirs turns on the full tool set (and the full brief); `work` on their word turns it back | `PATCH /api/sessions/by-key/:key/kind` (or the hook's split) |
+| **manage:** `trash_doc`, `restore_doc` | Move a doc of theirs to the trash (30 days, then gone) or take it out; both undoable | `POST /api/agent/docs/:id/trash`, `…/restore` |
+| **manage:** `empty_trash` (level 3) | Ask to delete the trash for good: a card under Suggested on Home with "Do it"; nothing happens until they tap it | `POST /api/actions` (`empty_trash`) |
+| **manage:** `complete_revision`, `move_revision` | Mark a due review done (when they just reviewed it with you) or move a pending one to another day; both undoable | `POST /api/revisions/:id/complete`, `…/reschedule` |
+| **manage:** `get_settings`, `update_settings` | Their daily budget, busy-until day, the morning email and the profile agents read; agents can't change the time zone or the old routine | `GET` / `PATCH /api/learning/settings` |
+| **manage:** `update_project` | A coding project's name, next step, goal, archive or kind (by key or name); undoable | `GET /api/projects`, `PATCH /api/projects/:id` |
+| **manage:** `list_suggestions` | What waits under Suggested on their Home, actions that need their tap marked | `GET /api/suggestions` |
+| `set_reminder`, **manage:** `list_reminders`, `cancel_reminder` | A reminder on a task, or with a title that makes the task: silent (it shows on their phone's home screen, no sound, no email) unless they ask for an alarm or a ring (`ring: true`: the phone app rings at the time; an email only for one no phone holds); `repeat` daily, on weekdays or weekly until cancelled (cancelling ends the series); list the ones to come; cancel one (the task stays). Set and cancel are undoable | `POST /api/reminders`, `GET /api/reminders`, `POST /api/reminders/:id/cancel` |
+| **manage:** `show_on_lock_screen`, `clear_lock_line` | Their own words on their phone's lock screen for a window ("until 6", weekdays, a last day; today only by default): in it they are the lock line, over the buddy's words; clear the one showing, one by id, or all | `POST /api/lock-pins`, `POST /api/lock-pins/clear` |
+| **manage:** `get_recall` | A topic's last Recall sessions: grades, the questions they missed with the grader's words, open weak spots (by topic or doc) | `GET /api/topics/:id/recall` |
+| **manage:** `get_sharing` | Who can see a doc of theirs: published to the web or not (its read-only link), the people added with their roles, who asks to edit | `GET /api/agent/docs/:id/sharing` |
+| **manage:** `publish_doc`, `share_doc` (level 3) | Ask to publish or unpublish a doc (a read-only link, stable until switched off), or to give someone with an account "can view" / "can edit" (or take it away): a card under Suggested on Home with "Do it"; nothing happens until they tap it | `POST /api/actions` (`publish_doc`, `share_doc`) |
+| **manage:** `spread_backlog` | Spread every overdue review over the next days by their daily budget, undoable; more than 20 at once only asks ("Do it" on Home) | `POST /api/revisions/spread` |
 | `get_outline` | A doc's blocks, one line each (id · kind · first words, children indented): the ids the block tools take. Every doc is on the new editor since the switch (2026-11-15); a doc with old content and no blocks would answer 409 | `GET /api/agent/docs/:id/outline` |
 | `insert_blocks`, `update_block`, `delete_blocks`; **manage:** `move_blocks` | Change the new editor's blocks by id, live: insert Markdown after / before / under a block or at the start or end; change one block (one block of Markdown, or props: a heading's level, a to-do's tick, a callout's kind; its children stay); move blocks with their children; delete them. Each is one change the user can undo (`doc_blocks`) | `POST /api/agent/docs/:id/blocks`, `PATCH …/blocks/:blockId`, `POST …/blocks/move`, `POST …/blocks/delete` |
 
@@ -138,16 +163,19 @@ GitHub Markdown, with headings `#` to `######` (a toggle heading folds its secti
 
 ## Claude Code hooks (coding sessions log themselves)
 
-`npm run install:hooks` (after `npm run build`) adds four hooks to `~/.claude/settings.json` (a backup is saved beside it first) and writes `~/.recollect/hooks.json` (`url`, `token`, `allow`, `brief`). Make the token in Settings → Agents with **read** and **sessions:write** only. `npm run install:hooks -- --remove` takes the hooks out again.
+`re-collect setup` adds four hooks to `~/.claude/settings.json` (a backup is saved beside it first); the url and token are in `~/.recollect/config.json`. By hand: `npm run install:hooks` (after `npm run build`) writes `~/.recollect/hooks.json` (`url`, `token`, `allow`, `brief`) instead; make that token in Settings → Agents with **read** and **sessions:write**. `npm run install:hooks -- --remove` takes the hooks out again.
 
-- **SessionStart:** in an allowed folder (default `E:/PERSONAL_PROJECTS/`), prints the brief into the session (with the key `cc_<session>` and the project), and opens the session in `~/.recollect/open/`. The header asks the model to `checkpoint` once with that key, the project, a title and the `nextStep` when it finishes a piece of work, so the project's next step stays current (a real run did it unasked).
+- **Folder rules (EASY_SETUP_PLAN, 11-23):** without an `allow` list the rules are the server's: what each folder is and what is logged there (Settings › Tracking), read at each session's start and kept 10 minutes in `~/.recollect/rules.json` (a prompt never waits for the network). A folder is known by its project folder: the outermost git repo it is in, below the home folder, else its own name. A folder the server has never seen follows the account's default; by default it asks once: the start hook tells the agent to ask, `set_folder` saves the answer, and until then nothing is read and the session waits on the PC (14 days at most). An `allow` list in `hooks.json` is an override for that PC: a folder it doesn't name is not heard, and for one the server knows, the stricter of the two decides what is read.
+- **What a chat is:** `set_chat`, or a typed `/study`, `/personal`, `/work` (`all` after it: from the chat's start), adds a line to `~/.recollect/open/<session>.kind.jsonl`. The session's time splits where it changed (`cc_<session>`, then `cc_<session>:k1`, …), each part sent with what it is and who said so. Their own word that a chat in a work folder is theirs reads its words from then on; an agent's guess never reads more, and a chat marked work reads no words.
+
+- **SessionStart:** in a folder the hooks act in, prints the brief into the session (with the key `cc_<session>` and the project), and opens the session in `~/.recollect/open/`. The header asks the model to `checkpoint` once with that key, the project, a title and the `nextStep` when it finishes a piece of work, so the project's next step stays current (a real run did it unasked).
 - **UserPromptSubmit, Stop:** one timestamp each, no network: active minutes are the gaps between them, none over 5 minutes. The first real prompt (first line, not a slash command or a one-word reply) is kept as the session's title.
-- **SessionEnd:** logs a `build` session: the project is the first folder under the allowed root (`second_brain/backend` → `second_brain`), active minutes, the branch and the subjects of commits made during it (that folder's repo and the repos directly inside it). Its title: the first commit, else the session's own title or first prompt; a chat's title is never replaced. Under 2 active minutes or fewer than 2 prompts: nothing is logged.
+- **SessionEnd:** logs a `build` session: the project is the first folder under the allowed root, or the outermost repo (`app/backend` → `app`), active minutes, the branch and the subjects of commits made during it (that folder's repo and the repos directly inside it). Its title: the first commit, else the session's own title or first prompt; a chat's title is never replaced. Under 2 active minutes or fewer than 2 prompts: nothing is logged.
 - A window closed without SessionEnd is logged by the next session start (the sweep: last activity over 30 minutes ago). A swept window used again logs the rest as a session of its own (`cc_<id>:r<time>`), as does a session that began before the hooks were installed.
 - Never blocks Claude Code: 3 s per call, failures go to `~/.recollect/hook.log`. Other folders, subagents and `RECOLLECT_HOOKS=off` do nothing. The transcript is never read. A study chat in an allowed folder checkpoints under the same key, so there is one entry, not two.
 - **The day's clock (B10):** in every folder the hooks act in, each prompt and each reply's end is stamped in `~/.recollect/times/<project>/<day>.jsonl` (the prompt's first 60 characters with it). It stays on the PC; `log_work` reads it for the turn times, and files older than two weeks are deleted.
-- **Folder kinds (PERSONAL_OFFICE_PLAN, 11-23):** an entry may say what the folder is, `{ path, kind: "personal" | "study" | "work" }`. The kind gives the defaults (personal and study: `full`, briefed; work: `light`, no brief, the nudge, no commit subjects); the knobs below still override, and `brief: false` without a kind still means work. The session tells the server the kind as a first guess for a folder it has never seen; after that the app's choice (Settings › Tracking) wins on every PC: a folder the server knows as work gets the work brief and its words and lines are office work whatever the PC says. Work time counts as progress only when the person says so. `npm run install:hooks -- --token rcl_… --personal "E:/projects/" --work "D:/job/"` writes such entries (repeatable; `--study` too); a folder none of them names is not heard.
-- **Folder entries** in `allow` are `{ path, mode, brief, nudge, commits }`: `mode` `full` (his typed words are read for his buddy), `light` (hours only: nothing leaves the PC until the session closes) or `off`; `brief: false` (a work folder) never shows his brief and titles its sessions by the project, never his words; `nudge: true` adds to each prompt a one-line reminder, with the time, to save quietly what he would want later, and once a day to offer to log the work (after 17:30 with an hour of work, or the next morning); `commits: false` sends no branch or commit subjects. A work folder's MCP lists only `get_brief`, `remember`, `add_task`, `set_reminder`, `add_pocket_note`, `log_work` and `get_work_log`, with instructions of its own (save quietly, never company code or data).
+- **Folder kinds (PERSONAL_OFFICE_PLAN, 11-23):** an entry may say what the folder is, `{ path, kind: "personal" | "study" | "work" }`. The kind gives the defaults (personal and study: `full`, briefed; work: `light`, no brief, the nudge, no commit subjects); the knobs below still override, and `brief: false` without a kind still means work. The session tells the server the kind as a first guess for a folder it has never seen; after that the app's choice (Settings › Tracking) wins on every PC: a folder the server knows as work gets the work brief and its words and lines are office work whatever the PC says. Work time counts as progress only when the person says so. `npm run install:hooks -- --token rcl_… --personal "~/projects/" --work "~/job/"` writes such entries (repeatable; `--study` too); a folder none of them names is not heard.
+- **Folder entries** in `allow` are `{ path, mode, brief, nudge, commits }`: `mode` `full` (their typed words are read for their buddy), `light` (hours only: nothing leaves the PC until the session closes) or `off`; `brief: false` (a work folder) never shows their brief and titles its sessions by the project, never their words; `nudge: true` adds to each prompt a one-line reminder, with the time, to save quietly what they would want later, and once a day to offer to log the work (after 17:30 with an hour of work, or the next morning); `commits: false` sends no branch or commit subjects. A work folder's MCP lists only `get_brief`, `remember`, `add_task`, `set_reminder`, `add_pocket_note`, `log_work`, `get_work_log`, `set_folder` and `set_chat`, with instructions of its own (save quietly, never company code or data).
 
 ## How it behaves
 

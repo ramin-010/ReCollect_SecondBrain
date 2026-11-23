@@ -113,7 +113,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
             description: web
                 ? WEB_DOC_WORDS.search_docs
                 : "Find docs by words in the title or text (every word must match, in any form or as a word's start; best match first). " +
-                  'Without a query: the most recently updated docs. Returns id, subject, last update and a snippet per doc. Search before creating a doc, to extend an existing one instead of making a duplicate.',
+                  'Without a query: the most recently updated docs. Each: id, subject, last update, a snippet. Search before creating a doc, to extend one instead of duplicating it.',
             input: {
                 query: z.string().trim().max(200).optional().describe('Words to look for. Leave out for the most recently updated docs.'),
                 limit: z.number().int().min(1).max(50).optional().describe('How many docs, 1–50 (default 10).'),
@@ -140,7 +140,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
             title: 'Read a doc',
             description: web
                 ? WEB_DOC_WORDS.read_doc
-                : 'Read one doc as Markdown (the live version if it is open), after a one-line header with its id, title, subject, last update and whether you can edit it. ' +
+                : 'Read one doc as Markdown (the live version if it is open), after a header line (id, title, subject, last update, whether you can edit it). ' +
                   'Read before replace_section, to see the exact headings. A canvas shows as a ```canvas fence in Mermaid flowchart text, its id on the first line (%% id: cv_…): ' +
                   'change it with update_canvas (small changes, or a whole new diagram) and see it with preview_diagram; positions are not in the text, Recollect keeps them.',
             input: { docId: zDocId },
@@ -297,11 +297,10 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Replace a section',
             description:
-                'Rewrite one section of a doc: everything under the first heading with this text (case-insensitive, without the #s) up to the next heading of the same or a higher level. ' +
-                'If markdown starts with a heading of the same or a higher level, it replaces the old heading too (a rename); otherwise the heading stays and only the body under it is replaced. ' +
-                "An unknown heading fails with a list of the doc's headings. Read the doc first (read_doc). " +
-                'A ```canvas fence you send back with the %% id line read_doc showed updates that board in place: the boxes the user arranged keep their places and only new boxes are laid out ' +
-                '(update_canvas does the same without rewriting the section). ' +
+                'Rewrite one section of a doc: everything under the first heading with this text (any case, no #s) up to the next heading of the same or a higher level. ' +
+                'Markdown starting with such a heading replaces the old one too (a rename); else only the body is replaced. ' +
+                "An unknown heading fails with the doc's headings. Read the doc first (read_doc). " +
+                'A ```canvas fence sent back with its %% id line (from read_doc) updates that board in place, keeping the boxes the user arranged (update_canvas does it without rewriting the section). ' +
                 SAME_MARKDOWN,
             input: {
                 docId: zDocId,
@@ -359,11 +358,11 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Change a canvas in place',
             description:
-                "Change one canvas board of a doc by its id (read_doc shows it on the fence's first line: %% id: cv_…), keeping everything the user arranged: boxes that stay keep their places, " +
-                'new boxes are laid out next to what they connect to, zones grow to hold them, arrows that stay keep their routes. ' +
+                "Change one canvas board of a doc by its id (read_doc shows it on the fence's first line: %% id: cv_…), keeping what the user arranged: boxes and arrows that stay keep their places and routes, " +
+                'new boxes go next to what they connect to, zones grow to hold them. ' +
                 'Either send small changes: add (lines in the canvas text form, e.g. "api --> cache[(Redis)]"; a box written again changes its label, shape, colour or kind; ' +
                 '"subgraph tier … end" with an existing zone id puts new boxes in that zone), remove (box ids, their arrows go too; or arrows like "a --> b"), rename (box id → new label). ' +
-                'Or send diagram: the whole new text (as read_doc printed it, edited). It answers with the same line as a write (size, zoom in a doc, problems to fix); the user can undo it.',
+                'Or send diagram: the whole new text (as read_doc printed it, edited). It answers like a write (size, zoom, problems to fix); the user can undo it.',
             input: {
                 docId: zDocId,
                 canvasId: z

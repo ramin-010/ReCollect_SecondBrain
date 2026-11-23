@@ -36,7 +36,7 @@ export function registerSubjectTools(server: McpServer, ctx: ToolContext): void 
         {
             title: 'Create a subject',
             description:
-                'Add a subject to group docs under (e.g. "System Design"). If a subject with that name exists already (case-insensitive), nothing is created and its id is returned.',
+                'Add a subject to group docs under (e.g. "System Design"). An existing name (any case) returns its id instead.',
             input: { name: zSubjectName.describe('The subject name, e.g. "System Design".') },
             annotations: ADDS,
         },

@@ -31,6 +31,14 @@
 // the person's AI is paused it answers 503 AI_PAUSED and the words wait on the PC; words a failed close
 // left are sent at the next start; nothing older than 14 days is sent. While one of the buddy's questions
 // is open in the session, a reply under 3 words is read too. An older server gets exactly today's pieces.
+// EASY_SETUP_PLAN (11-23): `npx re-collect setup` signs the PC in and writes ~/.recollect/config.json { url, token };
+// with no `allow` list (hooks.json) the folder rules are the server's (./folders.ts): what a folder is and what is
+// logged there, a new folder asking once (the start hook tells the agent to ask, set_folder saves the answer; until
+// then its time waits on the PC and nothing is read). hooks.json's `allow` list stays an override for power users (the
+// server's word still decides a folder it knows; the stricter of the two decides what is read). A chat can say what it
+// is (open/<session>.kind.jsonl: set_chat, or a typed /study, /personal, /work): its time is split where it changed,
+// each part sent with what it is and who said so; their own word that a chat in a work folder is theirs reads its
+// words from then on (an agent's guess never reads more).
 // Test knobs: RECOLLECT_HOOKS_HOME (instead of ~/.recollect), RECOLLECT_HOOKS_CONFIG,
 // RECOLLECT_HOOKS_MIN_MINUTES (default 2), RECOLLECT_HOOKS_MIN_PROMPTS (default 2),
 // RECOLLECT_HOOKS_FLUSH=inline (the stop hook flushes in its own process: tests).
@@ -40,6 +48,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ApiError, RecollectApi } from './api.js';
+import { addPart, folderOf, partAt, projectFolder, readParts, readRules, refreshRules, slashKind, type ChatPart, type RulesCache } from './folders.js';
 import { briefText, type Brief } from './tools/record.js';
 
 export type FolderMode = 'full' | 'light' | 'off';
@@ -56,6 +65,7 @@ export type AllowEntry = string | { path: string; kind?: FolderKind; mode?: Fold
 export interface HookConfig {
     url: string;
     token: string;
+    /** The PC's own folder rules (hooks.json); empty = the server's rules (EASY_SETUP_PLAN). */
     allow: AllowEntry[];
     brief: boolean;
 }
@@ -96,6 +106,8 @@ export interface OpenSession {
     asks?: Array<{ id: string; until: string }>;
     /** Stage 4: the session line is logged; only its words still wait to be sent (the next start sends them). */
     logged?: boolean;
+    /** EASY_SETUP_PLAN: a new folder nobody has answered for yet: the session waits on this PC (14 days at most). */
+    pending?: boolean;
 }
 
 /** One line of a session's words file: his words, or the agent's reply to them (its start, and its end when longer). */
@@ -141,11 +153,14 @@ const NOTE_FRESH_MS = 24 * 3600_000;
 
 export const hooksHome = (env: Env = process.env): string => env['RECOLLECT_HOOKS_HOME'] || path.join(os.homedir(), '.recollect');
 export const configPath = (env: Env = process.env): string => env['RECOLLECT_HOOKS_CONFIG'] || path.join(hooksHome(env), 'hooks.json');
+/** EASY_SETUP_PLAN: what `re-collect setup` writes: { url, token } (the MCP server reads it too). */
+export const userConfigPath = (env: Env = process.env): string => path.join(hooksHome(env), 'config.json');
 
 /** "E:\\A\\b" → "e:/a/b/": compared case-insensitively, as Windows paths are. */
 export const normalizePath = (p: string): string => `${p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()}/`;
 
 const KINDS: readonly FolderKind[] = ['personal', 'study', 'work'];
+const safeName = (project: string) => project.toLowerCase().replace(/[^a-z0-9._-]+/g, '_').slice(0, 80) || 'home';
 
 const ruleOf = (e: AllowEntry): FolderRule | null => {
     if (typeof e === 'string') return e.trim() ? { path: e, kind: 'personal', mode: 'light', brief: true, nudge: false, commits: true } : null;
@@ -228,7 +243,7 @@ export function worthLogging(session: Pick<OpenSession, 'prompts'>, minutes: num
 
 /**
  * The project folder of a working folder: the first folder under the allow root it is in
- * (`E:/PERSONAL_PROJECTS/second_brain/backend` → `E:/PERSONAL_PROJECTS/second_brain`); the folder
+ * (`D:/code/app/backend` → `D:/code/app` under the root `D:/code/`); the folder
  * itself when it is a root, or under no root.
  */
 export function projectRoot(cwd: string, allow: readonly AllowEntry[] = []): string {
@@ -307,11 +322,184 @@ function readJson<T>(file: string): T | null {
     }
 }
 
+/**
+ * The hooks' settings: hooks.json (the older setup: url, token, its folder rules), else or beside it config.json (the
+ * easy setup's url and token). hooks.json's url and token win when it has them; its rules always apply.
+ */
 export function loadHookConfig(env: Env = process.env): HookConfig | null {
     const c = readJson<Partial<HookConfig>>(configPath(env));
-    if (!c?.token || !c.url) return null;
-    return { url: c.url, token: c.token, allow: Array.isArray(c.allow) ? c.allow : [], brief: c.brief !== false };
+    const u = readJson<{ url?: string; token?: string }>(userConfigPath(env));
+    const url = c?.url || u?.url;
+    const token = c?.token || u?.token;
+    if (!token || !url) return null;
+    return { url, token, allow: Array.isArray(c?.allow) ? c.allow : [], brief: c?.brief !== false };
 }
+
+// ─── The folder's rule, with the server's word (EASY_SETUP_PLAN) ─────────
+
+/** A folder's rule as this PC follows it. */
+export interface ResolvedRule extends FolderRule {
+    /** The folder's key (the server's Project.key), its own spelling, and its project folder on this PC. */
+    key: string;
+    name: string;
+    root: string;
+    /** A new folder nobody has answered for (the account asks): nothing read, no brief, its time waits on this PC. */
+    ask: boolean;
+    /** Its words and work lines are office work (the stricter of the PC's rule and the server's word). */
+    office: boolean;
+    /** What the server is told a folder it has never seen is (the PC's rule, or the account's default). */
+    hint?: FolderKind;
+    /** What is logged there is the folder's own choice (a chat's word never reads more than that). */
+    trackingSet: boolean;
+}
+
+const STRICT: Record<FolderMode, number> = { off: 0, light: 1, full: 2 };
+const stricter = (a: FolderMode, b: FolderMode): FolderMode => (STRICT[a] <= STRICT[b] ? a : b);
+const kindDefaults = (kind: FolderKind, mode?: FolderMode): Omit<FolderRule, 'path'> => ({
+    kind,
+    mode: mode ?? (kind === 'work' ? 'light' : 'full'),
+    brief: kind !== 'work',
+    nudge: kind === 'work',
+    commits: kind !== 'work',
+});
+
+/**
+ * The rule for a working folder. With hooks.json's `allow` list: that list (a folder none names is not heard), and the
+ * server's word on a folder it knows (its kind; the stricter of the two marks office and decides what is read). Without
+ * one (the easy setup): the server's rule for the folder; a folder it has never seen (or nobody decided) follows the
+ * account's default (ask, a kind, off). No rules on the PC yet (offline at the first start): it asks. An older server
+ * without rules and no list: nothing is heard (as before).
+ */
+export function resolveRule(cwd: string, config: HookConfig, rules: RulesCache | null, home?: string): ResolvedRule | null {
+    if (config.allow.length > 0) {
+        const local = folderRule(cwd, config.allow);
+        if (!local) return null;
+        const root = projectRoot(cwd, config.allow);
+        const key = projectOf(cwd, config.allow);
+        const name = path.basename(root) || key;
+        const server = rules && !rules.unsupported ? rules.folders[key] : undefined;
+        const base = { key, name, root, ask: false, hint: local.kind };
+        if (!server?.decided) return { ...local, ...base, office: local.kind === 'work', trackingSet: false };
+        const office = local.kind === 'work' || server.kind === 'work';
+        return {
+            ...local,
+            ...base,
+            kind: server.kind,
+            mode: stricter(local.mode, server.tracking),
+            brief: local.brief && !office,
+            nudge: local.nudge || office,
+            commits: local.commits && !office,
+            office,
+            trackingSet: server.trackingSet === true,
+        };
+    }
+    if (rules?.unsupported) return null;
+    const root = projectFolder(cwd, home);
+    const { key, name } = folderOf(cwd, home);
+    const server = rules?.folders[key];
+    const base = { path: root, key, name, root };
+    if (server?.decided) return { ...base, ...kindDefaults(server.kind, server.tracking), ask: false, office: server.kind === 'work', trackingSet: server.trackingSet === true };
+    const fallback = rules?.newFolders ?? 'ask';
+    if (fallback === 'off') return { ...base, ...kindDefaults('personal', 'off'), ask: false, office: false, trackingSet: false };
+    if (fallback !== 'ask') return { ...base, ...kindDefaults(fallback), ask: false, office: fallback === 'work', hint: fallback, trackingSet: false };
+    return { ...base, kind: 'personal', mode: 'light', brief: false, nudge: false, commits: false, ask: true, office: false, trackingSet: false };
+}
+
+/**
+ * What is read in a chat now: its folder's rule, unless the chat says what it is. A chat marked work reads no words
+ * (unless it is a work folder that reads everything by its own choice); their own word that a chat in a work folder is
+ * theirs (study, personal) reads it in full, unless the folder's own choice says less. An agent's guess never reads more.
+ */
+export function chatMode(rule: ResolvedRule, part: ChatPart | null): FolderMode {
+    if (!part || rule.mode === 'off' || rule.ask) return rule.mode;
+    if (part.kind === 'work') return rule.kind === 'work' ? rule.mode : stricter(rule.mode, 'light');
+    if (part.by === 'chat' && rule.office && !rule.trackingSet) return 'full';
+    return rule.mode;
+}
+
+/** Whose a chat's words are now: office (its folder's), unless the chat says what it is (work: office; their own word: theirs). */
+export const chatOffice = (rule: Pick<ResolvedRule, 'office'>, part: ChatPart | null): boolean => (part ? part.kind === 'work' || (part.by === 'agent' && rule.office) : rule.office);
+
+/** The server speaks the easy setup (its folder rules answered): the new fields go with the session and the words. */
+const speaksSetup = (rules: RulesCache | null): boolean => !!rules && !rules.unsupported;
+
+/** The rules as a hook may read them: from the PC (a prompt never waits for the network). */
+export const rulesOnPc = (config: Pick<HookConfig, 'url'>, env: Env = process.env): RulesCache | null => readRules(config.url, env);
+
+// ─── A chat split where it changed (EASY_SETUP_PLAN §7) ───────────────
+
+/** One part of a session: from, to, its active minutes, and what it is when someone said so (null: its folder's). */
+export interface SessionPart {
+    from: string;
+    to: string;
+    minutes: number;
+    part: ChatPart | null;
+}
+
+const RANK: Record<ChatPart['by'], number> = { agent: 1, chat: 2 };
+
+/**
+ * A session's time split by what the chat was: each change starts a part (one from the chat's start, or before it,
+ * says what it was from the beginning); two parts in a row that are the same thing are one (the stronger word kept).
+ * Each gap between stamps (at most 5 minutes) counts for the part its end falls in (a gap that ends at the change, the
+ * prompt that made it, is the part before).
+ */
+export function splitSession(stamps: readonly string[], startedAt: string, end: string, parts: readonly ChatPart[], folderKind: FolderKind): SessionPart[] {
+    const start = Date.parse(startedAt);
+    const marks = parts
+        .map((p) => ({ part: p, t: Math.max(start, Date.parse(p.at)) }))
+        .filter((m) => Number.isFinite(m.t))
+        .sort((a, b) => a.t - b.t);
+    const bounds: Array<{ t: number; part: ChatPart | null }> = [{ t: start, part: null }];
+    for (const m of marks) {
+        const last = bounds[bounds.length - 1]!;
+        const lastKind = last.part?.kind ?? folderKind;
+        if (m.t <= last.t) last.part = m.part;
+        else if (m.part.kind === lastKind) {
+            // The same thing again: one part, the stronger word (their own over the agent's) kept.
+            if (!last.part || RANK[m.part.by] > RANK[last.part.by]) last.part = { ...m.part, at: new Date(last.t).toISOString() };
+        } else bounds.push({ t: m.t, part: m.part });
+    }
+    const t = [...stamps, end].map((x) => Date.parse(x)).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+    const ms = bounds.map(() => 0);
+    for (let i = 1; i < t.length; i++) {
+        let seg = 0;
+        for (let j = 1; j < bounds.length; j++) if (bounds[j]!.t < t[i]!) seg = j;
+        ms[seg]! += Math.min(t[i]! - t[i - 1]!, GAP_MAX_MS);
+    }
+    return bounds.map((b, i) => ({
+        from: new Date(b.t).toISOString(),
+        to: i + 1 < bounds.length ? new Date(bounds[i + 1]!.t).toISOString() : end,
+        minutes: Math.round(ms[i]! / 60_000),
+        part: b.part,
+    }));
+}
+
+// ─── A new folder asks once ──────────────────────────────────────────
+
+const askedFile = (key: string, env: Env) => path.join(hooksHome(env), 'asked', `${safeName(key)}.txt`);
+/** The folder's question was put today (in any chat here): not again until tomorrow. */
+function askedToday(key: string, env: Env, now: Date): boolean {
+    try {
+        return readFileSync(askedFile(key, env), 'utf8').trim() === localDay(now);
+    } catch {
+        return false;
+    }
+}
+function markAsked(key: string, env: Env, now: Date): void {
+    try {
+        mkdirSync(path.dirname(askedFile(key, env)), { recursive: true });
+        writeFileSync(askedFile(key, env), localDay(now));
+    } catch {
+        // It may ask once more.
+    }
+}
+
+/** The start hook's line in a new folder: the agent asks the one question, set_folder keeps the answer. */
+export const askText = (name: string): string =>
+    `Recollect (session-start hook): this folder, "${name}", is new to Recollect, so nothing from this chat is read; only its time is kept on this PC until the user says what the folder is. ` +
+    'Early in this chat, at a natural point, ask them once in one short line: is this folder personal, study or work, or should Recollect ignore it? ' +
+    'Then call set_folder with their answer (it holds for every chat in this folder). If they don’t want to say, drop it.';
 
 // ─── The day's clock (B10, BUDDY_MEMORY_PLAN §12.4) ───────────────────────────
 // ~/.recollect/times/<project>/<YYYY-MM-DD>.jsonl, by the PC's local day: a line per prompt
@@ -345,7 +533,6 @@ export const localDay = (d: Date): string => `${d.getFullYear()}-${pad2(d.getMon
 export const localTime = (d: Date): string => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 /** "Mon 16 Nov" (the PC's zone). */
 export const dayLabel = (d: Date): string => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-const safeName = (project: string) => project.toLowerCase().replace(/[^a-z0-9._-]+/g, '_').slice(0, 80) || 'home';
 export const clockDir = (project: string, env: Env = process.env): string => path.join(hooksHome(env), 'times', safeName(project));
 export const clockFile = (project: string, day: string, env: Env = process.env): string => path.join(clockDir(project, env), `${day}.jsonl`);
 type Mark = 'logged' | 'asked-evening' | 'asked-morning';
@@ -459,6 +646,19 @@ function pruneClocks(env: Env, now: Date): void {
         }
     } catch {
         // No clock yet.
+    }
+}
+
+/** A chat's parts outlive its session file (a resumed chat is the same chat); two weeks after their last change they go. */
+function pruneParts(dir: string, now: Date): void {
+    try {
+        for (const name of readdirSync(dir)) {
+            if (!name.endsWith('.kind.jsonl')) continue;
+            const f = path.join(dir, name);
+            if (now.getTime() - statSync(f).mtimeMs > HOLD_MS && !existsSync(path.join(dir, name.replace(/\.kind\.jsonl$/, '.json')))) rmSync(f, { force: true });
+        }
+    } catch {
+        // No open sessions yet.
     }
 }
 
@@ -610,12 +810,18 @@ export async function flushWords(api: RecollectApi, dir: string, sessionId: stri
     try {
         const session = readJson<OpenSession>(path.join(dir, `${sessionId}.json`));
         const state = readJson<FlushState>(flushFile(dir, sessionId)) ?? { sent: 0, seq: 0 };
-        // A work folder: its words are office work (B9: the work log keeps them apart; the server also knows its folders).
+        // A work folder: its words are office work (B9: the work log keeps them apart; the server also knows its folders),
+        // unless the chat says what it is (EASY_SETUP_PLAN §7: their own word that it is theirs).
         const config = loadHookConfig(env);
-        const office = !!session && !!config && folderRule(session.cwd, config.allow)?.kind === 'work';
+        const rules = config ? rulesOnPc(config, env) : null;
+        const rule = session && config ? resolveRule(session.cwd, config, rules) : null;
+        const parts = readParts(dir, sessionId);
+        const part = parts[parts.length - 1] ?? null;
+        const office = !!rule && chatOffice(rule, part);
+        const chat = part && speaksSetup(rules) ? { kind: part.kind, by: part.by } : undefined;
         const lines = readWords(dir, sessionId);
         if (config && serverCapture(config, env) >= CAPTURE_V2) {
-            await sendNumbered(api, dir, sessionId, session, config, env, lines, state, office, now);
+            await sendNumbered(api, dir, sessionId, session, config, env, lines, state, office, now, chat);
             return;
         }
         let { sent, seq } = state;
@@ -629,7 +835,7 @@ export async function flushWords(api: RecollectApi, dir: string, sessionId: stri
             }
             const messages = unsentMessages(lines.slice(0, end), sent);
             if (messages.length) {
-                const answer = await api.post<{ capture?: number }>('/api/buddy/words', { sessionKey: session?.key ?? `cc_${sessionId}`, seq: seq + 1, project: session?.project ?? null, ...(office ? { office: true } : {}), messages });
+                const answer = await api.post<{ capture?: number }>('/api/buddy/words', { sessionKey: session?.key ?? `cc_${sessionId}`, seq: seq + 1, project: session?.project ?? null, ...(office ? { office: true } : {}), ...(chat ? { chat } : {}), messages });
                 // A server that speaks message numbers says so: the next sends use them.
                 if (config) noteCapture(config, env, answer?.capture);
                 seq++;
@@ -676,7 +882,8 @@ async function sendNumbered(
     lines: readonly WordsLine[],
     state: FlushState,
     office: boolean,
-    now: Date
+    now: Date,
+    chat?: { kind: ChatPart['kind']; by: ChatPart['by'] }
 ): Promise<void> {
     const all = numberedMessages(lines);
     let read = state.read ?? textsIn(lines, state.sent);
@@ -701,6 +908,7 @@ async function sendNumbered(
                 seq: fresh[0]!.n,
                 project: session?.project ?? null,
                 ...(office ? { office: true } : {}),
+                ...(chat ? { chat } : {}),
                 v: CAPTURE_V2,
                 canHold: true,
                 messages,
@@ -751,6 +959,11 @@ function apiFor(config: HookConfig): RecollectApi {
     return new RecollectApi({ baseUrl: config.url, token: config.token, agentName: 'Claude Code hook', timeoutMs: NET_TIMEOUT_MS, retryDelayMs: 100, runningDelayMs: 300 });
 }
 
+/** The rules' fetch: shorter, so a slow server never holds a session's start (the brief comes after it). */
+function rulesApiFor(config: HookConfig): RecollectApi {
+    return new RecollectApi({ baseUrl: config.url, token: config.token, agentName: 'Claude Code hook', timeoutMs: 2000, retryDelayMs: 100, runningDelayMs: 300 });
+}
+
 /**
  * A folder no longer read in full (B10: a rule changed while a session was open): its waiting words
  * are moved to ~/.recollect/held/, never sent; one line in hook.log.
@@ -774,10 +987,14 @@ async function close(api: RecollectApi, file: string, endedAt: string, env: Env,
     const sessionId = path.basename(file, '.json');
     const opened = readJson<OpenSession>(file);
     const config = loadHookConfig(env);
-    const rule = opened && config ? folderRule(opened.cwd, config.allow) : null;
+    // The folder's rule now, from the PC (set_folder writes its answer there at once; the app's, at the next start's fetch).
+    const rules = config ? rulesOnPc(config, env) : null;
+    const rule = opened && config ? resolveRule(opened.cwd, config, rules) : null;
+    const parts = readParts(dir, sessionId);
+    const lastPart = parts[parts.length - 1] ?? null;
     let wordsLeft = false;
     if (existsSync(wordsFile(dir, sessionId))) {
-        if (!rule || rule.mode !== 'full') holdWords(dir, sessionId, env);
+        if (!rule || chatMode(rule, lastPart) !== 'full') holdWords(dir, sessionId, env);
         else {
             await flushWords(api, dir, sessionId, env, now);
             const v2 = !!config && serverCapture(config, env) >= CAPTURE_V2;
@@ -792,6 +1009,14 @@ async function close(api: RecollectApi, file: string, endedAt: string, env: Env,
     const s = readJson<OpenSession>(file);
     if (!s || (opened && (!rule || rule.mode === 'off'))) {
         rmSync(file, { force: true });
+        return;
+    }
+    // A new folder still without an answer: the session waits here (nothing sent), at most 14 days.
+    if (rule?.ask) {
+        if (now.getTime() - Date.parse(s.endedAt ?? endedAt) > HOLD_MS) {
+            rmSync(file, { force: true });
+            log(env, `dropped ${s.key}: its folder "${rule.name}" was never answered for in 14 days`);
+        } else writeFileSync(file, JSON.stringify({ ...s, endedAt: s.endedAt ?? endedAt, pending: true }));
         return;
     }
     // Logged already (a close whose words could not all be sent): only the words wait, for the next start.
@@ -812,31 +1037,51 @@ async function close(api: RecollectApi, file: string, endedAt: string, env: Env,
     }
     const withCommits = rule?.commits !== false;
     const { branch, commits } = withCommits ? commitsSince(s.heads) : { branch: null, commits: [] as string[] };
-    const titleIfNew = rule && (rule.kind === 'work' || !rule.brief) ? s.project : (s.sessionTitle ?? s.firstPrompt);
-    const body = {
-        kindIfNew: 'build',
-        source: 'hook',
-        project: s.project,
-        startedAt: s.startedAt,
-        endedAt: end,
-        minutes,
-        ...(titleIfNew ? { titleIfNew } : {}),
-        details: withCommits ? { ...(branch ? { branch } : {}), commits } : {},
-    };
-    const url = `/api/sessions/by-key/${encodeURIComponent(s.key)}`;
+    const titleIfNew = rule && (rule.office || !rule.brief) ? (rule.name || s.project) : (s.sessionTitle ?? s.firstPrompt);
+    // EASY_SETUP_PLAN §7: the chat's time split where it changed what it is (one part when it never did).
+    const pieces = splitSession(s.stamps, s.startedAt, end, speaksSetup(rules) ? parts : [], rule?.kind ?? 'personal');
+    const minMinutes = Number(env['RECOLLECT_HOOKS_MIN_MINUTES'] ?? 2);
     try {
-        // PERSONAL_OFFICE_PLAN: the folder's kind, a first guess for a folder the server has never seen.
-        try {
-            await api.put(url, rule ? { ...body, projectKind: rule.kind } : body);
-        } catch (err) {
-            // An older server refuses the field it doesn't know: the session goes without it.
-            if (!(err instanceof ApiError) || err.status !== 400 || !/projectKind|unrecognized/i.test(err.message)) throw err;
-            await api.put(url, body);
+        for (const [i, piece] of pieces.entries()) {
+            if (pieces.length > 1 && piece.minutes < minMinutes) continue;
+            const last = i === pieces.length - 1;
+            const body = {
+                kindIfNew: 'build',
+                source: 'hook',
+                project: s.project,
+                startedAt: pieces.length > 1 ? piece.from : s.startedAt,
+                endedAt: pieces.length > 1 ? piece.to : end,
+                minutes: pieces.length > 1 ? Math.min(most, piece.minutes) : minutes,
+                ...(titleIfNew ? { titleIfNew } : {}),
+                // The commits since the chat's start go with its last part.
+                details: withCommits && last ? { ...(branch ? { branch } : {}), commits } : {},
+            };
+            const extra = {
+                // PERSONAL_OFFICE_PLAN: the folder's kind, a first guess for a folder the server has never seen.
+                ...(rule?.hint ? { projectKind: rule.hint } : {}),
+                ...(piece.part ? { chatKind: piece.part.kind, kindBy: piece.part.by } : {}),
+            };
+            await putSession(api, i === 0 ? s.key : `${s.key}:k${i}`, body, extra);
         }
         keep(true);
     } catch (err) {
         writeFileSync(file, JSON.stringify({ ...s, endedAt: end }));
         log(env, `could not close ${s.key}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+}
+
+/** PUT a session; an older server that refuses the newer fields (projectKind, chatKind, kindBy) gets it without them. */
+async function putSession(api: RecollectApi, key: string, body: Record<string, unknown>, extra: Record<string, unknown>): Promise<void> {
+    const url = `/api/sessions/by-key/${encodeURIComponent(key)}`;
+    if (!Object.keys(extra).length) {
+        await api.put(url, body);
+        return;
+    }
+    try {
+        await api.put(url, { ...body, ...extra });
+    } catch (err) {
+        if (!(err instanceof ApiError) || err.status !== 400 || !/projectKind|chatKind|kindBy|unrecognized/i.test(err.message)) throw err;
+        await api.put(url, body);
     }
 }
 
@@ -862,14 +1107,15 @@ async function sweep(api: RecollectApi, dir: string, current: string, env: Env, 
  * may already be logged gets a key of its own (`cc_<id>:r<time>`). `stamps`: 1 = the start counts as
  * the first stamp; 0 = the caller adds the first one (a prompt).
  */
-function newOpenSession(sessionId: string, cwd: string, allow: readonly AllowEntry[], now: Date, resumed: boolean, stamps: 0 | 1): OpenSession {
+function newOpenSession(sessionId: string, cwd: string, rule: Pick<ResolvedRule, 'key' | 'root' | 'ask'>, now: Date, resumed: boolean, stamps: 0 | 1): OpenSession {
     const at = now.toISOString();
-    const root = projectRoot(cwd, allow);
+    const root = rule.root;
     return {
         key: `cc_${sessionId}${resumed ? `:r${Math.floor(now.getTime() / 1000).toString(36)}` : ''}`,
         sessionId,
         cwd,
-        project: projectOf(cwd, allow),
+        project: rule.key,
+        ...(rule.ask ? { pending: true } : {}),
         startedAt: at,
         stamps: stamps ? [at] : [],
         prompts: 0,
@@ -900,8 +1146,13 @@ export async function runHook(event: string, input: Record<string, unknown>, env
     if (!config) return '';
     const cwd = typeof input['cwd'] === 'string' && input['cwd'] ? input['cwd'] : process.cwd();
     const sessionId = typeof input['session_id'] === 'string' ? input['session_id'].replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64) : '';
-    const rule = folderRule(cwd, config.allow);
-    if (!sessionId || !rule || rule.mode === 'off') return '';
+    if (!sessionId) return '';
+    // A folder the PC's own list doesn't name is never heard: not even the rules are fetched for it.
+    if (config.allow.length > 0 && !isAllowed(cwd, config.allow)) return '';
+    // The server's folder rules: fetched at a session's start (kept 10 minutes on the PC), read from the PC otherwise.
+    const rules = event === 'start' ? await refreshRules(rulesApiFor(config), config.url, env, now) : rulesOnPc(config, env);
+    const rule = resolveRule(cwd, config, rules);
+    if (!rule || rule.mode === 'off') return '';
 
     const dir = path.join(hooksHome(env), 'open');
     mkdirSync(dir, { recursive: true });
@@ -912,7 +1163,7 @@ export async function runHook(event: string, input: Record<string, unknown>, env
 
     if (event === 'prompt' || event === 'stop') {
         // The day's clock (B10): every folder the hooks act in; local only, never sent.
-        const clockProject = projectOf(cwd, config.allow);
+        const clockProject = rule.key;
         const today = localDay(now);
         const firstToday = event === 'prompt' && !readClock(clockProject, today, env).some((l) => !l.end);
         try {
@@ -921,16 +1172,20 @@ export async function runHook(event: string, input: Record<string, unknown>, env
         } catch (err) {
             log(env, `clock: ${err instanceof Error ? err.message : String(err)}`);
         }
-        // A folder no longer read in full (its rule changed mid-session): whatever words wait are held, never sent.
-        if (rule.mode !== 'full') holdWords(dir, sessionId, env);
+        // EASY_SETUP_PLAN §7: a typed /study, /personal or /work says what this chat is from now, on their own word.
+        const slash = event === 'prompt' ? slashKind(input['prompt']) : null;
+        if (slash) addPart(dir, sessionId, { at: slash.whole ? (readJson<OpenSession>(file)?.startedAt ?? at) : at, kind: slash.kind, by: 'chat' });
+        const mode = chatMode(rule, partAt(readParts(dir, sessionId), now.getTime()));
+        // A folder no longer read in full (its rule changed mid-session, or the chat became work): whatever words wait are held, never sent.
+        if (mode !== 'full') holdWords(dir, sessionId, env);
         let s = readJson<OpenSession>(file);
         // No open file on a prompt: the session was swept (idle over 30 minutes, then another session
         // started) or began before the hooks were installed. The rest of it is a session of its own.
-        if (!s && event === 'prompt') s = newOpenSession(sessionId, cwd, config.allow, now, true, 0);
+        if (!s && event === 'prompt') s = newOpenSession(sessionId, cwd, rule, now, true, 0);
         if (!s) return '';
         const firstPrompt = s.firstPrompt ?? (event === 'prompt' ? promptTitle(input['prompt']) ?? undefined : undefined);
-        // His words (a "full" folder): what he typed, and the start of the agent's answer to it.
-        if (rule.mode === 'full') {
+        // His words (a "full" folder, or a chat they said is theirs): what he typed, and the start of the agent's answer to it.
+        if (mode === 'full') {
             if (event === 'prompt') {
                 const askOpen = (s.asks ?? []).some((a) => Date.parse(a.until) > now.getTime());
                 const text = promptWords(input['prompt'], { short: askOpen });
@@ -958,7 +1213,7 @@ export async function runHook(event: string, input: Record<string, unknown>, env
         // server reads a session's messages together a little later, or at once while a question is open).
         // An older one gets today's pieces: when 2,000 characters or 30 minutes wait, after a reply.
         const numbered = serverCapture(config, env) >= CAPTURE_V2;
-        if (rule.mode === 'full' && ((event === 'prompt' && numbered) || (event === 'stop' && !numbered))) {
+        if (mode === 'full' && ((event === 'prompt' && numbered) || (event === 'stop' && !numbered))) {
             const lines = readWords(dir, sessionId);
             const state = readJson<FlushState>(flushFile(dir, sessionId));
             if (numbered ? leftover(lines, state, true) > 0 : flushDue(lines, state?.sent ?? 0, now)) await startFlush(api, dir, sessionId, env, now);
@@ -977,12 +1232,19 @@ export async function runHook(event: string, input: Record<string, unknown>, env
 
     await sweep(api, dir, file, env, now);
     pruneClocks(env, now);
+    pruneParts(dir, now);
     let session = readJson<OpenSession>(file);
     if (!session) {
         // A resumed session whose first part was already logged gets a key of its own.
         const resumed = input['source'] === 'resume' || input['source'] === 'compact';
-        session = { ...newOpenSession(sessionId, cwd, config.allow, now, resumed, 1), ...(sessionTitle ? { sessionTitle } : {}) };
+        session = { ...newOpenSession(sessionId, cwd, rule, now, resumed, 1), ...(sessionTitle ? { sessionTitle } : {}) };
         writeFileSync(file, JSON.stringify(session));
+    }
+    // EASY_SETUP_PLAN §3.5: a new folder asks once (a day, across this PC's chats); nothing more is said until it has an answer.
+    if (rule.ask) {
+        if (askedToday(rule.key, env, now)) return '';
+        markAsked(rule.key, env, now);
+        return askText(rule.name);
     }
     if (!config.brief || !rule.brief) return '';
     try {

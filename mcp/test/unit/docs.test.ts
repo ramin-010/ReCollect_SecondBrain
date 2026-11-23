@@ -431,7 +431,7 @@ describe('update_canvas', () => {
         const { tools } = await h.client.listTools();
         expect(tools.find((t) => t.name === 'read_doc')!.description).toContain('update_canvas');
         expect(tools.find((t) => t.name === 'replace_section')!.description).toContain('update_canvas');
-        expect(tools.find((t) => t.name === 'update_canvas')!.description).toContain('keeping everything the user arranged');
+        expect(tools.find((t) => t.name === 'update_canvas')!.description).toContain('keeping what the user arranged');
     });
 });
 

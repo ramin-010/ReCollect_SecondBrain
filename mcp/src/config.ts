@@ -1,5 +1,8 @@
-// Settings from the environment. The token is kept here and handed to the API client only: it is
-// never logged, printed or put in an error message.
+// Settings from the environment, else from ~/.recollect/config.json (`re-collect setup`). The token is kept here and
+// handed to the API client only: it is never logged, printed or put in an error message.
+import { readFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 export const DEFAULT_URL = 'http://localhost:8002';
 export const DEFAULT_AGENT_NAME = 'Claude Code';
@@ -37,16 +40,29 @@ export function cleanAgentName(raw: string | undefined): string {
     return clean || DEFAULT_AGENT_NAME;
 }
 
+/** EASY_SETUP_PLAN: what `re-collect setup` wrote ({ url, token }), or null. */
+function setupConfig(env: NodeJS.ProcessEnv): { url?: string; token?: string } | null {
+    const home = env['RECOLLECT_HOOKS_HOME'] || path.join(os.homedir(), '.recollect');
+    try {
+        const c = JSON.parse(readFileSync(path.join(home, 'config.json'), 'utf8')) as { url?: unknown; token?: unknown };
+        return { ...(typeof c.url === 'string' ? { url: c.url } : {}), ...(typeof c.token === 'string' ? { token: c.token } : {}) };
+    } catch {
+        return null;
+    }
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-    const baseUrl = normalizeBaseUrl(env['RECOLLECT_URL']);
-    const token = (env['RECOLLECT_TOKEN'] ?? '').trim();
+    // The environment first (a hand setup: claude mcp add -e …); else what `re-collect setup` wrote.
+    const saved = env['RECOLLECT_TOKEN']?.trim() ? null : setupConfig(env);
+    const baseUrl = normalizeBaseUrl(env['RECOLLECT_URL'] || saved?.url);
+    const token = (env['RECOLLECT_TOKEN'] ?? saved?.token ?? '').trim();
     const timeout = Number(env['RECOLLECT_TIMEOUT_MS']);
 
     let problem: string | null = null;
     if (!/^https?:\/\/[^/\s]+/i.test(baseUrl)) {
         problem = `RECOLLECT_URL must be an http(s) URL such as ${DEFAULT_URL}.`;
     } else if (!token) {
-        problem = 'RECOLLECT_TOKEN is not set. Make a token in Recollect (Settings → Agents) and add it with: claude mcp add recollect -e RECOLLECT_TOKEN=rcl_… -- node …/mcp/dist/index.js';
+        problem = 'Recollect is not signed in on this computer: run `npx re-collect setup` (it opens re-collect.in to approve), then start a new chat.';
     } else if (!token.startsWith('rcl_')) {
         problem = "RECOLLECT_TOKEN doesn't look like a Recollect token (they start with rcl_). Make a new one in Settings → Agents.";
     }

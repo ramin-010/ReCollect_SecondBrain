@@ -64,7 +64,8 @@ describe('an office folder', () => {
         await runHook('stop', office(), env, at(10, 19));
         await runHook('prompt', office({ prompt: 'now the tests' }), env, at(10, 25));
         await runHook('stop', office(), env, at(10, 31));
-        expect(calls).toHaveLength(0);
+        // The start's one read of the folder rules aside (EASY_SETUP_PLAN), nothing goes out.
+        expect(calls.filter((c) => !c.url.endsWith('/api/projects/rules'))).toHaveLength(0);
         expect(readClock('erp', '2026-11-16', env)).toEqual([
             { at: at(10, 12).toISOString(), sid: 'o1', head: 'fix the GST rounding in invoice_totals for client Acme' },
             { at: at(10, 19).toISOString(), sid: 'o1', end: true },
@@ -72,8 +73,9 @@ describe('an office folder', () => {
             { at: at(10, 31).toISOString(), sid: 'o1', end: true },
         ]);
         await runHook('end', office(), env, at(10, 40));
-        expect(calls).toHaveLength(1);
-        expect(calls[0]!.body).toMatchObject({ project: 'erp', titleIfNew: 'erp', details: {}, source: 'hook' });
+        const sent = calls.filter((c) => !c.url.endsWith('/api/projects/rules'));
+        expect(sent).toHaveLength(1);
+        expect(sent[0]!.body).toMatchObject({ project: 'erp', titleIfNew: 'erp', details: {}, source: 'hook' });
         // Nothing of what he typed left the PC.
         expect(JSON.stringify(calls)).not.toMatch(/GST|Acme|tests/);
         // A personal folder: stamped too, but no reminder (no nudge flag).

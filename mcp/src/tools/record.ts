@@ -10,6 +10,7 @@ import { resolveSubject } from '../subjects.js';
 import { CHANGES, READ_ONLY, defineTool, type ToolContext } from '../tool.js';
 import { nextUpLine } from './paths.js';
 import { pictureItem, type PictureLine } from './buddy.js';
+import { putWithKind } from './folders.js';
 import type { NextUp, PathStatus } from '../types.js';
 
 type Kind = 'study' | 'practice' | 'build' | 'review';
@@ -275,11 +276,20 @@ export function registerRecordTools(server: McpServer, ctx: ToolContext): void {
         },
         // MCP_MEMORY_PLAN §4.2: one way in for what they say about themselves (remember, update_memory): `said` and
         // `learned` went from here (the API still takes them from older builds for one release).
-        async ({ key, subject, ...rest }) => {
+        async ({ key: asked, subject, ...rest }) => {
             const resolved = subject ? await resolveSubject(api, subject) : null;
             const body = { ...rest, ...(resolved ? { subjectId: resolved.id } : {}) };
             if (Object.keys(body).length === 0) throw new ToolError('Send at least a title, or what changed (score, weakSpots, topicStatus, nextStep…).');
-            const w = await api.put<SessionWrite>(`/api/sessions/by-key/${encodeURIComponent(key)}`, body);
+            // EASY_SETUP_PLAN §7: a chat that said what it is (set_chat, no hooks) carries it; from now, under its new key.
+            const chats = ctx.chats;
+            const key = chats?.alias.get(asked) ?? asked;
+            const mark = chats?.pending.get(key) ?? chats?.pending.get('*');
+            const w = await putWithKind<SessionWrite>(api, key, body, mark);
+            if (chats) {
+                chats.pending.delete(key);
+                chats.pending.delete('*');
+                chats.lastKey = asked;
+            }
             const s = w.session;
             const where = [s.topic?.title ?? s.subject?.name, s.project?.name].filter(Boolean).join(' · ');
             const lines = [

@@ -91,7 +91,8 @@ describe('the flow', () => {
         await runHook('end', input({ reason: 'prompt_input_exit' }), env, t(780));
         const put = calls.find((c) => c.method === 'PUT')!;
         expect(put.body).toMatchObject({ minutes: 600 });
-    });
+        // About 200 hook runs, each writing files: about a second alone, more beside the other suites' workers.
+    }, 20_000);
 
     it('start prints the brief and opens the session; prompts stamp it; end logs it under cc_<session> and forgets it', async () => {
         const { env, calls } = setup();
@@ -99,7 +100,9 @@ describe('the flow', () => {
         const out = await runHook('start', input(), env, t(0));
         expect(out).toContain('Recollect (session-start hook)');
         expect(out).toContain('Session key: cc_s1');
-        expect(calls[0]!.url).toContain('/api/brief?project=second_brain&key=cc_s1');
+        // EASY_SETUP_PLAN: the start asks for the server's folder rules first (kept 10 minutes), then the brief.
+        expect(calls[0]!.url).toBe('http://recollect.test/api/projects/rules');
+        expect(calls[1]!.url).toContain('/api/brief?project=second_brain&key=cc_s1');
         await runHook('prompt', input(), env, t(1));
         await runHook('stop', input(), env, t(4));
         await runHook('prompt', input(), env, t(5));
@@ -157,7 +160,7 @@ describe('the flow', () => {
     it('the start hook names the project of a subfolder and tells the model how to keep its next step', async () => {
         const { env, calls } = setup();
         const out = await runHook('start', input({ cwd: 'E:/PERSONAL_PROJECTS/second_brain/backend' }), env, new Date(Date.UTC(2026, 10, 14, 10, 0)));
-        expect(calls[0]!.url).toContain('project=second_brain');
+        expect(calls.find((c) => c.url.includes('/api/brief'))!.url).toContain('project=second_brain');
         expect(out).toContain('project "second_brain"');
         expect(out).toContain('nextStep');
     });

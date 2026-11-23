@@ -1,15 +1,26 @@
 {
-  "name": "recollect-mcp",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Recollect for agents: a local stdio MCP server that reads and writes Recollect docs and learning data through the Recollect REST API.",
+  "name": "re-collect",
+  "version": "0.2.0",
+  "description": "Recollect for your AI coding tools: `npx re-collect setup` signs this computer in (you approve it in your browser) and adds Recollect's tools, hooks and skills to Claude Code, Antigravity and Cursor.",
+  "keywords": [
+    "recollect",
+    "mcp",
+    "claude-code",
+    "antigravity",
+    "cursor",
+    "learning",
+    "work-log"
+  ],
+  "license": "UNLICENSED",
   "type": "module",
   "bin": {
-    "recollect-mcp": "dist/index.js"
+    "re-collect": "dist/cli.js"
   },
   "main": "dist/index.js",
   "files": [
-    "dist"
+    "dist/**/*.js",
+    "skills",
+    "README.md"
   ],
   "engines": {
     "node": ">=22"
@@ -21,7 +32,8 @@
     "test:smoke": "npm run build && vitest run --config vitest.smoke.config.ts",
     "start": "node dist/index.js",
     "install:skill": "node scripts/install-skill.mjs",
-    "install:hooks": "node scripts/install-hooks.mjs"
+    "install:hooks": "node scripts/install-hooks.mjs",
+    "pack:check": "npm pack --dry-run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

@@ -35,6 +35,11 @@ const hookJs = path.resolve(here, '../dist/hook.js').replace(/\\/g, '/');
 const settingsFile = path.resolve(flag('--settings') ?? path.join(os.homedir(), '.claude', 'settings.json'));
 const home = path.resolve(flag('--home') ?? process.env.RECOLLECT_HOOKS_HOME ?? path.join(os.homedir(), '.recollect'));
 const MARK = 'mcp/dist/hook.js';
+/** Ours: this checkout's hook.js, or the one `re-collect setup` installed (EASY_SETUP_PLAN). */
+const isOurs = (command) => {
+    const c = String(command ?? '').replace(/\\/g, '/');
+    return c.includes(MARK) || (/dist\/hook\.js/.test(c) && /re-collect|recollect/i.test(c));
+};
 
 /** [event, hook.js argument, extra group fields, timeout in seconds] */
 const EVENTS = [
@@ -90,7 +95,7 @@ if (existsSync(settingsFile)) {
 settings.hooks ??= {};
 for (const [event] of EVENTS) {
     const groups = (settings.hooks[event] ?? [])
-        .map((g) => ({ ...g, hooks: (g.hooks ?? []).filter((h) => !String(h.command ?? '').includes(MARK)) }))
+        .map((g) => ({ ...g, hooks: (g.hooks ?? []).filter((h) => !isOurs(h.command)) }))
         .filter((g) => g.hooks.length > 0);
     if (groups.length) settings.hooks[event] = groups;
     else delete settings.hooks[event];

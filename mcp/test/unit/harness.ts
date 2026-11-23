@@ -67,7 +67,10 @@ export interface Harness {
     close(): Promise<void>;
 }
 
-export async function connect(routes: Routes, options: { problem?: string | null; groups?: readonly ToolGroup[]; set?: ToolSet; workMode?: boolean; workProject?: string; clockProject?: string } = {}): Promise<Harness> {
+export async function connect(
+    routes: Routes,
+    options: { problem?: string | null; groups?: readonly ToolGroup[]; set?: ToolSet; workMode?: boolean; workProject?: string; clockProject?: string; folder?: { key: string; name: string; isNew?: boolean } } = {}
+): Promise<Harness> {
     const { fetch, requests } = fakeFetch(routes);
     const logs: string[] = [];
     const api = new RecollectApi({
@@ -89,6 +92,7 @@ export async function connect(routes: Routes, options: { problem?: string | null
         ...(options.workMode ? { workMode: true } : {}),
         ...(options.workProject ? { workProject: options.workProject } : {}),
         ...(options.clockProject ? { clockProject: options.clockProject } : {}),
+        ...(options.folder ? { folder: options.folder } : {}),
     });
     const client = new Client({ name: 'unit-test', version: '1.0.0' });
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();

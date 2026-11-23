@@ -22,6 +22,7 @@ import { registerSubjectTools } from './tools/subjects.js';
 import { registerManageTools } from './tools/manage.js';
 import { registerBlockTools } from './tools/blocks.js';
 import { registerBuddyTools } from './tools/buddy.js';
+import { newChatMemory, registerFolderTools } from './tools/folders.js';
 
 export const SERVER_NAME = 'recollect';
 export const SERVER_VERSION = '0.1.0';
@@ -31,6 +32,8 @@ export const INSTRUCTIONS = [
     "Recollect is the user's personal learning app and the record of their work: Docs (their notes, in Markdown), subjects with paths (topics in course order), spaced revision (reviews 1, 3, 7 and 21 days after a doc is scheduled), goals with dated milestones, a week of up to 5 targets, up to 3 focus lines a day, personal tasks, and work sessions. Their buddy there follows what is going on in their life.",
     'Start a working chat with get_brief (where they stand, and a session key), then checkpoint as you go: after each part, not only at the end. Pass on quietly, without asking or mentioning it, what the user says about their own life that will still matter after this conversation: something new about them (remember), or progress, a change or an end on something their buddy already knows (update_memory, with its id); a reminder or a dated to-do of their own (set_reminder, add_task); an idea or insight (add_pocket_note). Most turns have nothing. Before you rely on their routine, plans or preferences, look them up with recall_memory. When they ask to log the day’s work, use log_work. search_docs before writing a doc. Plan the week with get_week and add_week_target on their yes; when something is their call and they cannot say yes in the chat, suggest it instead.',
     'Every write is logged with your agent name and the user can undo it from Home → From your agent. Docs, goals and subjects are never deleted; a focus line or a milestone can be removed (and Undo brings it back). Answers are compact text with the ids the next call needs.',
+    // EASY_SETUP_PLAN §7: the chat decides, the folder is only its default.
+    'A chat counts as its folder says (personal, study or work); when this one clearly is not (learning a topic for themselves in a work folder), call set_chat and say so in one line.',
     'Docs take GitHub Markdown plus callouts (> [!TIP]), <details> toggles for self-test questions, ```mermaid diagrams and ```canvas diagrams (Mermaid flowchart text that Recollect lays out as a board the user can edit; add_canvas draws one, update_canvas changes one in place, preview_diagram shows it): see create_doc.',
 ].join(' ');
 
@@ -60,13 +63,19 @@ export const OFFICE_INSTRUCTIONS = [
     "Recollect is the user's own notebook, not this company's. This is a work folder: nothing from this chat reaches Recollect unless you save it.",
     'Save quietly what they would want later: something about their own life (remember), a reminder or a dated to-do of their own (set_reminder, add_task), an idea or insight (add_pocket_note). Don’t ask first, and say nothing about it in your reply unless they asked for it. One thing a call; most turns have nothing. Never save company code, data, clients or colleagues’ names.',
     'When they ask to log the day’s work ("log today’s work", /log-work), use log_work. Call get_brief or get_work_log only when they ask what was done here before.',
+    // EASY_SETUP_PLAN §7: a chat here that is clearly theirs (study, a side project) is marked; only their own word reads it.
+    'If this chat is clearly not work (learning a topic for themselves, their own project), call set_chat with by "agent" and say so in one line; when they say it themselves, by "user".',
 ].join(' ');
+
+/** EASY_SETUP_PLAN §3.5: a folder nobody has said what it is yet: the one question comes first. */
+export const NEW_FOLDER_INSTRUCTIONS = (name: string): string =>
+    `This folder ("${name}") is new to Recollect: early in the chat, ask the user once in one line whether it is personal, study or work, or whether Recollect should ignore it, and call set_folder with the answer. Until then nothing from this chat is read.`;
 
 /** A folder the user excluded (MCP_MEMORY_PLAN §4.9, R13): no tools, and this one line. */
 export const EXCLUDED_INSTRUCTIONS = 'This folder is excluded by the user: nothing here is saved to Recollect or read from it, so no Recollect tools are listed.';
 
 /** What a work folder lists (B10): the saving tools and this project's work log, nothing else. */
-export const OFFICE_TOOLS = ['get_brief', 'remember', 'add_task', 'set_reminder', 'add_pocket_note', 'log_work', 'get_work_log'] as const;
+export const OFFICE_TOOLS = ['get_brief', 'remember', 'add_task', 'set_reminder', 'add_pocket_note', 'log_work', 'get_work_log', 'set_folder', 'set_chat'] as const;
 
 /**
  * MCP_MEMORY_PLAN §4.1: what claude.ai and ChatGPT list (the remote door). No more_tools: each request there builds a
@@ -211,6 +220,9 @@ export const TOOL_NAMES = [
     // Stage 12: an app folds, rewords, links or removes its own work line.
     'update_work_line',
     'forget',
+    // EASY_SETUP_PLAN: what a folder is (a new folder's one question) and what a chat is.
+    'set_folder',
+    'set_chat',
 ] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -299,6 +311,8 @@ export const TOOL_LEVELS: Readonly<Record<ToolName, 1 | 2 | 3>> = {
     get_work_log: 1,
     log_work: 2,
     update_work_line: 2,
+    set_folder: 2,
+    set_chat: 2,
 };
 
 export const TOOL_GROUP_NAMES = ['core', 'docs', 'plan', 'record', 'manage'] as const;
@@ -395,6 +409,9 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     log_work: 'record',
     // Stage 12: listed on the web; Claude Code rewrites its own list with log_work, so it waits on more_tools.
     update_work_line: 'manage',
+    // EASY_SETUP_PLAN: a new folder's question and a chat's own kind are answered without more_tools.
+    set_folder: 'core',
+    set_chat: 'core',
 };
 
 /** RECOLLECT_TOOLS: "all", or groups separated by commas ("core,docs,manage"); else the default. */
@@ -426,13 +443,17 @@ export interface ServerOptions {
     project?: string;
     /** Stage 5's connector simulation: each tool call with its answer, in order (never the token). */
     trace?: (call: { tool: string; args: unknown; answer?: string }) => void;
+    /** EASY_SETUP_PLAN: the folder this chat runs in (isNew: the account asks what it is). */
+    folder?: { key: string; name: string; isNew?: boolean };
 }
 
 const INSTRUCTIONS_OF: Readonly<Record<ToolSet, string>> = { web: WEB_INSTRUCTIONS, code: INSTRUCTIONS, office: OFFICE_INSTRUCTIONS, excluded: EXCLUDED_INSTRUCTIONS, all: INSTRUCTIONS };
 
 export function createRecollectServer(options: ServerOptions): McpServer {
     const set: ToolSet = options.set ?? (options.workMode ? 'office' : 'code');
-    const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: INSTRUCTIONS_OF[set] });
+    // A new folder's question comes before everything else (EASY_SETUP_PLAN §3.5).
+    const instructions = options.folder?.isNew && set !== 'excluded' && set !== 'web' ? `${NEW_FOLDER_INSTRUCTIONS(options.folder.name)} ${INSTRUCTIONS_OF[set]}` : INSTRUCTIONS_OF[set];
+    const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions });
     const registry = new Map<string, RegisteredTool>();
     const ctx: ToolContext = {
         api: options.api,
@@ -443,6 +464,25 @@ export function createRecollectServer(options: ServerOptions): McpServer {
         ...(options.workProject ? { workProject: options.workProject } : {}),
         ...(options.clockProject ? { clockProject: options.clockProject } : {}),
         ...(options.project ? { project: options.project } : {}),
+        ...(options.folder ? { folder: options.folder } : {}),
+        chats: newChatMemory(),
+    };
+    // EASY_SETUP_PLAN §7: their own word on what this chat is moves it between a work folder's set and the full one
+    // (the work brief turns into the full brief, and back); the tools list changes, the instructions stay.
+    ctx.switchSet = (to) => {
+        if ((to !== 'code' && to !== 'office') || to === ctx.set || (ctx.set !== 'code' && ctx.set !== 'office')) return false;
+        // Only a work folder's chat goes back to the work set: elsewhere a chat called work keeps its tools (a tool
+        // without hooks logs its time through checkpoint, which the work set doesn't list).
+        if (to === 'office' && set !== 'office') return false;
+        const listed = new Set<string>(to === 'office' ? OFFICE_TOOLS : [...registry.keys()].filter((n) => (options.groups ?? DEFAULT_GROUPS).includes(TOOL_GROUPS[n as ToolName])));
+        for (const [name, tool] of registry) {
+            if (listed.has(name) && !tool.enabled) tool.enable();
+            else if (!listed.has(name) && tool.enabled) tool.disable();
+        }
+        ctx.set = to;
+        if (to === 'office') ctx.workMode = true;
+        else delete ctx.workMode;
+        return true;
     };
     registerRecordTools(server, ctx);
     registerWeekTools(server, ctx);
@@ -461,10 +501,15 @@ export function createRecollectServer(options: ServerOptions): McpServer {
     registerManageTools(server, ctx);
     registerBlockTools(server, ctx);
     registerBuddyTools(server, ctx);
+    registerFolderTools(server, ctx);
     registerPrompts(server, set);
     leanToolList(server);
-    guardCalls(server, registry, set, options.trace);
-    if (set === 'all') return server;
+    guardCalls(server, registry, () => ctx.set ?? set, options.trace);
+    if (set === 'all') {
+        // Ask AI runs in no folder and is no coding chat: a folder's kind is update_project's there (EASY_SETUP_PLAN).
+        for (const name of ['set_folder', 'set_chat']) registry.get(name)?.disable();
+        return server;
+    }
     if (set === 'code') {
         const listed = new Set(options.groups ?? DEFAULT_GROUPS);
         for (const [name, tool] of registry) if (!listed.has(TOOL_GROUPS[name as ToolName])) tool.disable();
@@ -480,7 +525,7 @@ export function createRecollectServer(options: ServerOptions): McpServer {
  * A call to a tool this door doesn't list answers one clear line, never the SDK's "disabled" (MCP_MEMORY_PLAN §4.1);
  * a call that still sends a removed field (a host's cached list) runs, and its answer says to reconnect.
  */
-function guardCalls(server: McpServer, registry: Map<string, RegisteredTool>, set: ToolSet, trace?: ServerOptions['trace']): void {
+function guardCalls(server: McpServer, registry: Map<string, RegisteredTool>, setNow: () => ToolSet, trace?: ServerOptions['trace']): void {
     const handlers = (server.server as unknown as { _requestHandlers: Map<string, (req: unknown, extra: unknown) => Promise<CallToolResult>> })._requestHandlers;
     const original = handlers.get('tools/call');
     if (!original) return;
@@ -488,6 +533,7 @@ function guardCalls(server: McpServer, registry: Map<string, RegisteredTool>, se
         const name = req.params.name;
         const answer = async (): Promise<CallToolResult> => {
             const tool = registry.get(name);
+            const set = setNow();
             if (tool && !tool.enabled) {
                 if (set === 'excluded') return errorResult(EXCLUDED_INSTRUCTIONS);
                 if (set === 'code') return errorResult(`${name} is in the ${TOOL_GROUPS[name as ToolName]} group: call more_tools first, then call it again.`);

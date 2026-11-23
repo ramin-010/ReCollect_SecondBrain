@@ -23,6 +23,12 @@ export interface ToolContext {
     project?: string;
     /** MCP_MEMORY_PLAN §4.1: the door's tool set (the web's get_brief is the small buddy brief). */
     set?: 'web' | 'code' | 'office' | 'excluded' | 'all';
+    /** EASY_SETUP_PLAN: the folder this chat runs in (set_folder's default); isNew: nobody has said what it is yet. */
+    folder?: { key: string; name: string; isNew?: boolean };
+    /** EASY_SETUP_PLAN §7: what a chat without hooks said it is, until its next checkpoint carries it. */
+    chats?: import('./tools/folders.js').ChatMemory;
+    /** EASY_SETUP_PLAN §7: on their own word, this chat moves to the full set (theirs) or a work folder's (work). */
+    switchSet?: (to: 'code' | 'office') => boolean;
 }
 
 export interface ToolSpec<S extends z.ZodRawShape> {
