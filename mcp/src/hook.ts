@@ -48,7 +48,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ApiError, RecollectApi } from './api.js';
-import { addPart, folderOf, partAt, projectFolder, readParts, readRules, refreshRules, slashKind, type ChatPart, type RulesCache } from './folders.js';
+import { addPart, folderOf, partAt, projectFolder, readParts, readRules, refreshRules, slashKind, workFolderAbove, type ChatPart, type RulesCache } from './folders.js';
 import { briefText, type Brief } from './tools/record.js';
 
 export type FolderMode = 'full' | 'light' | 'off';
@@ -395,7 +395,9 @@ export function resolveRule(cwd: string, config: HookConfig, rules: RulesCache |
     }
     if (rules?.unsupported) return null;
     const root = projectFolder(cwd, home);
-    const { key, name } = folderOf(cwd, home);
+    const own = folderOf(cwd, home);
+    // A project nobody decided on its own, inside a work folder, is part of that folder (workFolderAbove).
+    const { key, name } = rules?.folders[own.key]?.decided ? own : (workFolderAbove(root, rules, home) ?? own);
     const server = rules?.folders[key];
     const base = { path: root, key, name, root };
     if (server?.decided) return { ...base, ...kindDefaults(server.kind, server.tracking), ask: false, office: server.kind === 'work', trackingSet: server.trackingSet === true };

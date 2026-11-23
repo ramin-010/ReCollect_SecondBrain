@@ -154,6 +154,9 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
                 doc.subject ? `subject ${doc.subject.name}` : 'no subject',
                 `updated ${dayOf(doc.updatedAt, zone)}`,
                 doc.canEdit ? 'editable' : 'read-only (shared with the user as a viewer)',
+                // STUDY_FLOW_PLAN: a lesson's card and its notes (list_notes reads them).
+                ...(doc.card ? ['has its revision card'] : []),
+                ...(doc.topicId && doc.notes ? [`${plural(doc.notes, 'note')} on this lesson`] : []),
             ].join(' · ');
             const body = doc.markdown.trim() ? doc.markdown : '(empty doc)';
             return `${header}\n\n${body}${doc.canEdit && doc.markdown.trim() ? `\n\n---\n${STUDY_NOTE_LINE}` : ''}`;

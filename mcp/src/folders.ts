@@ -83,6 +83,27 @@ export function folderOf(cwd: string, home?: string, has?: (p: string) => boolea
     return { name, key: folderKey(name) };
 }
 
+/**
+ * The work folder a project sits in (server mode): the nearest folder above it that someone decided, when that one is
+ * work. `D:/erp-workspace/beta/rbpu-erp` is part of `erp-workspace`, which is no git repo itself, so each repo in it
+ * would otherwise be a folder of its own that asks. Only a work folder takes in what is inside it, as that never reads
+ * more; inside a personal or study folder a new project still asks. A project decided on its own keeps its own rule
+ * (the caller looks at that first). Below the home folder only, like `projectFolder`.
+ */
+export function workFolderAbove(root: string, rules: Pick<RulesCache, 'folders'> | null, home: string = os.homedir()): { name: string; key: string } | null {
+    if (!rules) return null;
+    let dir = clean(root);
+    for (let i = 0; i < 40; i++) {
+        const up = path.posix.dirname(dir);
+        if (!up || up === dir || /^[A-Za-z]:$/.test(up) || up === '/' || same(up, home)) return null;
+        const name = path.posix.basename(up);
+        const folder = rules.folders[folderKey(name)];
+        if (folder?.decided) return folder.kind === 'work' ? { name: folder.name || name, key: folderKey(name) } : null;
+        dir = up;
+    }
+    return null;
+}
+
 function readJson<T>(file: string): T | null {
     try {
         return JSON.parse(readFileSync(file, 'utf8')) as T;

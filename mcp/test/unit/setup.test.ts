@@ -5,7 +5,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { packageRoot, pathsOf, runRemove, runSetup, runStatus, type SetupIo } from '../../src/setup.js';
+import { packageRoot, packageVersion, pathsOf, runRemove, runSetup, runStatus, type SetupIo } from '../../src/setup.js';
 import { fakeFetch, ok, fail } from './harness.js';
 
 const URL_ = 'http://recollect.test';
@@ -79,7 +79,7 @@ describe('recollect-setup', () => {
         scratch();
         const p = pathsOf(home);
         // The old token no longer works: a new sign-in.
-        const t = io(server((tok) => (tok === NEW ? { name: 'Asha', tokenName: 'LAPTOP (re-collect setup)' } : null)));
+        const t = io(server((tok) => (tok === NEW ? { name: 'Asha', tokenName: 'LAPTOP (Windows) · recollect-setup' } : null)));
         await runSetup({ home, url: URL_ }, t.io);
 
         expect(t.opened).toEqual(['http://app.test/connect-pc?code=BCDF-GHJK']);
@@ -93,7 +93,7 @@ describe('recollect-setup', () => {
 
         // The app, then Claude Code: its MCP server reads ~/.recollect/config.json (nothing secret in Claude's config).
         const app = path.join(p.app, 'node_modules', 'recollect-setup').replace(/\\/g, '/');
-        expect(t.ran.find((r) => r.includes('install'))).toEqual(expect.arrayContaining(['--prefix', p.app, 'recollect-setup@0.2.0']));
+        expect(t.ran.find((r) => r.includes('install'))).toEqual(expect.arrayContaining(['--prefix', p.app, `recollect-setup@${packageVersion()}`, '--prefer-offline']));
         const claude = JSON.parse(readFileSync(p.claudeJson, 'utf8'));
         expect(claude.mcpServers.recollect).toEqual({ type: 'stdio', command: process.execPath.replace(/\\/g, '/'), args: [`${app}/dist/index.js`], env: {} });
         const settings = JSON.parse(readFileSync(p.claudeSettings, 'utf8'));
@@ -119,7 +119,7 @@ describe('recollect-setup', () => {
         expect(existsSync(path.join(p.agySkills, 'work', 'SKILL.md'))).toBe(true);
 
         // status
-        const s = io(server(() => ({ name: 'Asha', tokenName: 'LAPTOP (re-collect setup)' })));
+        const s = io(server(() => ({ name: 'Asha', tokenName: 'LAPTOP (Windows) · recollect-setup' })));
         const report = await runStatus({ home }, s.io);
         expect(report).toMatchObject({ url: URL_, signedInAs: 'Asha', app: '0.2.0' });
         expect(report.tools).toEqual([
@@ -127,9 +127,13 @@ describe('recollect-setup', () => {
             { id: 'antigravity', name: 'Antigravity', mcp: true, skills: 6 },
         ]);
 
-        // Again with a working sign-in: no new code, no browser.
+        // Again with a working sign-in, as `update`: no new code, no browser; npm is asked for the newest version, so a
+        // cached list of versions can't install the old one again.
         const again = io(server(() => ({ name: 'Asha', tokenName: 'x' })));
-        await runSetup({ home }, again.io);
+        await runSetup({ home, version: 'latest' }, again.io);
+        const update = again.ran.find((r) => r.includes('install'));
+        expect(update).toEqual(expect.arrayContaining(['--prefer-online', 'recollect-setup@latest']));
+        expect(update).not.toContain('--prefer-offline');
         expect(again.opened).toEqual([]);
         expect(again.requests.some((r) => r.path === '/api/setup/start')).toBe(false);
         const commandsAgain = Object.values(JSON.parse(readFileSync(p.claudeSettings, 'utf8')).hooks as Record<string, Array<{ hooks: Array<{ command: string }> }>>).flat().flatMap((g) => g.hooks.map((h) => h.command));

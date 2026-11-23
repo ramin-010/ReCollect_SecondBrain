@@ -10,7 +10,7 @@ afterEach(async () => {
     h = undefined;
 });
 
-const READS = ['get_brief', 'list_sessions', 'get_week', 'get_mirror', 'list_tasks', 'list_decisions', 'get_today', 'get_learning_overview', 'search_docs', 'read_doc', 'preview_diagram', 'list_subjects', 'get_path', 'list_due', 'list_goals', 'recent_agent_edits', 'more_tools', 'get_settings', 'list_suggestions', 'list_reminders', 'get_recall', 'get_sharing', 'get_outline', 'recall_memory', 'get_work_log'];
+const READS = ['get_brief', 'list_sessions', 'get_week', 'get_mirror', 'list_tasks', 'list_decisions', 'get_today', 'get_learning_overview', 'search_docs', 'read_doc', 'preview_diagram', 'list_subjects', 'get_path', 'list_due', 'list_goals', 'recent_agent_edits', 'more_tools', 'get_settings', 'list_suggestions', 'list_reminders', 'get_recall', 'get_sharing', 'get_outline', 'recall_memory', 'get_work_log', 'list_notes'];
 
 describe('the server', () => {
     it('lists every tool in TOOL_NAMES (catalogue.test.ts pins the count to the README), each with a title, a description and an object input schema', async () => {
@@ -24,8 +24,8 @@ describe('the server', () => {
             expect(tool.inputSchema.type).toBe('object');
         }
         // Nothing deletes docs, goals or subjects; a focus line or a milestone can be removed (undoable).
-        // ...and a doc's blocks (delete_blocks; Undo brings them back).
-        expect(tools.filter((t) => /delete|remove/i.test(t.name)).map((t) => t.name)).toEqual(['remove_milestone', 'remove_focus', 'delete_blocks']);
+        // ...and a doc's blocks (delete_blocks; Undo brings them back), and a note on a lesson or a subject (remove_note, undoable).
+        expect(tools.filter((t) => /delete|remove/i.test(t.name)).map((t) => t.name)).toEqual(['remove_milestone', 'remove_focus', 'delete_blocks', 'remove_note']);
     });
 
     it('marks reads read-only and writes not; every tool has a level (1 = reads), level 3 only asks', async () => {
@@ -46,7 +46,7 @@ describe('the server', () => {
         expect(await listed()).toEqual(TOOL_NAMES.filter((n) => DEFAULT_GROUPS.includes(TOOL_GROUPS[n])));
         const changed = new Promise<void>((resolve) => h!.client.setNotificationHandler(ToolListChangedNotificationSchema, () => resolve()));
         const res = await h.call('more_tools', {});
-        expect(res.text).toMatch(/^Turned on: list_sessions, .*get_mirror.*list_decisions.*get_learning_overview.*recent_agent_edits.*get_work_log, update_work_line\. They are in your tool list now\.$/);
+        expect(res.text).toMatch(/^Turned on: list_sessions, .*get_mirror.*list_decisions.*get_learning_overview.*recent_agent_edits.*get_work_log, update_work_line, set_revision_card, add_note, list_notes, update_note, remove_note\. They are in your tool list now\.$/);
         expect(res.text).not.toContain('set_reminder');
         await changed;
         expect(await listed()).toEqual([...TOOL_NAMES]);

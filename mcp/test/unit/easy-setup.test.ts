@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { addPart, folderOf, partAt, projectFolder, readParts, readRules, refreshRules, slashKind } from '../../src/folders.js';
+import { addPart, folderOf, partAt, projectFolder, readParts, readRules, refreshRules, slashKind, workFolderAbove } from '../../src/folders.js';
 import { chatMode, resolveRule, runHook, splitSession, type HookConfig, type ResolvedRule } from '../../src/hook.js';
 import { RecollectApi } from '../../src/api.js';
 import { connect, fail, ok, type Harness } from './harness.js';
@@ -23,6 +23,21 @@ describe('the folder’s key (server mode)', () => {
         // A home kept in git never swallows a project in it.
         expect(projectFolder('C:/Users/me/code/tool/src', 'C:/Users/me', has)).toBe('C:/Users/me/code/tool');
         expect(folderOf('C:/Users/me', 'C:/Users/me', has).key).toBe('me');
+    });
+
+    it('a project inside a work folder is part of it; a personal or study folder doesn’t take in what is inside it', () => {
+        const f = (kind: 'personal' | 'study' | 'work', decided = true) => ({ name: '', kind, tracking: 'light' as const, decided });
+        const work = { folders: { 'erp-workspace': { ...f('work'), name: 'erp-workspace' } } };
+        expect(workFolderAbove('D:/erp-workspace/beta/rbpu-erp', work, 'C:/Users/me')).toEqual({ name: 'erp-workspace', key: 'erp-workspace' });
+        expect(workFolderAbove('D:/erp-workspace', work, 'C:/Users/me')).toBeNull();
+        // The nearest decided folder above it says: a personal one in between stops the climb.
+        expect(workFolderAbove('D:/erp-workspace/notes/x', { folders: { ...work.folders, notes: f('personal') } }, 'C:/Users/me')).toBeNull();
+        // One nobody decided is passed over.
+        expect(workFolderAbove('D:/erp-workspace/beta/rbpu-erp', { folders: { ...work.folders, beta: f('work', false) } }, 'C:/Users/me')?.key).toBe('erp-workspace');
+        expect(workFolderAbove('C:/Users/me/code/tool', { folders: { code: f('study') } }, 'C:/Users/me')).toBeNull();
+        // Never the home folder or above it.
+        expect(workFolderAbove('C:/Users/me/tool', { folders: { me: f('work'), users: f('work') } }, 'C:/Users/me')).toBeNull();
+        expect(workFolderAbove('D:/x', null)).toBeNull();
     });
 });
 
@@ -99,6 +114,23 @@ describe('the rules', () => {
         expect(resolveRule('D:/fresh', config(), rules({}, 'work'), 'C:/Users/me')).toMatchObject({ kind: 'work', hint: 'work', ask: false, office: true });
         expect(resolveRule('D:/fresh', config(), rules({}, 'off'), 'C:/Users/me')).toMatchObject({ mode: 'off' });
         expect(resolveRule('D:/fresh', config(), { ...rules({}), unsupported: true }, 'C:/Users/me')).toBeNull();
+    });
+
+    it('server mode: a repo inside a work folder (no repo itself) is that folder, unless it was decided on its own', () => {
+        home = mkdtempSync(path.join(os.tmpdir(), 'rc-inside-'));
+        const repo = path.join(home, 'erp-ws', 'beta', 'rbpu-erp');
+        mkdirSync(path.join(repo, '.git'), { recursive: true });
+        mkdirSync(path.join(repo, 'src'), { recursive: true });
+        const cwd = path.join(repo, 'src');
+        const work = { 'erp-ws': { kind: 'work' as const, tracking: 'light' as const, decided: true } };
+        const rule = resolveRule(cwd, config(), rules(work));
+        expect(rule).toMatchObject({ key: 'erp-ws', name: 'erp-ws', kind: 'work', mode: 'light', office: true, ask: false });
+        // Its repos are still its own (the heads for commits).
+        expect(rule?.root).toBe(repo.replace(/\\/g, '/'));
+        // Decided on its own: its own rule.
+        expect(resolveRule(cwd, config(), rules({ ...work, 'rbpu-erp': { kind: 'personal', tracking: 'full', decided: true } }))).toMatchObject({ key: 'rbpu-erp', kind: 'personal', office: false });
+        // Inside a personal folder a new repo still asks.
+        expect(resolveRule(cwd, config(), rules({ 'erp-ws': { kind: 'personal', tracking: 'full', decided: true } }))).toMatchObject({ key: 'rbpu-erp', ask: true });
     });
 
     it('the PC’s own list: only what it names; the server’s word on a folder it knows, the stricter of the two', () => {

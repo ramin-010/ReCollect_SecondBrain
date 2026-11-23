@@ -21,6 +21,9 @@ export interface DocRead {
     topicId: string | null;
     updatedAt: string;
     canEdit: boolean;
+    /** STUDY_FLOW_PLAN: it has a revision card; its lesson's notes and links (older servers send neither). */
+    card?: boolean;
+    notes?: number;
 }
 
 /** What the API says about a canvas a write made (backend/src/services/docs/diagram/resolve.ts). */

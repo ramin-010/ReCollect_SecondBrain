@@ -225,8 +225,11 @@ export function installApp(p: Paths, opts: Pick<SetupOptions, 'from' | 'version'
     mkdirSync(p.app, { recursive: true });
     if (!existsSync(path.join(p.app, 'package.json'))) writeFileSync(path.join(p.app, 'package.json'), '{ "private": true, "description": "Recollect on this computer (recollect-setup)" }\n');
     const what = opts.from ? path.resolve(opts.from) : `${PACKAGE}@${opts.version ?? packageVersion()}`;
+    // A named version never changes, so npm's cache may answer; "latest" (update) asks the registry, or a cached
+    // list of versions would install the old one again (`--prefer-offline` trusts any cached list).
+    const cache = opts.version === 'latest' && !opts.from ? '--prefer-online' : '--prefer-offline';
     const { cmd, pre } = npmCommand();
-    const r = io.run(cmd, [...pre, 'install', '--no-audit', '--no-fund', '--omit=dev', '--prefer-offline', '--prefix', p.app, what], { cwd: p.app });
+    const r = io.run(cmd, [...pre, 'install', '--no-audit', '--no-fund', '--omit=dev', cache, '--prefix', p.app, what], { cwd: p.app });
     if (r.status !== 0) throw new Error(`Installing the app failed (npm install ${what}): ${(r.stderr || r.stdout).trim().split('\n').slice(-3).join(' ')}`);
 }
 

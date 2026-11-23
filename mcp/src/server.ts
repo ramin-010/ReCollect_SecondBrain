@@ -23,6 +23,7 @@ import { registerManageTools } from './tools/manage.js';
 import { registerBlockTools } from './tools/blocks.js';
 import { registerBuddyTools } from './tools/buddy.js';
 import { newChatMemory, registerFolderTools } from './tools/folders.js';
+import { registerStudyTools } from './tools/study.js';
 
 export const SERVER_NAME = 'recollect';
 export const SERVER_VERSION = '0.1.0';
@@ -223,6 +224,12 @@ export const TOOL_NAMES = [
     // EASY_SETUP_PLAN: what a folder is (a new folder's one question) and what a chat is.
     'set_folder',
     'set_chat',
+    // STUDY_FLOW_PLAN (11-23): a lesson's revision card; the notes and links on a lesson or a subject.
+    'set_revision_card',
+    'add_note',
+    'list_notes',
+    'update_note',
+    'remove_note',
 ] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -313,6 +320,11 @@ export const TOOL_LEVELS: Readonly<Record<ToolName, 1 | 2 | 3>> = {
     update_work_line: 2,
     set_folder: 2,
     set_chat: 2,
+    set_revision_card: 2,
+    add_note: 2,
+    list_notes: 1,
+    update_note: 2,
+    remove_note: 2,
 };
 
 export const TOOL_GROUP_NAMES = ['core', 'docs', 'plan', 'record', 'manage'] as const;
@@ -412,6 +424,12 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     // EASY_SETUP_PLAN: a new folder's question and a chat's own kind are answered without more_tools.
     set_folder: 'core',
     set_chat: 'core',
+    // STUDY_FLOW_PLAN: the default groups are at their 40,000 characters; the study skill calls more_tools first.
+    set_revision_card: 'manage',
+    add_note: 'manage',
+    list_notes: 'manage',
+    update_note: 'manage',
+    remove_note: 'manage',
 };
 
 /** RECOLLECT_TOOLS: "all", or groups separated by commas ("core,docs,manage"); else the default. */
@@ -502,6 +520,7 @@ export function createRecollectServer(options: ServerOptions): McpServer {
     registerBlockTools(server, ctx);
     registerBuddyTools(server, ctx);
     registerFolderTools(server, ctx);
+    registerStudyTools(server, ctx);
     registerPrompts(server, set);
     leanToolList(server);
     guardCalls(server, registry, () => ctx.set ?? set, options.trace);
@@ -566,7 +585,7 @@ function registerMoreTools(server: McpServer, ctx: ToolContext, registry: Map<st
         'more_tools',
         {
             title: 'More tools',
-            description: "Turn on the manage tools: the trash, mark a review done or move it, settings, projects, goal edits, the mirror, decisions, sessions, agents' edits, reminders, what waits for the user's tap.",
+            description: "Turn on the manage tools: notes on a lesson or subject, the revision card, the trash, reviews done or moved, settings, projects, goal edits, the mirror, decisions, sessions, reminders, agents' edits.",
             input: { group: z.enum(['manage']).optional() },
             annotations: READ_ONLY,
         },
