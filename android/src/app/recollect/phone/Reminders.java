@@ -89,7 +89,7 @@ final class Reminders {
     }
 
     /** The intent of one reminder's alarm: unique by its id (the data URI), so it can be cancelled alone. */
-    private static PendingIntent intent(Context ctx, String id, String text, int flags) {
+    static PendingIntent intent(Context ctx, String id, String text, int flags) {
         Intent i = new Intent(ctx, ReminderAlarm.class).setData(Uri.parse("recollect://reminder/" + Uri.encode(id)));
         if (text != null) i.putExtra(EXTRA_TEXT, text);
         i.putExtra(EXTRA_ID, id);

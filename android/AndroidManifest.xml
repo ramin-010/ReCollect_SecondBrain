@@ -16,6 +16,12 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Stage 11 (his item 10c): reminders on the minute from Android 12; the person allows it from the checklist. -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- 0.7.5: a reminder that rings is a real alarm: a full-screen alarm with looping sound and vibration (AlarmService). -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Only to keep a copy of the wallpaper he had, so Disconnect can put it back (Android 12 and older; asked when he ticks it). -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
@@ -124,6 +130,21 @@
         <receiver
             android:name=".ReminderAlarm"
             android:exported="false" />
+
+        <!-- 0.7.5: the ringing alarm (sound, vibration, the full-screen screen with Snooze and Dismiss). -->
+        <service
+            android:name=".AlarmService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+        <activity
+            android:name=".AlarmActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Recollect" />
 
         <receiver
             android:name=".Wake"

@@ -15,6 +15,10 @@
 // { path, mode: "full" | "light" | "off", brief } (BUDDY_MEMORY_PLAN §3.1): the longest matching path
 // wins, "*" matches any folder; full = his typed words are read for his buddy; brief: false = the
 // session is logged (and read) but never shown his brief, portrait or the buddy's notes (a work folder).
+// PERSONAL_OFFICE_PLAN (11-23): a rule may say what the folder is, `kind: "personal" | "study" | "work"`, which gives
+// its defaults (work: light, no brief, the nudge, no commit subjects; personal and study: full, brief); the knobs above
+// still override, and `brief: false` without a kind still means work. The session tells the server the kind as a first
+// guess for a folder it has never seen (`projectKind`); the app's choice (Settings › Tracking) wins after that.
 // Open sessions: ~/.recollect/open/<session>.json (+ .words.jsonl, .flush.json). Folders no entry
 // allows, subagents (their input has agent_id) and RECOLLECT_HOOKS=off do nothing. Never blocks Claude
 // Code: every call has a 3 s limit, every failure is one line in ~/.recollect/hook.log, and the exit
@@ -39,13 +43,15 @@ import { ApiError, RecollectApi } from './api.js';
 import { briefText, type Brief } from './tools/record.js';
 
 export type FolderMode = 'full' | 'light' | 'off';
+/** PERSONAL_OFFICE_PLAN: what a folder is (its time counts as progress unless it is work). */
+export type FolderKind = 'personal' | 'study' | 'work';
 /** A folder (logged, briefed, words not read) or a rule. */
 /**
  * `nudge` (B10): each prompt reminds the agent, with the clock, to save quietly what the user would want
  * later (a work folder: nothing else leaves the PC). `commits: false`: the session goes without its
  * branch and commit subjects (office repos: company text).
  */
-export type AllowEntry = string | { path: string; mode?: FolderMode; brief?: boolean; nudge?: boolean; commits?: boolean };
+export type AllowEntry = string | { path: string; kind?: FolderKind; mode?: FolderMode; brief?: boolean; nudge?: boolean; commits?: boolean };
 
 export interface HookConfig {
     url: string;
@@ -57,6 +63,8 @@ export interface HookConfig {
 /** What the hooks do in a folder. */
 export interface FolderRule {
     path: string;
+    /** PERSONAL_OFFICE_PLAN: personal, study or work (a rule without one: work when `brief: false`, else personal). */
+    kind: FolderKind;
     mode: FolderMode;
     brief: boolean;
     /** B10: the per-prompt reminder to save (with the clock). */
@@ -137,11 +145,24 @@ export const configPath = (env: Env = process.env): string => env['RECOLLECT_HOO
 /** "E:\\A\\b" → "e:/a/b/": compared case-insensitively, as Windows paths are. */
 export const normalizePath = (p: string): string => `${p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()}/`;
 
+const KINDS: readonly FolderKind[] = ['personal', 'study', 'work'];
+
 const ruleOf = (e: AllowEntry): FolderRule | null => {
-    if (typeof e === 'string') return e.trim() ? { path: e, mode: 'light', brief: true, nudge: false, commits: true } : null;
+    if (typeof e === 'string') return e.trim() ? { path: e, kind: 'personal', mode: 'light', brief: true, nudge: false, commits: true } : null;
     if (!e || typeof e.path !== 'string' || !e.path.trim()) return null;
-    const mode: FolderMode = e.mode === 'full' || e.mode === 'off' ? e.mode : 'light';
-    return { path: e.path, mode, brief: e.brief !== false, nudge: e.nudge === true, commits: e.commits !== false };
+    const named = e.kind !== undefined && KINDS.includes(e.kind);
+    const kind: FolderKind = named ? e.kind! : e.brief === false ? 'work' : 'personal';
+    const work = kind === 'work';
+    // A named kind gives the defaults; a rule without one keeps the old ones (light, brief, no nudge, commits).
+    const mode: FolderMode = e.mode === 'full' || e.mode === 'off' || e.mode === 'light' ? e.mode : named && !work ? 'full' : 'light';
+    return {
+        path: e.path,
+        kind,
+        mode,
+        brief: e.brief !== undefined ? e.brief !== false : !work,
+        nudge: e.nudge !== undefined ? e.nudge === true : named && work,
+        commits: e.commits !== undefined ? e.commits !== false : !work,
+    };
 };
 
 /** The rule for a folder: the longest matching entry ("*" matches any folder, last); null = none. */
@@ -589,9 +610,9 @@ export async function flushWords(api: RecollectApi, dir: string, sessionId: stri
     try {
         const session = readJson<OpenSession>(path.join(dir, `${sessionId}.json`));
         const state = readJson<FlushState>(flushFile(dir, sessionId)) ?? { sent: 0, seq: 0 };
-        // A work folder (brief: false): its words are office work (B9: the work log keeps them apart).
+        // A work folder: its words are office work (B9: the work log keeps them apart; the server also knows its folders).
         const config = loadHookConfig(env);
-        const office = !!session && !!config && folderRule(session.cwd, config.allow)?.brief === false;
+        const office = !!session && !!config && folderRule(session.cwd, config.allow)?.kind === 'work';
         const lines = readWords(dir, sessionId);
         if (config && serverCapture(config, env) >= CAPTURE_V2) {
             await sendNumbered(api, dir, sessionId, session, config, env, lines, state, office, now);
@@ -791,18 +812,27 @@ async function close(api: RecollectApi, file: string, endedAt: string, env: Env,
     }
     const withCommits = rule?.commits !== false;
     const { branch, commits } = withCommits ? commitsSince(s.heads) : { branch: null, commits: [] as string[] };
-    const titleIfNew = rule && !rule.brief ? s.project : (s.sessionTitle ?? s.firstPrompt);
+    const titleIfNew = rule && (rule.kind === 'work' || !rule.brief) ? s.project : (s.sessionTitle ?? s.firstPrompt);
+    const body = {
+        kindIfNew: 'build',
+        source: 'hook',
+        project: s.project,
+        startedAt: s.startedAt,
+        endedAt: end,
+        minutes,
+        ...(titleIfNew ? { titleIfNew } : {}),
+        details: withCommits ? { ...(branch ? { branch } : {}), commits } : {},
+    };
+    const url = `/api/sessions/by-key/${encodeURIComponent(s.key)}`;
     try {
-        await api.put(`/api/sessions/by-key/${encodeURIComponent(s.key)}`, {
-            kindIfNew: 'build',
-            source: 'hook',
-            project: s.project,
-            startedAt: s.startedAt,
-            endedAt: end,
-            minutes,
-            ...(titleIfNew ? { titleIfNew } : {}),
-            details: withCommits ? { ...(branch ? { branch } : {}), commits } : {},
-        });
+        // PERSONAL_OFFICE_PLAN: the folder's kind, a first guess for a folder the server has never seen.
+        try {
+            await api.put(url, rule ? { ...body, projectKind: rule.kind } : body);
+        } catch (err) {
+            // An older server refuses the field it doesn't know: the session goes without it.
+            if (!(err instanceof ApiError) || err.status !== 400 || !/projectKind|unrecognized/i.test(err.message)) throw err;
+            await api.put(url, body);
+        }
         keep(true);
     } catch (err) {
         writeFileSync(file, JSON.stringify({ ...s, endedAt: end }));

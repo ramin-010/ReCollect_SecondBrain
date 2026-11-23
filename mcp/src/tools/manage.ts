@@ -99,6 +99,8 @@ interface Project {
     _id: string;
     key: string;
     name: string;
+    /** PERSONAL_OFFICE_PLAN (newer servers): personal, study or work. */
+    kind?: 'personal' | 'study' | 'work';
     nextStep: string | null;
     isArchived: boolean;
     goal: { _id: string; title: string } | null;
@@ -236,24 +238,25 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         'update_project',
         {
             title: 'Change a project',
-            description: 'Change a coding project (by key or name, as get_brief shows): its name, next step, goal, or archive it.',
+            description: 'Change a coding project (by key or name, as get_brief shows): its name, next step, goal, archive it, or what it is (personal, study, work: work time is not counted as progress), only when the user asks.',
             input: {
                 project: z.string().trim().min(1).max(120),
                 name: z.string().trim().min(1).max(120).optional(),
                 nextStep: z.string().trim().max(300).nullable().optional(),
                 goalId: zId('goal').nullable().optional(),
                 isArchived: z.boolean().optional(),
+                kind: z.enum(['personal', 'study', 'work']).optional(),
             },
             annotations: CHANGES,
         },
         async ({ project, ...patch }) => {
-            if (Object.values(patch).every((v) => v === undefined)) throw new ToolError('Send name, nextStep, goalId or isArchived.');
+            if (Object.values(patch).every((v) => v === undefined)) throw new ToolError('Send name, nextStep, goalId, isArchived or kind.');
             const all = await api.get<Project[]>('/api/projects');
             const want = project.toLowerCase();
             const found = all.find((p) => p.key.toLowerCase() === want) ?? all.find((p) => p.name.toLowerCase() === want);
             if (!found) throw new ToolError(`No project ${quote(project)}. Projects: ${all.map((p) => p.key).join(', ') || 'none'}.`);
             const p = await api.patch<Project>(`/api/projects/${found._id}`, patch);
-            return withUndo(`Project ${quote(p.name)}: next ${p.nextStep ? quote(p.nextStep) : 'not set'}${p.goal ? ` · goal ${quote(p.goal.title)}` : ''}${p.isArchived ? ' · archived' : ''}.`);
+            return withUndo(`Project ${quote(p.name)}: next ${p.nextStep ? quote(p.nextStep) : 'not set'}${p.goal ? ` · goal ${quote(p.goal.title)}` : ''}${p.isArchived ? ' · archived' : ''}${p.kind && p.kind !== 'personal' ? ` · ${p.kind}` : ''}.`);
         }
     );
 

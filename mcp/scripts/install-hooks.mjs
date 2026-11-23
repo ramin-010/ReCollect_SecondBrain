@@ -3,6 +3,10 @@
 //   npm run install:hooks                         asks for the token once (Settings → Agents: read + sessions:write)
 //   npm run install:hooks -- --token rcl_… --allow "E:/PERSONAL_PROJECTS/" --url http://localhost:8002
 //   npm run install:hooks -- --remove             takes the hooks out of settings.json (hooks.json stays)
+//   --personal <path>  --study <path>  --work <path>   (repeatable; PERSONAL_OFFICE_PLAN) the folders and what they
+//                      are: personal and study folders are read in full and briefed; a work folder is logged for time
+//                      only (no brief, no commit subjects, the reminder to save). They replace the folders in hooks.json.
+//                      A folder none of them names is not heard. The app's Settings › Tracking can change a folder later.
 //   --settings <file>  another settings file (tests: a throwaway one)   --home <dir>  instead of ~/.recollect
 // Writes ~/.recollect/hooks.json, and merges four hooks into ~/.claude/settings.json after saving a
 // backup beside it (settings.json.bak-<time>). Our hooks are the ones whose command runs mcp/dist/hook.js;
@@ -19,6 +23,13 @@ const flag = (name) => {
     return i >= 0 ? args[i + 1] : undefined;
 };
 const remove = args.includes('--remove');
+/** Every value of a flag that may repeat. */
+const flagsOf = (name) => args.flatMap((a, i) => (a === name && args[i + 1] && !args[i + 1].startsWith('--') ? [args[i + 1]] : []));
+const kindRules = [
+    ...flagsOf('--personal').map((p) => ({ path: p, kind: 'personal' })),
+    ...flagsOf('--study').map((p) => ({ path: p, kind: 'study' })),
+    ...flagsOf('--work').map((p) => ({ path: p, kind: 'work' })),
+];
 const here = path.dirname(fileURLToPath(import.meta.url));
 const hookJs = path.resolve(here, '../dist/hook.js').replace(/\\/g, '/');
 const settingsFile = path.resolve(flag('--settings') ?? path.join(os.homedir(), '.claude', 'settings.json'));
@@ -43,7 +54,10 @@ if (!remove) {
     const configFile = path.join(home, 'hooks.json');
     const config = existsSync(configFile) ? JSON.parse(readFileSync(configFile, 'utf8')) : {};
     config.url = flag('--url') ?? config.url ?? 'http://localhost:8002';
-    config.allow = flag('--allow') ? [flag('--allow')] : config.allow ?? ['E:/PERSONAL_PROJECTS/'];
+    config.allow =
+        kindRules.length > 0 || flag('--allow')
+            ? [...(flag('--allow') ? [flag('--allow')] : []), ...kindRules]
+            : (config.allow ?? ['E:/PERSONAL_PROJECTS/']);
     config.brief = config.brief ?? true;
     let token = flag('--token') ?? config.token;
     if (!token) {
@@ -62,7 +76,8 @@ if (!remove) {
     config.token = token;
     mkdirSync(home, { recursive: true });
     writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
-    console.log(`Wrote ${configFile} (url ${config.url}; allowed folders: ${config.allow.join(', ')})`);
+    const named = config.allow.map((e) => (typeof e === 'string' ? e : `${e.path}${e.kind ? ` (${e.kind})` : e.mode === 'off' ? ' (off)' : ''}`));
+    console.log(`Wrote ${configFile} (url ${config.url}; folders: ${named.join(', ')})`);
 }
 
 // ── settings.json ───────────────────────────────────────────────────────
