@@ -47,3 +47,4 @@ dist-next/
 .env
 .env.*
 *.log
+/context/specs/COVERAGE_PLAN.md
