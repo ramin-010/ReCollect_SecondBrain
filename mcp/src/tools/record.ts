@@ -162,7 +162,7 @@ export function briefText(b: Brief): string {
     if (b.project) {
         const last = b.project.lastSession ? ` · last: ${shortDay(b.project.lastSession.day)}${b.project.lastSession.minutes ? ` ${mins(b.project.lastSession.minutes)}` : ''} ${quote(b.project.lastSession.title, 60)}` : '';
         // PERSONAL_OFFICE_PLAN: a study or work folder says so (a work folder's time is logged, not counted as progress).
-        const kind = b.project.kind === 'study' ? ' (a study folder)' : b.project.kind === 'work' ? ' (work: its time is logged, not counted as progress)' : '';
+        const kind = b.project.kind === 'study' ? ' (a learning folder)' : b.project.kind === 'work' ? ' (work: its time is logged, not counted as progress)' : '';
         lines.push(`Project ${b.project.name}${kind}${b.project.nextStep ? ` · next: ${b.project.nextStep}` : ''}${last}`);
     }
     for (const d of b.decisions?.project ?? []) lines.push(`Decided ${d.day}: ${quote(d.title, 70)} because ${quote(d.why, 90)}`);

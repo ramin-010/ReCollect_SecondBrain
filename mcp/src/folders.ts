@@ -8,7 +8,7 @@
 //
 // A chat (one session) can say what it is, whatever its folder: ~/.recollect/open/<session>.kind.jsonl holds each
 // change (when, what, and who said so: the agent, or the user's own word), appended by set_chat or by the prompt hook
-// when they type /study, /personal or /work. The hook splits the session's time there when it closes.
+// when they type /study, /build or /work. The hook splits the session's time there when it closes.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -24,6 +24,18 @@ export type ChatKind = FolderKind;
 export type ChatBy = 'agent' | 'chat';
 
 export const FOLDER_KINDS: readonly FolderKind[] = ['personal', 'study', 'work'];
+
+/**
+ * STUDY_FLOW_PLAN §4.5: what people and agents read for a kind. Personal (everything that is theirs) is Learning and
+ * Building; the stored values stay personal (= their own project, Building), study (Learning) and work.
+ */
+export const KIND_WORDS: Readonly<Record<FolderKind, string>> = { personal: 'building', study: 'learning', work: 'work' };
+
+/** What tools take (build, study, work) as the stored kind; an older `personal` still means building. */
+export const kindOfWord = (word: 'build' | 'study' | 'work' | 'personal'): FolderKind => (word === 'build' || word === 'personal' ? 'personal' : word);
+
+/** The typed commands and what each says a chat is (a typed /personal is no longer one). */
+const SLASH_KINDS: Readonly<Record<string, ChatKind>> = { study: 'study', build: 'personal', work: 'work' };
 
 /** One folder's rule as the server keeps it. */
 export interface ServerFolder {
@@ -220,7 +232,7 @@ export function partAt(parts: readonly ChatPart[], at: number): ChatPart | null 
 }
 
 /**
- * A typed `/study`, `/personal` or `/work` (also as Claude Code's command tags): what the chat is, from now; with
+ * A typed `/study`, `/build` or `/work` (also as Claude Code's command tags): what the chat is, from now; with
  * "all" or "whole" after it ("/study all"), from the chat's start.
  */
 export function slashKind(prompt: unknown): { kind: ChatKind; whole: boolean } | null {
@@ -228,8 +240,9 @@ export function slashKind(prompt: unknown): { kind: ChatKind; whole: boolean } |
     const tag = /<command-name>\s*\/?([a-z-]+)\s*<\/command-name>/i.exec(prompt);
     const typed = /^\s*\/([a-z-]+)(?:\s+(.*))?$/is.exec(prompt);
     const name = (tag?.[1] ?? typed?.[1] ?? '').toLowerCase().replace(/^re-collect:/, '');
-    if (!(FOLDER_KINDS as readonly string[]).includes(name)) return null;
+    const kind = Object.hasOwn(SLASH_KINDS, name) ? SLASH_KINDS[name] : undefined;
+    if (!kind) return null;
     const args = (tag ? (/<command-args>([\s\S]*?)<\/command-args>/i.exec(prompt)?.[1] ?? '') : (typed?.[2] ?? '')).toLowerCase();
-    return { kind: name as ChatKind, whole: /(?:^|\s)(?:all|whole|entire)(?:\s|$)/.test(args) };
+    return { kind, whole: /(?:^|\s)(?:all|whole|entire)(?:\s|$)/.test(args) };
 }
 

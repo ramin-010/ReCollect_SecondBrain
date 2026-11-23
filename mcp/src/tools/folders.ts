@@ -1,6 +1,6 @@
 // What a folder is and what a chat is (EASY_SETUP_PLAN, 11-23).
 //
-//   set_folder   their answer to a new folder's one question (personal, study, work, or ignore it): the server keeps it
+//   set_folder   their answer to a new folder's one question (build, study, work, or ignore it): the server keeps it
 //                for every chat and PC, and this PC's hooks see it at once (~/.recollect/rules.json)
 //   set_chat     what this chat is when it isn't what its folder says: the user's own word ("user") or the agent's
 //                judgement ("agent", said in one line). With Claude Code's hooks the chat's time splits there (the
@@ -12,7 +12,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { ApiError, type RecollectApi } from '../api.js';
 import { ToolError } from '../errors.js';
-import { addPart, folderKey, noteFolder, type ChatKind, type FolderKind, type Tracking } from '../folders.js';
+import { addPart, folderKey, KIND_WORDS, kindOfWord, noteFolder, type ChatKind, type FolderKind, type Tracking } from '../folders.js';
 import { hooksHome, loadHookConfig, type OpenSession } from '../hook.js';
 import { CHANGES, defineTool, type ToolContext } from '../tool.js';
 
@@ -28,7 +28,9 @@ export interface ChatMemory {
 
 export const newChatMemory = (): ChatMemory => ({ pending: new Map(), alias: new Map() });
 
-const KIND_WORDS: Record<ChatKind, string> = { personal: 'personal', study: 'study', work: 'work' };
+/** build, study or work (STUDY_FLOW_PLAN §4.5); an older `personal` still means build. */
+export const zKindWord = <T extends string>(more: readonly T[]) =>
+    z.preprocess((v) => (v === 'personal' ? 'build' : v), z.enum(['build', 'study', 'work', ...more] as unknown as readonly ['build', 'study', 'work', ...T[]]));
 
 /** A key in the server's own shape (s_ + start second + 5 random), so the first checkpoint counts from now. */
 export function newChatKey(now: Date = new Date()): string {
@@ -97,9 +99,9 @@ export function registerFolderTools(server: McpServer, ctx: ToolContext): void {
         'set_folder',
         {
             title: 'Say what a folder is',
-            description: "Save the user's answer to what this folder is (asked once per new folder): personal, study, work (time logged, words not read) or ignore (nothing logged). Holds for every chat in it.",
+            description: "Save the user's answer to what this folder is (asked once per folder): build (their own), study, work (time logged, words not read) or ignore (nothing logged). Holds for every chat in it.",
             input: {
-                kind: z.enum(['personal', 'study', 'work', 'ignore']),
+                kind: zKindWord(['ignore'] as const),
                 folder: z.string().trim().min(1).max(100).optional().describe("Another folder's name (default: this one)."),
             },
             annotations: CHANGES,
@@ -107,13 +109,13 @@ export function registerFolderTools(server: McpServer, ctx: ToolContext): void {
         async ({ kind, folder }) => {
             const target = folder ? { key: folderKey(folder), name: folder } : (ctx.folder ?? null);
             if (!target) throw new ToolError('Which folder? Pass folder, its name.');
-            const body = kind === 'ignore' ? { tracking: 'off', name: target.name } : { kind, name: target.name };
+            const body = kind === 'ignore' ? { tracking: 'off', name: target.name } : { kind: kindOfWord(kind), name: target.name };
             const p = await api.put<FolderAnswer>(`/api/projects/by-key/${encodeURIComponent(target.key)}`, body);
             // This PC's hooks follow it from the next prompt (the server's rules reach other PCs within 10 minutes).
             const hooks = loadHookConfig();
             if (hooks) noteFolder(hooks.url, p.key, { name: p.name, kind: p.kind, tracking: p.tracking, ...(p.trackingSet ? { trackingSet: true } : {}), decided: true });
             if (kind === 'ignore') return `Recollect ignores ${p.name} from now on: nothing from its chats is logged. Settings › Tracking can change it.`;
-            const what = p.kind === 'work' ? 'work: its time is logged for their work log, its words are not read, and it isn’t counted as progress' : `${KIND_WORDS[p.kind]}: its time and their words count for them`;
+            const what = p.kind === 'work' ? 'work: its time is logged for their work log, its words are not read, and it isn’t counted as progress' : `for ${p.kind === 'study' ? 'learning' : 'building something of their own'}: its time and their words count for them`;
             return `${p.name} is ${what}. This holds for every chat in it; Settings › Tracking can change it.`;
         }
     );
@@ -125,16 +127,17 @@ export function registerFolderTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Say what this chat is',
             description:
-                'Mark this chat when it isn’t what its folder says. by "user": they said so; "agent": your judgement, then tell them in one line ("Logged this chat as study, not work: say if that’s wrong"). from "start": the whole chat; else from now.',
+                'Mark this chat when it isn’t what its folder says. by "user": they said so; "agent": your judgement, then tell them in one line ("Logged this chat as learning, not work: say if that’s wrong"). from "start": the whole chat; else from now.',
             input: {
-                kind: z.enum(['personal', 'study', 'work']),
+                kind: zKindWord([] as const),
                 by: z.enum(['user', 'agent']),
                 from: z.enum(['start', 'now']).optional(),
                 key: z.string().trim().min(1).max(80).optional().describe('This chat’s session key, if any.'),
             },
             annotations: CHANGES,
         },
-        async ({ kind, by, from, key }) => {
+        async ({ kind: word, by, from, key }) => {
+            const kind: ChatKind = kindOfWord(word);
             const who = by === 'user' ? 'chat' : 'agent';
             const fromStart = from === 'start';
             // Their own word moves this chat's tools with it: theirs get the full set (and the full brief), work the

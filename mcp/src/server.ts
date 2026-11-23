@@ -34,7 +34,7 @@ export const INSTRUCTIONS = [
     'Start a working chat with get_brief (where they stand, and a session key), then checkpoint as you go: after each part, not only at the end. Pass on quietly, without asking or mentioning it, what the user says about their own life that will still matter after this conversation: something new about them (remember), or progress, a change or an end on something their buddy already knows (update_memory, with its id); a reminder or a dated to-do of their own (set_reminder, add_task); an idea or insight (add_pocket_note). Most turns have nothing. Before you rely on their routine, plans or preferences, look them up with recall_memory. When they ask to log the day’s work, use log_work. search_docs before writing a doc. Plan the week with get_week and add_week_target on their yes; when something is their call and they cannot say yes in the chat, suggest it instead.',
     'Every write is logged with your agent name and the user can undo it from Home → From your agent. Docs, goals and subjects are never deleted; a focus line or a milestone can be removed (and Undo brings it back). Answers are compact text with the ids the next call needs.',
     // EASY_SETUP_PLAN §7: the chat decides, the folder is only its default.
-    'A chat counts as its folder says (personal, study or work); when this one clearly is not (learning a topic for themselves in a work folder), call set_chat and say so in one line.',
+    'A chat counts as its folder says (build, study or work); when this one clearly is not (learning in a work folder; a chat about their plans or career, not the code, is study), call set_chat and say so in one line.',
     'Docs take GitHub Markdown plus callouts (> [!TIP]), <details> toggles for self-test questions, ```mermaid diagrams and ```canvas diagrams (Mermaid flowchart text that Recollect lays out as a board the user can edit; add_canvas draws one, update_canvas changes one in place, preview_diagram shows it): see create_doc.',
 ].join(' ');
 
@@ -70,7 +70,7 @@ export const OFFICE_INSTRUCTIONS = [
 
 /** EASY_SETUP_PLAN §3.5: a folder nobody has said what it is yet: the one question comes first. */
 export const NEW_FOLDER_INSTRUCTIONS = (name: string): string =>
-    `This folder ("${name}") is new to Recollect: early in the chat, ask the user once in one line whether it is personal, study or work, or whether Recollect should ignore it, and call set_folder with the answer. Until then nothing from this chat is read.`;
+    `This folder ("${name}") is new to Recollect: early in the chat, ask the user once in one line whether it is for building something of their own, for learning, or for their job, or whether Recollect should ignore it, and call set_folder with the answer. Until then nothing from this chat is read.`;
 
 /** A folder the user excluded (MCP_MEMORY_PLAN §4.9, R13): no tools, and this one line. */
 export const EXCLUDED_INSTRUCTIONS = 'This folder is excluded by the user: nothing here is saved to Recollect or read from it, so no Recollect tools are listed.';

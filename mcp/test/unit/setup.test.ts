@@ -20,6 +20,9 @@ function scratch() {
     mkdirSync(path.join(home, '.claude', 'skills', 'work'), { recursive: true });
     // Their own /work skill, not ours: setup leaves it alone.
     writeFileSync(path.join(home, '.claude', 'skills', 'work', 'SKILL.md'), '---\nname: work\ndescription: my own\n---\nmine\n');
+    // Our /personal of 0.2.0 (STUDY_FLOW_PLAN §4.5: now /build): it carries our mark, so it goes.
+    mkdirSync(path.join(home, '.claude', 'skills', 'personal'), { recursive: true });
+    writeFileSync(path.join(home, '.claude', 'skills', 'personal', 'SKILL.md'), '---\nname: personal\n---\nset_chat personal\n<!-- installed by re-collect -->\n');
     writeFileSync(
         path.join(home, '.claude', 'settings.json'),
         JSON.stringify({ model: 'opus', hooks: { Stop: [{ hooks: [{ type: 'command', command: 'echo done' }] }, { hooks: [{ type: 'command', command: 'node "E:/old/mcp/dist/hook.js" stop' }] }] } })
@@ -107,6 +110,8 @@ describe('recollect-setup', () => {
             `"${process.execPath.replace(/\\/g, '/')}" "${app}/dist/hook.js" end`,
         ]);
         expect(existsSync(path.join(p.claudeSkills, 'study', 'SKILL.md'))).toBe(true);
+        expect(existsSync(path.join(p.claudeSkills, 'build', 'SKILL.md'))).toBe(true);
+        expect(existsSync(path.join(p.claudeSkills, 'personal'))).toBe(false);
         expect(readFileSync(path.join(p.claudeSkills, 'work', 'SKILL.md'), 'utf8')).toContain('mine');
         expect(t.logs.join('\n')).toContain('Left your own /work alone');
         // A backup beside each file changed.

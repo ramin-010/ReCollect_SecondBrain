@@ -41,11 +41,13 @@ describe('the folder’s key (server mode)', () => {
     });
 });
 
-describe('a typed /study, /personal, /work', () => {
+describe('a typed /study, /build, /work', () => {
     it('says what the chat is, from now; "all" after it, from its start; anything else is not one', () => {
         expect(slashKind('/study')).toEqual({ kind: 'study', whole: false });
         expect(slashKind('  /work all')).toEqual({ kind: 'work', whole: true });
-        expect(slashKind('<command-message>personal</command-message>\n<command-name>/personal</command-name>\n<command-args>the whole chat</command-args>')).toEqual({ kind: 'personal', whole: true });
+        // STUDY_FLOW_PLAN §4.5: /build says the chat is building (stored as personal); a typed /personal is no longer one.
+        expect(slashKind('<command-message>build</command-message>\n<command-name>/build</command-name>\n<command-args>the whole chat</command-args>')).toEqual({ kind: 'personal', whole: true });
+        expect(slashKind('/personal')).toBeNull();
         expect(slashKind('/studying')).toBeNull();
         expect(slashKind('let us study graphs')).toBeNull();
         expect(slashKind('/compact')).toBeNull();
@@ -294,6 +296,12 @@ describe('set_folder and set_chat', () => {
         expect(readRules('http://recollect.test', { RECOLLECT_HOOKS_HOME: home })?.folders['side-project']).toMatchObject({ kind: 'work', tracking: 'light', decided: true });
         expect((await h.call('set_folder', { kind: 'ignore', folder: 'Old Stuff' })).text).toContain('ignores Old Stuff');
         expect(h.requests[1]).toMatchObject({ path: '/api/projects/by-key/old%20stuff', body: { tracking: 'off' } });
+        // build is stored as personal (an older personal still means build).
+        expect((await h.call('set_folder', { kind: 'build', folder: 'notes' })).text).toContain('notes is for building something of their own');
+        expect(h.requests[2]).toMatchObject({ body: { kind: 'personal', name: 'notes' } });
+        await h.call('set_folder', { kind: 'personal', folder: 'notes' });
+        expect(h.requests[3]).toMatchObject({ body: { kind: 'personal' } });
+        expect((await h.call('set_folder', { kind: 'study', folder: 'dsa' })).text).toContain('dsa is for learning');
     });
 
     it('set_chat with the hooks: the chat’s parts on the PC; without them: the session by key, or its next checkpoint', async () => {
@@ -309,13 +317,13 @@ describe('set_folder and set_chat', () => {
             { folder: { key: 'erp', name: 'erp' } }
         );
         const hooked = await h.call('set_chat', { kind: 'study', by: 'user' });
-        expect(hooked.text).toContain('logged as study from now on');
+        expect(hooked.text).toContain('logged as learning from now on');
         expect(readParts(path.join(home, 'open'), 'abc')).toEqual([expect.objectContaining({ kind: 'study', by: 'chat' })]);
-        expect((await h.call('set_chat', { kind: 'study', by: 'agent' })).text).toContain('already logged as study');
+        expect((await h.call('set_chat', { kind: 'study', by: 'agent' })).text).toContain('already logged as learning');
         expect(h.requests).toEqual([]);
 
         // No hooks for these keys: the session by key; a key not on the server yet waits for its checkpoint.
-        expect((await h.call('set_chat', { kind: 'study', by: 'agent', key: 's_known', from: 'start' })).text).toContain('logged as study');
+        expect((await h.call('set_chat', { kind: 'study', by: 'agent', key: 's_known', from: 'start' })).text).toContain('logged as learning');
         expect((await h.call('set_chat', { kind: 'study', by: 'user', key: 's_new', from: 'start' })).text).toContain('next checkpoint carries it');
         await h.call('checkpoint', { key: 's_new', title: 'Raft' });
         const cp = h.requests.find((r) => r.method === 'PUT')!;

@@ -36,7 +36,7 @@
 // logged there, a new folder asking once (the start hook tells the agent to ask, set_folder saves the answer; until
 // then its time waits on the PC and nothing is read). hooks.json's `allow` list stays an override for power users (the
 // server's word still decides a folder it knows; the stricter of the two decides what is read). A chat can say what it
-// is (open/<session>.kind.jsonl: set_chat, or a typed /study, /personal, /work): its time is split where it changed,
+// is (open/<session>.kind.jsonl: set_chat, or a typed /study, /build, /work; a part saying personal is building): its time is split where it changed,
 // each part sent with what it is and who said so; their own word that a chat in a work folder is theirs reads its
 // words from then on (an agent's guess never reads more).
 // Test knobs: RECOLLECT_HOOKS_HOME (instead of ~/.recollect), RECOLLECT_HOOKS_CONFIG,
@@ -500,7 +500,7 @@ function markAsked(key: string, env: Env, now: Date): void {
 /** The start hook's line in a new folder: the agent asks the one question, set_folder keeps the answer. */
 export const askText = (name: string): string =>
     `Recollect (session-start hook): this folder, "${name}", is new to Recollect, so nothing from this chat is read; only its time is kept on this PC until the user says what the folder is. ` +
-    'Early in this chat, at a natural point, ask them once in one short line: is this folder personal, study or work, or should Recollect ignore it? ' +
+    'Early in this chat, at a natural point, ask them once in one short line: is this folder for building something of their own, for learning, or for their job, or should Recollect ignore it? ' +
     'Then call set_folder with their answer (it holds for every chat in this folder). If they don’t want to say, drop it.';
 
 // ─── The day's clock (B10, BUDDY_MEMORY_PLAN §12.4) ───────────────────────────
@@ -1174,7 +1174,7 @@ export async function runHook(event: string, input: Record<string, unknown>, env
         } catch (err) {
             log(env, `clock: ${err instanceof Error ? err.message : String(err)}`);
         }
-        // EASY_SETUP_PLAN §7: a typed /study, /personal or /work says what this chat is from now, on their own word.
+        // EASY_SETUP_PLAN §7: a typed /study, /build or /work says what this chat is from now, on their own word (STUDY_FLOW_PLAN §4.5: /build replaced /personal).
         const slash = event === 'prompt' ? slashKind(input['prompt']) : null;
         if (slash) addPart(dir, sessionId, { at: slash.whole ? (readJson<OpenSession>(file)?.startedAt ?? at) : at, kind: slash.kind, by: 'chat' });
         const mode = chatMode(rule, partAt(readParts(dir, sessionId), now.getTime()));

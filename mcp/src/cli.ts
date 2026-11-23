@@ -27,7 +27,7 @@ const HELP = `recollect-setup ${packageVersion()}: Recollect for your AI coding 
   npx recollect-setup help       This.
 
 Options: --url <server>  --login  --tools claude,antigravity,cursor  --no-open  --keep-token
-Folders: each new folder asks once (personal, study or work); change them in Recollect › Settings › Tracking.`;
+Folders: each new folder asks once (building, learning or work); change them in Recollect › Settings › Tracking.`;
 
 function flag(args: string[], name: string): string | undefined {
     const i = args.indexOf(name);

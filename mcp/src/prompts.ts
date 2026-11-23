@@ -39,16 +39,18 @@ export const LOG_MY_WORK = [
     '3. Call log_work once for each line. Then say in one short line what you logged, or that there was nothing to log.',
 ].join('\n');
 
-/** EASY_SETUP_PLAN §7: what a chat is, on the user's own word (Claude Code also has /study, /personal, /work as skills). */
-export const markChat = (kind: 'personal' | 'study' | 'work'): string =>
-    `The user says this chat is ${kind}${kind === 'work' ? ' (their job)' : kind === 'study' ? ' (learning)' : ' (their own project)'}, from now on. Call Recollect's set_chat with kind "${kind}" and by "user" (with this chat's session key if you have one), then confirm it in one short line and go on with what we were doing.`;
+/** EASY_SETUP_PLAN §7: what a chat is, on the user's own word (Claude Code also has /study, /build, /work as skills). */
+const MARK_WORDS = { build: 'building (their own project)', study: 'learning', work: 'work (their job)' } as const;
+export const markChat = (kind: 'build' | 'study' | 'work'): string =>
+    `The user says this chat is ${MARK_WORDS[kind]}, from now on. Call Recollect's set_chat with kind "${kind}" and by "user" (with this chat's session key if you have one), then confirm it in one short line and go on with what we were doing.`;
+const MARK_TITLES = { build: 'building', study: 'learning', work: 'work' } as const;
 
 export function registerPrompts(server: McpServer, set?: string): void {
     if (set !== 'web' && set !== 'excluded') {
-        for (const kind of ['study', 'personal', 'work'] as const) {
+        for (const kind of ['study', 'build', 'work'] as const) {
             server.registerPrompt(
                 kind,
-                { title: `This chat is ${kind}`, description: `Mark this chat as ${kind} in Recollect from now on (set_chat).` },
+                { title: `This chat is ${MARK_TITLES[kind]}`, description: `Mark this chat as ${MARK_TITLES[kind]} in Recollect from now on (set_chat).` },
                 () => ({ messages: [{ role: 'user', content: { type: 'text', text: markChat(kind) } }] })
             );
         }

@@ -22,7 +22,9 @@ import { ApiError, RecollectApi } from './api.js';
 export const PACKAGE = 'recollect-setup';
 export const DEFAULT_SERVER = 'https://api.re-collect.in';
 /** Our skills (skills/<name>/SKILL.md beside dist/). */
-export const SKILLS = ['recollect-study', 'recollect-notes', 'log-work', 'study', 'personal', 'work'] as const;
+export const SKILLS = ['recollect-study', 'recollect-notes', 'log-work', 'study', 'build', 'work'] as const;
+/** Our skills of older versions, taken out when they still carry our mark (STUDY_FLOW_PLAN §4.5: /personal became /build). */
+export const OLD_SKILLS = ['personal'] as const;
 /** The MCP server's name in every tool. */
 const SERVER_NAME = 'recollect';
 const MARK = '<!-- installed by re-collect -->';
@@ -340,7 +342,24 @@ export function writeSkills(dir: string, root: string): { written: string[]; ski
         copyFileSync(source, target);
         written.push(name);
     }
+    removeOldSkills(dir);
     return { written, skipped };
+}
+
+/** Our retired skills: only a copy with our mark goes (one of theirs by that name stays). */
+function removeOldSkills(dir: string): string[] {
+    const removed: string[] = [];
+    for (const name of OLD_SKILLS) {
+        const target = path.join(dir, name, 'SKILL.md');
+        try {
+            if (!readFileSync(target, 'utf8').includes(MARK)) continue;
+        } catch {
+            continue;
+        }
+        rmSync(path.join(dir, name), { recursive: true, force: true });
+        removed.push(name);
+    }
+    return removed;
 }
 
 export function removeSkills(dir: string): string[] {
@@ -351,7 +370,7 @@ export function removeSkills(dir: string): string[] {
         rmSync(path.join(dir, name), { recursive: true, force: true });
         removed.push(name);
     }
-    return removed;
+    return [...removed, ...removeOldSkills(dir)];
 }
 
 export const countSkills = (dir: string): number => SKILLS.filter((n) => existsSync(path.join(dir, n, 'SKILL.md')) && isOurSkill(path.join(dir, n, 'SKILL.md'))).length;
@@ -443,7 +462,7 @@ export async function runSetup(opts: SetupOptions, io: SetupIo): Promise<void> {
     }
     io.log('');
     io.log('Done. Start a new chat in your AI tool. The first chat in a new folder asks once what the folder is');
-    io.log('(personal, study or work); change it any time in Recollect › Settings › Tracking.');
+    io.log('(building, learning or work); change it any time in Recollect › Settings › Tracking.');
     if (oldHooks?.allow?.length) io.log('Your folder rules in ~/.recollect/hooks.json still apply on this PC.');
 }
 
