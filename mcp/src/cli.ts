@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// re-collect: Recollect for your AI coding tools (EASY_SETUP_PLAN §3).
+// recollect-setup: Recollect for your AI coding tools (EASY_SETUP_PLAN §3).
 //
-//   npx re-collect setup     sign this computer in (approve in the browser) and add Recollect to Claude Code,
-//                            Antigravity and Cursor; safe to run again
-//   re-collect status        what is set up here
-//   re-collect remove        take it all out again
-//   re-collect update        the newest version, set up again
-//   re-collect mcp           run the MCP server (the tools start dist/index.js, the hooks dist/hook.js, directly)
+//   npx recollect-setup            sign this computer in (approve in the browser) and add Recollect to Claude Code,
+//                                  Antigravity and Cursor; safe to run again (also `npx recollect-setup setup`)
+//   npx recollect-setup status     what is set up here
+//   npx recollect-setup remove     take it all out again
+//   npx recollect-setup update     the newest version, set up again
+//   npx recollect-setup mcp        run the MCP server (the tools start dist/index.js, the hooks dist/hook.js, directly)
 //
 // Options: --url <server> (default https://api.re-collect.in), --login (sign in again), --tools claude,antigravity,cursor,
 // --no-open (print the link, don't open the browser), --keep-token (remove: leave the sign-in), --from <dir|.tgz> and
@@ -17,13 +17,14 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { packageVersion, realIo, runRemove, runSetup, runStatus } from './setup.js';
 
-const HELP = `re-collect ${packageVersion()}: Recollect for your AI coding tools.
+const HELP = `recollect-setup ${packageVersion()}: Recollect for your AI coding tools.
 
-  npx re-collect setup      Sign this computer in (you approve it in your browser) and add
-                            Recollect to Claude Code, Antigravity and Cursor. Safe to run again.
-  npx re-collect status     What is set up here.
-  npx re-collect remove     Take it all out again.
-  npx re-collect update     Get the newest version and set up again.
+  npx recollect-setup            Sign this computer in (you approve it in your browser) and add
+                                 Recollect to Claude Code, Antigravity and Cursor. Safe to run again.
+  npx recollect-setup status     What is set up here.
+  npx recollect-setup remove     Take it all out again.
+  npx recollect-setup update     Get the newest version and set up again.
+  npx recollect-setup help       This.
 
 Options: --url <server>  --login  --tools claude,antigravity,cursor  --no-open  --keep-token
 Folders: each new folder asks once (personal, study or work); change them in Recollect › Settings › Tracking.`;
@@ -34,7 +35,7 @@ function flag(args: string[], name: string): string | undefined {
 }
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
-    const [command = 'help', ...args] = argv;
+    const [command, args] = !argv[0] || argv[0].startsWith('--') ? ['setup', argv] : [argv[0], argv.slice(1)];
     const io = realIo();
     const home = path.resolve(flag(args, '--home') ?? os.homedir());
     const tools = flag(args, '--tools')?.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);

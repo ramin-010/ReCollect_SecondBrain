@@ -207,7 +207,7 @@ describe('config', () => {
         expect(normalizeBaseUrl('  ')).toBe('http://localhost:8002');
     });
     it('a missing or malformed token is a problem every tool reports (never echoing the value)', () => {
-        expect(loadConfig({ RECOLLECT_HOOKS_HOME: 'Z:/no/such/home' }).problem).toMatch(/not signed in on this computer: run `npx re-collect setup`/);
+        expect(loadConfig({ RECOLLECT_HOOKS_HOME: 'Z:/no/such/home' }).problem).toMatch(/not signed in on this computer: run `npx recollect-setup`/);
         const bad = loadConfig({ RECOLLECT_TOKEN: 'ghp_secretvalue123' });
         expect(bad.problem).toMatch(/start with rcl_/);
         expect(bad.problem).not.toContain('secretvalue');

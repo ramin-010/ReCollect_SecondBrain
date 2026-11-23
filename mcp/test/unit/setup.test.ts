@@ -1,4 +1,4 @@
-// `re-collect setup`, `status`, `remove` (EASY_SETUP_PLAN §3) against a scratch home folder: the sign-in by approval,
+// `npx recollect-setup`, `status`, `remove` (EASY_SETUP_PLAN §3) against a scratch home folder: the sign-in by approval,
 // the app's files, Claude Code (its MCP server, the four hooks, the skills), Antigravity, an older setup moved over, and
 // everything taken out again. No network (a fake server), no npm (a fake install), nothing outside the scratch folder.
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -43,13 +43,13 @@ function io(routes: Parameters<typeof fakeFetch>[0]) {
         run: (cmd, args) => {
             ran.push([cmd, ...args]);
             if (args.includes('install')) {
-                // npm install --prefix <app> re-collect@…: this package's dist and skills, as npm would lay them out.
+                // npm install --prefix <app> recollect-setup@…: this package's dist and skills, as npm would lay them out.
                 const app = args[args.indexOf('--prefix') + 1]!;
-                const pkg = path.join(app, 'node_modules', 're-collect');
+                const pkg = path.join(app, 'node_modules', 'recollect-setup');
                 mkdirSync(path.join(pkg, 'dist'), { recursive: true });
                 writeFileSync(path.join(pkg, 'dist', 'index.js'), '');
                 writeFileSync(path.join(pkg, 'dist', 'hook.js'), '');
-                writeFileSync(path.join(pkg, 'package.json'), '{"name":"re-collect","version":"0.2.0"}');
+                writeFileSync(path.join(pkg, 'package.json'), '{"name":"recollect-setup","version":"0.2.0"}');
                 cpSync(path.join(packageRoot(), 'skills'), path.join(pkg, 'skills'), { recursive: true });
                 return { status: 0, stdout: '', stderr: '' };
             }
@@ -74,7 +74,7 @@ const server = (meFor: (token: string) => unknown) => ({
     'POST /api/setup/disconnect': ok({ ended: true }),
 });
 
-describe('re-collect setup', () => {
+describe('recollect-setup', () => {
     it('signs in by approval, moves the older setup over, and sets up Claude Code and Antigravity; status says so; remove takes it out', async () => {
         scratch();
         const p = pathsOf(home);
@@ -92,8 +92,8 @@ describe('re-collect setup', () => {
         expect(JSON.parse(readFileSync(p.hooksJson, 'utf8'))).toEqual({ allow: [{ path: 'E:/p/', kind: 'personal' }], brief: true });
 
         // The app, then Claude Code: its MCP server reads ~/.recollect/config.json (nothing secret in Claude's config).
-        const app = path.join(p.app, 'node_modules', 're-collect').replace(/\\/g, '/');
-        expect(t.ran.find((r) => r.includes('install'))).toEqual(expect.arrayContaining(['--prefix', p.app, 're-collect@0.2.0']));
+        const app = path.join(p.app, 'node_modules', 'recollect-setup').replace(/\\/g, '/');
+        expect(t.ran.find((r) => r.includes('install'))).toEqual(expect.arrayContaining(['--prefix', p.app, 'recollect-setup@0.2.0']));
         const claude = JSON.parse(readFileSync(p.claudeJson, 'utf8'));
         expect(claude.mcpServers.recollect).toEqual({ type: 'stdio', command: process.execPath.replace(/\\/g, '/'), args: [`${app}/dist/index.js`], env: {} });
         const settings = JSON.parse(readFileSync(p.claudeSettings, 'utf8'));

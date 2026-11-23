@@ -1,7 +1,7 @@
 {
-  "name": "re-collect",
+  "name": "recollect-setup",
   "version": "0.2.0",
-  "description": "Recollect for your AI coding tools: `npx re-collect setup` signs this computer in (you approve it in your browser) and adds Recollect's tools, hooks and skills to Claude Code, Antigravity and Cursor.",
+  "description": "Recollect for your AI coding tools: `npx recollect-setup` signs this computer in (you approve it in your browser) and adds Recollect's tools, hooks and skills to Claude Code, Antigravity and Cursor.",
   "keywords": [
     "recollect",
     "mcp",
@@ -14,7 +14,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "bin": {
-    "re-collect": "dist/cli.js"
+    "recollect-setup": "dist/cli.js"
   },
   "main": "dist/index.js",
   "files": [

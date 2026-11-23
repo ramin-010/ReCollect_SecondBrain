@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Recollect for agents: a local MCP server on stdio. `npx re-collect setup` registers it (it reads its url and token
+// Recollect for agents: a local MCP server on stdio. `npx recollect-setup` registers it (it reads its url and token
 // from ~/.recollect/config.json); by hand:
 //   claude mcp add recollect -e RECOLLECT_URL=http://localhost:8002 -e RECOLLECT_TOKEN=rcl_… -- node …/mcp/dist/index.js
 // stdout carries the MCP messages only; logs go to stderr and never contain the token.

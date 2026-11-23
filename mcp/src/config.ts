@@ -1,4 +1,4 @@
-// Settings from the environment, else from ~/.recollect/config.json (`re-collect setup`). The token is kept here and
+// Settings from the environment, else from ~/.recollect/config.json (`npx recollect-setup`). The token is kept here and
 // handed to the API client only: it is never logged, printed or put in an error message.
 import { readFileSync } from 'node:fs';
 import os from 'node:os';
@@ -40,7 +40,7 @@ export function cleanAgentName(raw: string | undefined): string {
     return clean || DEFAULT_AGENT_NAME;
 }
 
-/** EASY_SETUP_PLAN: what `re-collect setup` wrote ({ url, token }), or null. */
+/** EASY_SETUP_PLAN: what `npx recollect-setup` wrote ({ url, token }), or null. */
 function setupConfig(env: NodeJS.ProcessEnv): { url?: string; token?: string } | null {
     const home = env['RECOLLECT_HOOKS_HOME'] || path.join(os.homedir(), '.recollect');
     try {
@@ -52,7 +52,7 @@ function setupConfig(env: NodeJS.ProcessEnv): { url?: string; token?: string } |
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-    // The environment first (a hand setup: claude mcp add -e …); else what `re-collect setup` wrote.
+    // The environment first (a hand setup: claude mcp add -e …); else what `npx recollect-setup` wrote.
     const saved = env['RECOLLECT_TOKEN']?.trim() ? null : setupConfig(env);
     const baseUrl = normalizeBaseUrl(env['RECOLLECT_URL'] || saved?.url);
     const token = (env['RECOLLECT_TOKEN'] ?? saved?.token ?? '').trim();
@@ -62,7 +62,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     if (!/^https?:\/\/[^/\s]+/i.test(baseUrl)) {
         problem = `RECOLLECT_URL must be an http(s) URL such as ${DEFAULT_URL}.`;
     } else if (!token) {
-        problem = 'Recollect is not signed in on this computer: run `npx re-collect setup` (it opens re-collect.in to approve), then start a new chat.';
+        problem = 'Recollect is not signed in on this computer: run `npx recollect-setup` (it opens re-collect.in to approve), then start a new chat.';
     } else if (!token.startsWith('rcl_')) {
         problem = "RECOLLECT_TOKEN doesn't look like a Recollect token (they start with rcl_). Make a new one in Settings → Agents.";
     }

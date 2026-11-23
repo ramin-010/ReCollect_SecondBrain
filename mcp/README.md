@@ -1,4 +1,4 @@
-# re-collect: Recollect for your AI coding tools
+# recollect-setup: Recollect for your AI coding tools
 
 Recollect keeps what you learn and what you work on: notes with real diagrams, study paths and spaced revision, goals, a work log, and a buddy that remembers what you tell it across chats. This package connects your AI coding tools to it: the Recollect MCP server (the tools an agent calls), Claude Code's hooks (chats log their own time), and the skills.
 
@@ -7,7 +7,7 @@ Recollect keeps what you learn and what you work on: notes with real diagrams, s
 Needs Node.js 22 or newer and an account on [re-collect.in](https://re-collect.in).
 
 ```sh
-npx re-collect setup
+npx recollect-setup
 ```
 
 1. It shows a code and opens re-collect.in: check that the page shows the same code and press **Approve** (no token to copy).
@@ -19,9 +19,9 @@ npx re-collect setup
 4. A chat can differ from its folder: type `/study`, `/personal` or `/work` (or just say so), and the agent may mark one itself, saying so in one line. A change in the middle of a chat splits its time there.
 
 ```sh
-npx re-collect status    # what is set up, who it is signed in as
-npx re-collect update    # the newest version, set up again
-npx re-collect remove    # take it all out (the sign-in ends itself)
+npx recollect-setup status    # what is set up, who it is signed in as
+npx recollect-setup update    # the newest version, set up again
+npx recollect-setup remove    # take it all out (the sign-in ends itself)
 ```
 
 Options: `--url <server>` (default `https://api.re-collect.in`), `--login` (sign in again), `--tools claude,antigravity,cursor`, `--no-open` (print the link only). Every file it changes gets a backup beside it first, and only Recollect's own entries are touched. The token lives in `~/.recollect/config.json` only.
@@ -44,7 +44,7 @@ Options: `--url <server>` (default `https://api.re-collect.in`), `--login` (sign
    claude mcp add recollect -s user -e RECOLLECT_URL=http://localhost:8002 -e RECOLLECT_TOKEN=rcl_… -- node /path/to/mcp/dist/index.js
    ```
 
-   Check it with `claude mcp list`, or `/mcp` inside Claude Code. In Windows PowerShell, type `claude.cmd` instead of `claude` (here and for `npm`, `npm.cmd`): the `.ps1` shims drop the `--`, and the command then fails. Without `RECOLLECT_TOKEN` the server reads `~/.recollect/config.json` (what `re-collect setup` writes).
+   Check it with `claude mcp list`, or `/mcp` inside Claude Code. In Windows PowerShell, type `claude.cmd` instead of `claude` (here and for `npm`, `npm.cmd`): the `.ps1` shims drop the `--`, and the command then fails. Without `RECOLLECT_TOKEN` the server reads `~/.recollect/config.json` (what `npx recollect-setup` writes).
 
 | Variable | Default | |
 |---|---|---|
@@ -80,7 +80,7 @@ A call without the scope it needs fails with the scope named, e.g. `The Recollec
 
 ## Tools
 
-77 tools (some rows below hold two or more), plus the `study`, `personal`, `work`, `catch_up` and `note_recipe` prompts (and, on the web, `log_my_work`) and the skills (`npm run install:skill`, or `re-collect setup`).
+77 tools (some rows below hold two or more), plus the `study`, `personal`, `work`, `catch_up` and `note_recipe` prompts (and, on the web, `log_my_work`) and the skills (`npm run install:skill`, or `npx recollect-setup`).
 
 **A tool set per door** (MCP_MEMORY_PLAN §4.1, `createRecollectServer({ set })`):
 - **`code`, Claude Code (stdio):** the groups **core, docs, plan and record** from the start (the 40,000-character budget holds for these) and the **manage** group when it calls `more_tools` or the server runs with `RECOLLECT_TOOLS=all` (or a list such as `core,docs,manage`).
@@ -163,7 +163,7 @@ GitHub Markdown, with headings `#` to `######` (a toggle heading folds its secti
 
 ## Claude Code hooks (coding sessions log themselves)
 
-`re-collect setup` adds four hooks to `~/.claude/settings.json` (a backup is saved beside it first); the url and token are in `~/.recollect/config.json`. By hand: `npm run install:hooks` (after `npm run build`) writes `~/.recollect/hooks.json` (`url`, `token`, `allow`, `brief`) instead; make that token in Settings → Agents with **read** and **sessions:write**. `npm run install:hooks -- --remove` takes the hooks out again.
+`npx recollect-setup` adds four hooks to `~/.claude/settings.json` (a backup is saved beside it first); the url and token are in `~/.recollect/config.json`. By hand: `npm run install:hooks` (after `npm run build`) writes `~/.recollect/hooks.json` (`url`, `token`, `allow`, `brief`) instead; make that token in Settings → Agents with **read** and **sessions:write**. `npm run install:hooks -- --remove` takes the hooks out again.
 
 - **Folder rules (EASY_SETUP_PLAN, 11-23):** without an `allow` list the rules are the server's: what each folder is and what is logged there (Settings › Tracking), read at each session's start and kept 10 minutes in `~/.recollect/rules.json` (a prompt never waits for the network). A folder is known by its project folder: the outermost git repo it is in, below the home folder, else its own name. A folder the server has never seen follows the account's default; by default it asks once: the start hook tells the agent to ask, `set_folder` saves the answer, and until then nothing is read and the session waits on the PC (14 days at most). An `allow` list in `hooks.json` is an override for that PC: a folder it doesn't name is not heard, and for one the server knows, the stricter of the two decides what is read.
 - **What a chat is:** `set_chat`, or a typed `/study`, `/personal`, `/work` (`all` after it: from the chat's start), adds a line to `~/.recollect/open/<session>.kind.jsonl`. The session's time splits where it changed (`cc_<session>`, then `cc_<session>:k1`, …), each part sent with what it is and who said so. Their own word that a chat in a work folder is theirs reads its words from then on; an agent's guess never reads more, and a chat marked work reads no words.

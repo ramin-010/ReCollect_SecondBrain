@@ -31,7 +31,7 @@
 // the person's AI is paused it answers 503 AI_PAUSED and the words wait on the PC; words a failed close
 // left are sent at the next start; nothing older than 14 days is sent. While one of the buddy's questions
 // is open in the session, a reply under 3 words is read too. An older server gets exactly today's pieces.
-// EASY_SETUP_PLAN (11-23): `npx re-collect setup` signs the PC in and writes ~/.recollect/config.json { url, token };
+// EASY_SETUP_PLAN (11-23): `npx recollect-setup` signs the PC in and writes ~/.recollect/config.json { url, token };
 // with no `allow` list (hooks.json) the folder rules are the server's (./folders.ts): what a folder is and what is
 // logged there, a new folder asking once (the start hook tells the agent to ask, set_folder saves the answer; until
 // then its time waits on the PC and nothing is read). hooks.json's `allow` list stays an override for power users (the
@@ -153,7 +153,7 @@ const NOTE_FRESH_MS = 24 * 3600_000;
 
 export const hooksHome = (env: Env = process.env): string => env['RECOLLECT_HOOKS_HOME'] || path.join(os.homedir(), '.recollect');
 export const configPath = (env: Env = process.env): string => env['RECOLLECT_HOOKS_CONFIG'] || path.join(hooksHome(env), 'hooks.json');
-/** EASY_SETUP_PLAN: what `re-collect setup` writes: { url, token } (the MCP server reads it too). */
+/** EASY_SETUP_PLAN: what `npx recollect-setup` writes: { url, token } (the MCP server reads it too). */
 export const userConfigPath = (env: Env = process.env): string => path.join(hooksHome(env), 'config.json');
 
 /** "E:\\A\\b" → "e:/a/b/": compared case-insensitively, as Windows paths are. */

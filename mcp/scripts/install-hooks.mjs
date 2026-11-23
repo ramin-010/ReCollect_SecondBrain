@@ -35,7 +35,7 @@ const hookJs = path.resolve(here, '../dist/hook.js').replace(/\\/g, '/');
 const settingsFile = path.resolve(flag('--settings') ?? path.join(os.homedir(), '.claude', 'settings.json'));
 const home = path.resolve(flag('--home') ?? process.env.RECOLLECT_HOOKS_HOME ?? path.join(os.homedir(), '.recollect'));
 const MARK = 'mcp/dist/hook.js';
-/** Ours: this checkout's hook.js, or the one `re-collect setup` installed (EASY_SETUP_PLAN). */
+/** Ours: this checkout's hook.js, or the one `npx recollect-setup` installed (EASY_SETUP_PLAN). */
 const isOurs = (command) => {
     const c = String(command ?? '').replace(/\\/g, '/');
     return c.includes(MARK) || (/dist\/hook\.js/.test(c) && /re-collect|recollect/i.test(c));

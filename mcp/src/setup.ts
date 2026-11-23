@@ -1,4 +1,4 @@
-// `re-collect setup` and friends (EASY_SETUP_PLAN §3, 11-23): one command for anyone.
+// `npx recollect-setup` and friends (EASY_SETUP_PLAN §3, 11-23): one command for anyone.
 //
 //   setup    sign this computer in by approval (a code checked in the browser, no token to copy), install the app in
 //            ~/.recollect/app (so a hook never waits for npx), and add Recollect to each AI tool found here:
@@ -19,7 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ApiError, RecollectApi } from './api.js';
 
-export const PACKAGE = 're-collect';
+export const PACKAGE = 'recollect-setup';
 export const DEFAULT_SERVER = 'https://api.re-collect.in';
 /** Our skills (skills/<name>/SKILL.md beside dist/). */
 export const SKILLS = ['recollect-study', 'recollect-notes', 'log-work', 'study', 'personal', 'work'] as const;
@@ -47,7 +47,7 @@ export interface SetupOptions {
     /** Only these tools (claude, antigravity, cursor); default: every one found. */
     tools?: string[];
     noOpen?: boolean;
-    /** Install the app from this folder or .tgz (a build not on npm yet), instead of npm's re-collect. */
+    /** Install the app from this folder or .tgz (a build not on npm yet), instead of npm's recollect-setup. */
     from?: string;
     /** Use this package's own files where they are (a developer's checkout), no app install. */
     here?: boolean;
@@ -148,7 +148,7 @@ const platformName = (): string => ({ win32: 'Windows', darwin: 'macOS', linux: 
 
 /** Who a token is signed in as (null: it doesn't work any more). Throws for an older server without the easy setup. */
 export async function whoAmI(url: string, token: string, io: SetupIo): Promise<{ name: string; tokenName: string | null } | null> {
-    const api = new RecollectApi({ baseUrl: url, token, agentName: 're-collect setup', timeoutMs: 15_000, ...(io.fetch ? { fetch: io.fetch } : {}) });
+    const api = new RecollectApi({ baseUrl: url, token, agentName: 'recollect-setup', timeoutMs: 15_000, ...(io.fetch ? { fetch: io.fetch } : {}) });
     try {
         return await api.get<{ name: string; tokenName: string | null }>('/api/setup/me');
     } catch (err) {
@@ -220,10 +220,10 @@ function npmCommand(): { cmd: string; pre: string[] } {
     return candidates[0] ? { cmd: process.execPath, pre: [candidates[0]] } : { cmd: 'npm', pre: [] };
 }
 
-/** Installs (or updates) the app in ~/.recollect/app: npm's re-collect, or a build from --from. */
+/** Installs (or updates) the app in ~/.recollect/app: npm's recollect-setup, or a build from --from. */
 export function installApp(p: Paths, opts: Pick<SetupOptions, 'from' | 'version'>, io: SetupIo): void {
     mkdirSync(p.app, { recursive: true });
-    if (!existsSync(path.join(p.app, 'package.json'))) writeFileSync(path.join(p.app, 'package.json'), '{ "private": true, "description": "Recollect on this computer (re-collect setup)" }\n');
+    if (!existsSync(path.join(p.app, 'package.json'))) writeFileSync(path.join(p.app, 'package.json'), '{ "private": true, "description": "Recollect on this computer (recollect-setup)" }\n');
     const what = opts.from ? path.resolve(opts.from) : `${PACKAGE}@${opts.version ?? packageVersion()}`;
     const { cmd, pre } = npmCommand();
     const r = io.run(cmd, [...pre, 'install', '--no-audit', '--no-fund', '--omit=dev', '--prefer-offline', '--prefix', p.app, what], { cwd: p.app });
@@ -460,7 +460,7 @@ export async function runStatus(opts: Pick<SetupOptions, 'home'>, io: SetupIo): 
     if (saved) {
         try {
             me = await whoAmI(saved.url, saved.token, io);
-            if (!me) problem = 'its sign-in ended: run `npx re-collect setup` again';
+            if (!me) problem = 'its sign-in ended: run `npx recollect-setup` again';
         } catch (err) {
             problem = err instanceof Error ? err.message : String(err);
         }
@@ -480,7 +480,7 @@ export async function runStatus(opts: Pick<SetupOptions, 'home'>, io: SetupIo): 
         ),
     };
     io.log('Recollect on this computer');
-    io.log(`  Signed in: ${saved ? (me ? `yes, as ${me.name}${me.tokenName ? ` (${me.tokenName})` : ''}` : `no (${problem})`) : 'no: run `npx re-collect setup`'}${saved ? ` · ${saved.url}` : ''}`);
+    io.log(`  Signed in: ${saved ? (me ? `yes, as ${me.name}${me.tokenName ? ` (${me.tokenName})` : ''}` : `no (${problem})`) : 'no: run `npx recollect-setup`'}${saved ? ` · ${saved.url}` : ''}`);
     io.log(`  App: ${report.app ? `${report.app} in ${slash(p.app)}` : 'not installed'}`);
     for (const t of report.tools) io.log(`  ${t.name}: tools ${t.mcp ? '✓' : '✗'}${t.hooks !== undefined ? ` · hooks ${t.hooks === 4 ? '✓' : `${t.hooks} of 4`}` : ''}${t.id !== 'cursor' ? ` · skills ${t.skills}` : ''}`);
     if (!report.tools.length) io.log('  No AI coding tool found here.');
@@ -503,7 +503,7 @@ export async function runRemove(opts: Pick<SetupOptions, 'home'> & { keepToken?:
     if (fileHasMcp(p.cursorMcp)) writeMcpFile(p.cursorMcp, null, 'Cursor', io.now());
     if (saved && !opts.keepToken) {
         try {
-            const api = new RecollectApi({ baseUrl: saved.url, token: saved.token, agentName: 're-collect setup', timeoutMs: 15_000, ...(io.fetch ? { fetch: io.fetch } : {}) });
+            const api = new RecollectApi({ baseUrl: saved.url, token: saved.token, agentName: 'recollect-setup', timeoutMs: 15_000, ...(io.fetch ? { fetch: io.fetch } : {}) });
             await api.post('/api/setup/disconnect', {});
             io.log('✓ This computer’s sign-in ended (Settings › Agents shows it as ended).');
         } catch {
