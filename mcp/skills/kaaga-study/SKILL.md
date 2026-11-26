@@ -9,7 +9,7 @@ Kaaga holds the user's plan (goals → paths of topics → today) and their reco
 
 ## 1. Start: `get_brief`
 
-Call `get_brief` first (pass `project` when the chat is in a code folder), then `more_tools` once: it turns on the tools for notes and the revision card (`add_note`, `list_notes`, `update_note`, `remove_note`, `set_revision_card`). A resumed chat can start without them: when one isn't in your tool list, call `more_tools` again; never tell them Kaaga is disconnected before trying that. The brief gives their profile (how they like to learn: follow it), goals and pace, today, each path's next topic with its **last session** and **open weak spots**, and a **session key**. Keep the key for every checkpoint.
+Call `get_brief` first (pass `project` when the chat is in a code folder). The tools for notes, files on notes and the revision card (`add_note`, `list_notes`, `update_note`, `remove_note`, `attach_file`, `set_revision_card`) may not be in your tool list at first: call them by name anyway (every Kaaga tool runs by its name), or `find_tools` with the job ("notes on a lesson") shows them with their inputs and adds them to your list. Never tell them Kaaga is disconnected before trying that. The brief gives their profile (how they like to learn: follow it), goals and pace, today, each path's next topic with its **last session** and **open weak spots**, and a **session key**. Keep the key for every checkpoint.
 
 Then say, in two lines, where they stand and what you propose: first a piece of this week's targets (the brief's `Week:` line), else the next topic and its next step, starting with its weak spots. They may pick something else; go with them.
 

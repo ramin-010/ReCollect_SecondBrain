@@ -1,6 +1,6 @@
 {
   "name": "kaaga-setup",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Kaaga for your AI coding tools: `npx kaaga-setup` signs this computer in (you approve it in your browser) and adds Kaaga's tools, hooks and skills to Claude Code, Antigravity and Cursor.",
   "keywords": [
     "kaaga",
