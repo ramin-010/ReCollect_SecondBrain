@@ -114,7 +114,7 @@ describe('recent_agent_edits', () => {
         h = await connect({ 'GET /api/agent/edits': refused() }, { groups: TOOL_GROUP_NAMES });
         const res = await h.call('recent_agent_edits');
         expect(res.isError).toBe(true);
-        expect(res.text).toMatch(/^Can't reach Recollect at http:\/\/recollect\.test \(connection refused\)\. Is the backend running\?/);
+        expect(res.text).toMatch(/^Can't reach Kaaga at http:\/\/kaaga\.test \(connection refused\)\. Is the backend running\?/);
         expect(h.requests.filter((r) => r.path === '/api/agent/edits')).toHaveLength(2);
     });
 });

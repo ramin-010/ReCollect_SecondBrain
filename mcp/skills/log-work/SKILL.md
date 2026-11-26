@@ -1,6 +1,6 @@
 ---
 name: log-work
-description: Log the day's work from this chat into the user's work log in Recollect (its `log_work` tool), with the time each part took, so "what did I do on this project yesterday?" has an answer before their standup. Use when they say /log-work, "log today's work", "log the work we did", or accepts an offer to log the day.
+description: Log the day's work from this chat into the user's work log in Kaaga (its `log_work` tool), with the time each part took, so "what did I do on this project yesterday?" has an answer before their standup. Use when they say /log-work, "log today's work", "log the work we did", or accepts an offer to log the day.
 ---
 
 # Log the day's work
@@ -15,3 +15,5 @@ The user's work log keeps what they did per project and day. In work folders not
    - Only what this chat shows was done. Merge small steps into one line. No code, file contents, secrets, keys or links with them; no names of private people.
 3. **Call `log_work` with the lines.** Calling it again in the same chat replaces its lines for that day, so fix a mistake by sending the whole list again.
 4. **Answer in one line** ("Logged 4 lines for erp, Mon 16 Nov."). Don't paste the lines back unless they ask.
+
+<!-- installed by kaaga -->

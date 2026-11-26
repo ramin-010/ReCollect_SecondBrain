@@ -2,17 +2,18 @@
 //
 // The server keeps every folder's rule (what it is: personal, study, work; what is logged there: everything, the time
 // only, off) and the account's default for a folder it has never seen (ask, a kind, off). The hooks read the rules at
-// a session's start and keep them 10 minutes in ~/.recollect/rules.json, so a prompt never waits for the network; the
+// a session's start and keep them 10 minutes in ~/.kaaga/rules.json, so a prompt never waits for the network; the
 // MCP's set_folder writes its answer there at once. A folder is known by its project folder: the outermost git repo
 // it is in (below the home folder), else the folder's own name, so no path list per PC.
 //
-// A chat (one session) can say what it is, whatever its folder: ~/.recollect/open/<session>.kind.jsonl holds each
+// A chat (one session) can say what it is, whatever its folder: ~/.kaaga/open/<session>.kind.jsonl holds each
 // change (when, what, and who said so: the agent, or the user's own word), appended by set_chat or by the prompt hook
 // when they type /study, /build or /work. The hook splits the session's time there when it closes.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ApiError, type RecollectApi } from './api.js';
+import { ApiError, type KaagaApi } from './api.js';
+import { kaagaHome } from './config.js';
 
 type Env = Record<string, string | undefined>;
 
@@ -48,7 +49,7 @@ export interface ServerFolder {
     decided: boolean;
 }
 
-/** ~/.recollect/rules.json: the server's rules, for the url they came from. */
+/** ~/.kaaga/rules.json: the server's rules, for the url they came from. */
 export interface RulesCache {
     url: string;
     /** When they were fetched (ISO). */
@@ -61,8 +62,7 @@ export interface RulesCache {
 
 export const RULES_FRESH_MS = 10 * 60_000;
 
-export const recollectHome = (env: Env = process.env): string => env['RECOLLECT_HOOKS_HOME'] || path.join(os.homedir(), '.recollect');
-const rulesFile = (env: Env) => path.join(recollectHome(env), 'rules.json');
+const rulesFile = (env: Env) => path.join(kaagaHome(env), 'rules.json');
 
 /** A folder's key as the server keeps it (Project.key): single spaces, lower case, at most 100 characters. */
 export const folderKey = (name: string): string => name.replace(/\s+/g, ' ').trim().toLowerCase().slice(0, 100);
@@ -132,7 +132,7 @@ export function readRules(url: string, env: Env = process.env): RulesCache | nul
 
 function writeRules(cache: RulesCache, env: Env): void {
     try {
-        mkdirSync(recollectHome(env), { recursive: true });
+        mkdirSync(kaagaHome(env), { recursive: true });
         writeFileSync(rulesFile(env), JSON.stringify(cache));
     } catch {
         // The next start fetches them again.
@@ -149,7 +149,7 @@ interface RulesAnswer {
  * answer asks with 0). No answer: the cache as it is. An older server without rules (403, 404): marked unsupported,
  * asked again after the same 10 minutes.
  */
-export async function refreshRules(api: RecollectApi, url: string, env: Env = process.env, now: Date = new Date(), maxAgeMs = RULES_FRESH_MS): Promise<RulesCache | null> {
+export async function refreshRules(api: KaagaApi, url: string, env: Env = process.env, now: Date = new Date(), maxAgeMs = RULES_FRESH_MS): Promise<RulesCache | null> {
     const cached = readRules(url, env);
     if (cached && now.getTime() - Date.parse(cached.at) < maxAgeMs) return cached;
     try {
@@ -239,7 +239,7 @@ export function slashKind(prompt: unknown): { kind: ChatKind; whole: boolean } |
     if (typeof prompt !== 'string') return null;
     const tag = /<command-name>\s*\/?([a-z-]+)\s*<\/command-name>/i.exec(prompt);
     const typed = /^\s*\/([a-z-]+)(?:\s+(.*))?$/is.exec(prompt);
-    const name = (tag?.[1] ?? typed?.[1] ?? '').toLowerCase().replace(/^re-collect:/, '');
+    const name = (tag?.[1] ?? typed?.[1] ?? '').toLowerCase().replace(/^(?:kaaga|re-collect):/, '');
     const kind = Object.hasOwn(SLASH_KINDS, name) ? SLASH_KINDS[name] : undefined;
     if (!kind) return null;
     const args = (tag ? (/<command-args>([\s\S]*?)<\/command-args>/i.exec(prompt)?.[1] ?? '') : (typed?.[2] ?? '')).toLowerCase();

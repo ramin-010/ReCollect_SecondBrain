@@ -2,10 +2,10 @@
 // fetch that answers from a route table and records every request.
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { RecollectApi } from '../../src/api.js';
-import { createRecollectServer, type ToolGroup, type ToolSet } from '../../src/server.js';
+import { KaagaApi } from '../../src/api.js';
+import { createKaagaServer, type ToolGroup, type ToolSet } from '../../src/server.js';
 
-export const BASE = 'http://recollect.test';
+export const BASE = 'http://kaaga.test';
 export const TOKEN = `rcl_${'a'.repeat(43)}`;
 export const NOTE_ID = '11111111-2222-4333-8444-555555555555';
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -73,7 +73,7 @@ export async function connect(
 ): Promise<Harness> {
     const { fetch, requests } = fakeFetch(routes);
     const logs: string[] = [];
-    const api = new RecollectApi({
+    const api = new KaagaApi({
         baseUrl: BASE,
         token: TOKEN,
         agentName: 'Claude Code',
@@ -82,7 +82,7 @@ export async function connect(
         runningDelayMs: 0,
         log: (m) => logs.push(m),
     });
-    const server = createRecollectServer({
+    const server = createKaagaServer({
         api,
         agentName: 'Claude Code',
         problem: options.problem ?? null,

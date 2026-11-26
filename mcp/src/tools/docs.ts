@@ -19,7 +19,7 @@ export const CANVAS_KINDS = [
 
 /** The canvas text form in brief (backend/src/services/docs/diagram/parse.ts has all of it). */
 export const CANVAS_GUIDE = [
-    '```canvas holds a diagram in Mermaid flowchart syntax. Recollect lays it out (never give positions): zones, right-angle arrows, labels. Example:',
+    '```canvas holds a diagram in Mermaid flowchart syntax. Kaaga lays it out (never give positions): zones, right-angle arrows, labels. Example:',
     '    flowchart',
     '    user([User]) -->|HTTPS| lb[Load balancer]',
     '    subgraph api [API tier]',
@@ -30,7 +30,7 @@ export const CANVAS_GUIDE = [
     '    a1 & a2 -->|SQL| db[(Postgres)]:::blue',
     '    db -.->|CDC| q[[Outbox]]@{ kind: queue }',
     '    note for db: Primary + 2 replicas',
-    '  Direction: best left out (a bare flowchart line, or none): Recollect picks the one that shows bigger in a doc; flowchart LR or flowchart TB forces one. Shapes: [box] (rounded) ([pill]) [(database)] ((circle)) {decision} [[queue]].',
+    '  Direction: best left out (a bare flowchart line, or none): Kaaga picks the one that shows bigger in a doc; flowchart LR or flowchart TB forces one. Shapes: [box] (rounded) ([pill]) [(database)] ((circle)) {decision} [[queue]].',
     '  Arrows --> , --- (no head), -.-> (dashed: async), <--> (both ways), a label as -->|text|; a --> b & c fans out; chains a --> b --> c.',
     '  subgraph id [Title] … end makes a zone (nestable; an arrow may point at the zone). Colours :::blue :::green :::yellow :::red :::gray.',
     "  Notes: note: text, or note for box: text (beside that box). Kinds give an icon (and a shape when the bracket is a plain [box]): id@{ kind: cache }, kinds " +
@@ -39,7 +39,7 @@ export const CANVAS_GUIDE = [
 ].join('\n');
 
 export const MARKDOWN_GUIDE = [
-    'Markdown: GitHub style, plus Recollect extras.',
+    'Markdown: GitHub style, plus Kaaga extras.',
     '- Headings # to ######. A toggle heading folds its section: <details><summary>## Title</summary>…</details>.',
     '- **bold**, *italic*, ~~strike~~, `code`, ==highlight==, [links](https://…), images ![alt](https://…).',
     '- Lists, numbered lists and task lists (- [ ] todo / - [x] done), nested.',
@@ -142,7 +142,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
                 ? WEB_DOC_WORDS.read_doc
                 : 'Read one doc as Markdown (the live version if it is open), after a header line (id, title, subject, last update, whether you can edit it). ' +
                   'Read before replace_section, to see the exact headings. A canvas shows as a ```canvas fence in Mermaid flowchart text, its id on the first line (%% id: cv_…): ' +
-                  'change it with update_canvas (small changes, or a whole new diagram) and see it with preview_diagram; positions are not in the text, Recollect keeps them.',
+                  'change it with update_canvas (small changes, or a whole new diagram) and see it with preview_diagram; positions are not in the text, Kaaga keeps them.',
             input: { docId: zDocId },
             annotations: READ_ONLY,
         },
@@ -281,12 +281,12 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
                 note = await api.post<NoteAdded | DocAppended>(`/api/agent/docs/${docId}/append`, { markdown, heading, ...(after ? { after } : {}) });
             } catch (err) {
                 if (err instanceof ApiError && err.status === 400 && /unrecognized key/i.test(err.message)) {
-                    return 'This Recollect server is older: it adds notes inside a section from its next release. Nothing was added.';
+                    return 'This Kaaga server is older: it adds notes inside a section from its next release. Nothing was added.';
                 }
                 throw err;
             }
-            // An older Recollect server (before the deploy) ignores the two fields and appends at the doc's end.
-            if (!('heading' in note)) return withUndo(`Appended ${plural(note.appended, 'block')} to the end of doc ${note.id} (this Recollect server is older: notes go inside a section from its next release).`);
+            // An older Kaaga server (before the deploy) ignores the two fields and appends at the doc's end.
+            if (!('heading' in note)) return withUndo(`Appended ${plural(note.appended, 'block')} to the end of doc ${note.id} (this Kaaga server is older: notes go inside a section from its next release).`);
             if ('already' in note) return `Already in that section (${quote(note.heading, 80)}): not added again.`;
             const where = note.placed === 'after' ? 'right after the paragraph you quoted' : 'at the end of that section';
             return withUndo([`Added a note under ${quote(note.heading, 80)} in doc ${note.id}, ${where}, with the day and your app under it.`, ...canvasLines(note.canvases)].join('\n'));
@@ -344,7 +344,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
                     .min(1, 'diagram is empty')
                     .max(20_000, 'a diagram is at most 20 000 characters')
                     .describe('The diagram in Mermaid flowchart syntax, without the ``` fence, e.g. "flowchart LR\\n  web([Web]) -->|HTTPS| api[API]\\n  api --> db[(Postgres)]".'),
-                height: z.number().int().min(240).max(1400).optional().describe('Height of the board in the doc, in pixels. Leave out: Recollect fits the board.'),
+                height: z.number().int().min(240).max(1400).optional().describe('Height of the board in the doc, in pixels. Leave out: Kaaga fits the board.'),
             },
             annotations: ADDS,
         },

@@ -50,10 +50,10 @@ describe('manage tools', () => {
         h = await all({
             'POST /api/revisions/r1/complete': ok({ item: { title: 'Heaps', cycleNumber: 1 }, chain: [{ cycleNumber: 1, scheduledFor: '2026-11-14', status: 'done' }, { cycleNumber: 2, scheduledFor: '2026-11-17', status: 'pending' }], mastered: false }),
             'GET /api/projects': ok([{ _id: 'p1', key: 'second_brain', name: 'second_brain', nextStep: null, isArchived: false, goal: null }]),
-            'PATCH /api/projects/p1': ok({ _id: 'p1', key: 'second_brain', name: 'Recollect', nextStep: 'build the manager', isArchived: false, goal: null }),
+            'PATCH /api/projects/p1': ok({ _id: 'p1', key: 'second_brain', name: 'Kaaga', nextStep: 'build the manager', isArchived: false, goal: null }),
         });
         expect((await h.call('complete_revision', { revisionId: 'r1' })).text).toContain('Done: "Heaps", review 1. Next review 2026-11-17.');
-        expect((await h.call('update_project', { project: 'Second_Brain', nextStep: 'build the manager' })).text).toContain('Project "Recollect": next "build the manager".');
+        expect((await h.call('update_project', { project: 'Second_Brain', nextStep: 'build the manager' })).text).toContain('Project "Kaaga": next "build the manager".');
         expect(h.requests.at(-1)).toMatchObject({ method: 'PATCH', path: '/api/projects/p1', body: { nextStep: 'build the manager' } });
         const missing = await h.call('update_project', { project: 'nope', name: 'x' });
         expect([missing.isError, missing.text]).toEqual([true, 'No project "nope". Projects: second_brain.']);
@@ -81,7 +81,7 @@ describe('manage tools', () => {
         });
         // An older server (no `ring` in its answer): every reminder rings there, and the reply says so.
         expect((await h.call('set_reminder', { at: '19:00', taskId: 't1' })).text).toBe(
-            `Reminder set: "Book the mock" at ${when} (this Recollect server rings every reminder, once: silent and repeating ones come with its next release) · id m1.\nUndo: the user can undo this from Home → From your agent.`
+            `Reminder set: "Book the mock" at ${when} (this Kaaga server rings every reminder, once: silent and repeating ones come with its next release) · id m1.\nUndo: the user can undo this from Home → From your agent.`
         );
         expect(h.requests.at(-1)).toMatchObject({ method: 'POST', path: '/api/reminders', body: { at: '19:00', taskId: 't1' } });
         expect((await h.call('set_reminder', { at: '19:00', title: 'Call the bank' })).text).toContain('(a new task)');
@@ -101,7 +101,7 @@ describe('manage tools', () => {
             { at: '17:30', title: 'Stretch' },
         ]);
         expect(res.isError).toBeFalsy();
-        expect(res.text).toContain('(this Recollect server rings every reminder, once: silent and repeating ones come with its next release)');
+        expect(res.text).toContain('(this Kaaga server rings every reminder, once: silent and repeating ones come with its next release)');
     });
 
     it('stage 7: set_reminder is silent unless he asks for a ring, and may repeat; show_on_lock_screen and clear_lock_line', async () => {

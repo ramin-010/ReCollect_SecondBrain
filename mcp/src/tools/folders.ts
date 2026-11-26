@@ -1,7 +1,7 @@
 // What a folder is and what a chat is (EASY_SETUP_PLAN, 11-23).
 //
 //   set_folder   their answer to a new folder's one question (build, study, work, or ignore it): the server keeps it
-//                for every chat and PC, and this PC's hooks see it at once (~/.recollect/rules.json)
+//                for every chat and PC, and this PC's hooks see it at once (~/.kaaga/rules.json)
 //   set_chat     what this chat is when it isn't what its folder says: the user's own word ("user") or the agent's
 //                judgement ("agent", said in one line). With Claude Code's hooks the chat's time splits there (the
 //                hook's open/<session>.kind.jsonl); a chat without hooks carries it on its next checkpoint (from now:
@@ -10,7 +10,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { ApiError, type RecollectApi } from '../api.js';
+import { ApiError, type KaagaApi } from '../api.js';
 import { ToolError } from '../errors.js';
 import { addPart, folderKey, KIND_WORDS, kindOfWord, noteFolder, type ChatKind, type FolderKind, type Tracking } from '../folders.js';
 import { hooksHome, loadHookConfig, type OpenSession } from '../hook.js';
@@ -70,7 +70,7 @@ export function openSessionFor(key: string | undefined, folder: string | undefin
 }
 
 /** PUT a checkpoint; an older server that refuses chatKind / kindBy gets it without them. */
-export async function putWithKind<T>(api: RecollectApi, key: string, body: Record<string, unknown>, mark: { kind: ChatKind; by: 'agent' | 'chat' } | undefined): Promise<T> {
+export async function putWithKind<T>(api: KaagaApi, key: string, body: Record<string, unknown>, mark: { kind: ChatKind; by: 'agent' | 'chat' } | undefined): Promise<T> {
     const url = `/api/sessions/by-key/${encodeURIComponent(key)}`;
     if (!mark) return api.put<T>(url, body);
     try {
@@ -114,7 +114,7 @@ export function registerFolderTools(server: McpServer, ctx: ToolContext): void {
             // This PC's hooks follow it from the next prompt (the server's rules reach other PCs within 10 minutes).
             const hooks = loadHookConfig();
             if (hooks) noteFolder(hooks.url, p.key, { name: p.name, kind: p.kind, tracking: p.tracking, ...(p.trackingSet ? { trackingSet: true } : {}), decided: true });
-            if (kind === 'ignore') return `Recollect ignores ${p.name} from now on: nothing from its chats is logged. Settings › Tracking can change it.`;
+            if (kind === 'ignore') return `Kaaga ignores ${p.name} from now on: nothing from its chats is logged. Settings › Tracking can change it.`;
             const what = p.kind === 'work' ? 'work: its time is logged for their work log, its words are not read, and it isn’t counted as progress' : `for ${p.kind === 'study' ? 'learning' : 'building something of their own'}: its time and their words count for them`;
             return `${p.name} is ${what}. This holds for every chat in it; Settings › Tracking can change it.`;
         }
@@ -143,8 +143,8 @@ export function registerFolderTools(server: McpServer, ctx: ToolContext): void {
             // Their own word moves this chat's tools with it: theirs get the full set (and the full brief), work the
             // work folder's. An agent's judgement never opens more.
             const moved = by === 'user' ? ctx.switchSet?.(kind === 'work' ? 'office' : 'code') === true : false;
-            const after = moved ? (kind === 'work' ? ' This chat now has a work folder’s tools only.' : ' Their full Recollect tools are on now: call get_brief for where they stand.') : '';
-            // Claude Code with Recollect's hooks: the hook splits the chat's time where it changed.
+            const after = moved ? (kind === 'work' ? ' This chat now has a work folder’s tools only.' : ' Their full Kaaga tools are on now: call get_brief for where they stand.') : '';
+            // Claude Code with Kaaga's hooks: the hook splits the chat's time where it changed.
             const open = openSessionFor(key, ctx.folder?.key);
             if (open) {
                 const at = fromStart ? open.startedAt : new Date().toISOString();

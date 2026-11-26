@@ -1,4 +1,4 @@
-// Claude Code hooks for Recollect (SYNC_SPINE_SPEC 1.4): coding sessions log themselves, and a
+// Claude Code hooks for Kaaga (SYNC_SPINE_SPEC 1.4): coding sessions log themselves, and a
 // session in an allowed folder starts knowing where the user stands. No model has to remember anything.
 //
 //   node <mcp>/dist/hook.js start    SessionStart       sweep stale sessions; open this one; print the brief
@@ -10,7 +10,7 @@
 //   node <mcp>/dist/hook.js end      SessionEnd         flush, then close: PUT /api/sessions/by-key/cc_<session>
 //   node <mcp>/dist/hook.js flush <session>             POST /api/buddy/words, then GET /api/buddy/note
 //
-// Config: ~/.recollect/hooks.json { url, token, allow, brief: true }; the token needs only read +
+// Config: ~/.kaaga/hooks.json { url, token, allow, brief: true }; the token needs only read +
 // sessions:write. `allow` entries are a folder (today's meaning: logged, briefed, words not read) or
 // { path, mode: "full" | "light" | "off", brief } (BUDDY_MEMORY_PLAN §3.1): the longest matching path
 // wins, "*" matches any folder; full = his typed words are read for his buddy; brief: false = the
@@ -19,19 +19,19 @@
 // its defaults (work: light, no brief, the nudge, no commit subjects; personal and study: full, brief); the knobs above
 // still override, and `brief: false` without a kind still means work. The session tells the server the kind as a first
 // guess for a folder it has never seen (`projectKind`); the app's choice (Settings › Tracking) wins after that.
-// Open sessions: ~/.recollect/open/<session>.json (+ .words.jsonl, .flush.json). Folders no entry
-// allows, subagents (their input has agent_id) and RECOLLECT_HOOKS=off do nothing. Never blocks Claude
-// Code: every call has a 3 s limit, every failure is one line in ~/.recollect/hook.log, and the exit
+// Open sessions: ~/.kaaga/open/<session>.json (+ .words.jsonl, .flush.json). Folders no entry
+// allows, subagents (their input has agent_id) and KAAGA_HOOKS=off do nothing. Never blocks Claude
+// Code: every call has a 3 s limit, every failure is one line in ~/.kaaga/hook.log, and the exit
 // code is always 0. The transcript is never read (its format is internal): his words come from the
 // prompt hook's own input, the reply from the Stop hook's last_assistant_message.
 // Stage 4 (ECOSYSTEM_V2_PLAN §4.11, §4.15): a server that says `capture: 2` (in the brief or in a words
-// answer; kept in ~/.recollect/server.json) gets every message with its own number in the session, sent
+// answer; kept in ~/.kaaga/server.json) gets every message with its own number in the session, sent
 // at each prompt by a detached flush, the last message already read coming along as context with the end
 // of the agent's reply; it answers how far it has read, so a lost answer loses and doubles nothing. While
 // the person's AI is paused it answers 503 AI_PAUSED and the words wait on the PC; words a failed close
 // left are sent at the next start; nothing older than 14 days is sent. While one of the buddy's questions
 // is open in the session, a reply under 3 words is read too. An older server gets exactly today's pieces.
-// EASY_SETUP_PLAN (11-23): `npx recollect-setup` signs the PC in and writes ~/.recollect/config.json { url, token };
+// EASY_SETUP_PLAN (11-23): `npx kaaga-setup` signs the PC in and writes ~/.kaaga/config.json { url, token };
 // with no `allow` list (hooks.json) the folder rules are the server's (./folders.ts): what a folder is and what is
 // logged there, a new folder asking once (the start hook tells the agent to ask, set_folder saves the answer; until
 // then its time waits on the PC and nothing is read). hooks.json's `allow` list stays an override for power users (the
@@ -39,15 +39,17 @@
 // is (open/<session>.kind.jsonl: set_chat, or a typed /study, /build, /work; a part saying personal is building): its time is split where it changed,
 // each part sent with what it is and who said so; their own word that a chat in a work folder is theirs reads its
 // words from then on (an agent's guess never reads more).
-// Test knobs: RECOLLECT_HOOKS_HOME (instead of ~/.recollect), RECOLLECT_HOOKS_CONFIG,
-// RECOLLECT_HOOKS_MIN_MINUTES (default 2), RECOLLECT_HOOKS_MIN_PROMPTS (default 2),
-// RECOLLECT_HOOKS_FLUSH=inline (the stop hook flushes in its own process: tests).
+// Test knobs: KAAGA_HOOKS_HOME (instead of ~/.kaaga), KAAGA_HOOKS_CONFIG,
+// KAAGA_HOOKS_MIN_MINUTES (default 2), KAAGA_HOOKS_MIN_PROMPTS (default 2),
+// KAAGA_HOOKS_FLUSH=inline (the stop hook flushes in its own process: tests).
+// KAAGA_REBRAND_PLAN D7 (11-26): each knob may still be given by its older RECOLLECT_* name, and a PC that hasn't run
+// `npx kaaga-setup` since the rename keeps its files in ~/.recollect (./config.js: kaagaHome).
 import { execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { ApiError, RecollectApi } from './api.js';
+import { ApiError, KaagaApi } from './api.js';
+import { envOf, kaagaHome } from './config.js';
 import { addPart, folderOf, partAt, projectFolder, readParts, readRules, refreshRules, slashKind, workFolderAbove, type ChatPart, type RulesCache } from './folders.js';
 import { briefText, type Brief } from './tools/record.js';
 
@@ -119,7 +121,7 @@ interface FlushState {
     read?: number;
 }
 
-/** A note from the buddy for his chats (GET /api/buddy/note), kept in ~/.recollect/note.json. */
+/** A note from the buddy for his chats (GET /api/buddy/note), kept in ~/.kaaga/note.json. */
 export interface BuddyNote {
     id: string;
     text: string;
@@ -151,9 +153,9 @@ const LOCK_STALE_MS = 2 * 60_000;
 /** A note older than this is not shown mid-session. */
 const NOTE_FRESH_MS = 24 * 3600_000;
 
-export const hooksHome = (env: Env = process.env): string => env['RECOLLECT_HOOKS_HOME'] || path.join(os.homedir(), '.recollect');
-export const configPath = (env: Env = process.env): string => env['RECOLLECT_HOOKS_CONFIG'] || path.join(hooksHome(env), 'hooks.json');
-/** EASY_SETUP_PLAN: what `npx recollect-setup` writes: { url, token } (the MCP server reads it too). */
+export const hooksHome = (env: Env = process.env): string => kaagaHome(env);
+export const configPath = (env: Env = process.env): string => envOf('KAAGA_HOOKS_CONFIG', env) || path.join(hooksHome(env), 'hooks.json');
+/** EASY_SETUP_PLAN: what `npx kaaga-setup` writes: { url, token } (the MCP server reads it too). */
 export const userConfigPath = (env: Env = process.env): string => path.join(hooksHome(env), 'config.json');
 
 /** "E:\\A\\b" → "e:/a/b/": compared case-insensitively, as Windows paths are. */
@@ -236,8 +238,8 @@ export function activeMinutes(stamps: readonly string[]): number {
 
 /** Too small to be worth a line: under 2 active minutes, or fewer than 2 prompts. */
 export function worthLogging(session: Pick<OpenSession, 'prompts'>, minutes: number, env: Env = process.env): boolean {
-    const minMinutes = Number(env['RECOLLECT_HOOKS_MIN_MINUTES'] ?? 2);
-    const minPrompts = Number(env['RECOLLECT_HOOKS_MIN_PROMPTS'] ?? 2);
+    const minMinutes = Number(envOf('KAAGA_HOOKS_MIN_MINUTES', env) ?? 2);
+    const minPrompts = Number(envOf('KAAGA_HOOKS_MIN_PROMPTS', env) ?? 2);
     return minutes >= minMinutes && session.prompts >= minPrompts;
 }
 
@@ -512,12 +514,12 @@ function markAsked(key: string, env: Env, now: Date): void {
 
 /** The start hook's line in a new folder: the agent asks the one question, set_folder keeps the answer. */
 export const askText = (name: string): string =>
-    `Recollect (session-start hook): this folder, "${name}", is new to Recollect, so nothing from this chat is read; only its time is kept on this PC until the user says what the folder is. ` +
-    'Early in this chat, at a natural point, ask them once in one short line: is this folder for building something of their own, for learning, or for their job, or should Recollect ignore it? ' +
+    `Kaaga (session-start hook): this folder, "${name}", is new to Kaaga, so nothing from this chat is read; only its time is kept on this PC until the user says what the folder is. ` +
+    'Early in this chat, at a natural point, ask them once in one short line: is this folder for building something of their own, for learning, or for their job, or should Kaaga ignore it? ' +
     'Then call set_folder with their answer (it holds for every chat in this folder). If they don’t want to say, drop it.';
 
 // ─── The day's clock (B10, BUDDY_MEMORY_PLAN §12.4) ───────────────────────────
-// ~/.recollect/times/<project>/<YYYY-MM-DD>.jsonl, by the PC's local day: a line per prompt
+// ~/.kaaga/times/<project>/<YYYY-MM-DD>.jsonl, by the PC's local day: a line per prompt
 // { at, sid, head } (head: its first 60 characters, so a time can be matched to its turn after a
 // compaction) and per reply's end { at, sid, end: true }. Local only: no code path sends it. log_work
 // reads it for the turn times; <day>.logged marks a day logged; <day>.asked-evening and
@@ -680,8 +682,8 @@ function pruneParts(dir: string, now: Date): void {
 /** The reminder to save, with the clock (a `nudge` folder's every prompt). */
 export function nudgeText(now: Date): string {
     return (
-        `Recollect [${dayLabel(now)}, ${localTime(now)}]: before you finish this turn, if their message or your answer holds something the user would want later ` +
-        "(something about their own life, a reminder or dated to-do, an idea or insight), save it quietly with the recollect tools and say nothing about it in your reply. " +
+        `Kaaga [${dayLabel(now)}, ${localTime(now)}]: before you finish this turn, if their message or your answer holds something the user would want later ` +
+        "(something about their own life, a reminder or dated to-do, an idea or insight), save it quietly with Kaaga's tools and say nothing about it in your reply. " +
         'Most turns have nothing. Never save company code, data or client names.'
     );
 }
@@ -743,7 +745,7 @@ function readWords(dir: string, sessionId: string): WordsLine[] {
 
 const appendWords = (dir: string, sessionId: string, line: WordsLine) => appendFileSync(wordsFile(dir, sessionId), `${JSON.stringify(line)}\n`);
 
-/** What the server speaks (stage 4): ~/.recollect/server.json { url, capture }, for the configured url only. */
+/** What the server speaks (stage 4): ~/.kaaga/server.json { url, capture }, for the configured url only. */
 const capFile = (env: Env) => path.join(hooksHome(env), 'server.json');
 export function serverCapture(config: Pick<HookConfig, 'url'>, env: Env = process.env): number {
     const c = readJson<{ url?: string; capture?: number }>(capFile(env));
@@ -820,7 +822,7 @@ function takeLock(dir: string, sessionId: string): boolean {
  * Send the session's waiting words (POST /api/buddy/words, 50 at most per piece), then fetch the
  * buddy's note for his chats. Moves on only after a 2xx; a failure waits for the next flush.
  */
-export async function flushWords(api: RecollectApi, dir: string, sessionId: string, env: Env, now: Date = new Date()): Promise<void> {
+export async function flushWords(api: KaagaApi, dir: string, sessionId: string, env: Env, now: Date = new Date()): Promise<void> {
     if (!(await waitForLock(dir, sessionId, env))) return;
     try {
         const session = readJson<OpenSession>(path.join(dir, `${sessionId}.json`));
@@ -875,7 +877,7 @@ export async function flushWords(api: RecollectApi, dir: string, sessionId: stri
 async function waitForLock(dir: string, sessionId: string, env: Env): Promise<boolean> {
     for (let i = 0; i < 6; i++) {
         if (takeLock(dir, sessionId)) return true;
-        if (env['RECOLLECT_HOOKS_FLUSH'] === 'inline') return false;
+        if (envOf('KAAGA_HOOKS_FLUSH', env) === 'inline') return false;
         await new Promise((r) => setTimeout(r, 300));
     }
     return false;
@@ -888,7 +890,7 @@ async function waitForLock(dir: string, sessionId: string, env: Env): Promise<bo
  * (an older release came back) is forgotten, and the next flush sends today's pieces.
  */
 async function sendNumbered(
-    api: RecollectApi,
+    api: KaagaApi,
     dir: string,
     sessionId: string,
     session: OpenSession | null,
@@ -946,8 +948,8 @@ async function sendNumbered(
 const msgOf = (m: { n: number; at: string; text: string; tail?: string }) => ({ n: m.n, at: m.at, text: m.text, ...(m.tail ? { reply: m.tail } : {}) });
 
 /** Starts a flush that outlives this hook (Claude Code never waits for the network). */
-function startFlush(api: RecollectApi, dir: string, sessionId: string, env: Env, now: Date = new Date()): Promise<void> | void {
-    if (env['RECOLLECT_HOOKS_FLUSH'] === 'inline') return flushWords(api, dir, sessionId, env, now);
+function startFlush(api: KaagaApi, dir: string, sessionId: string, env: Env, now: Date = new Date()): Promise<void> | void {
+    if (envOf('KAAGA_HOOKS_FLUSH', env) === 'inline') return flushWords(api, dir, sessionId, env, now);
     try {
         const child = spawn(process.execPath, [fileURLToPath(import.meta.url), 'flush', sessionId], { detached: true, stdio: 'ignore', windowsHide: true, env: process.env });
         child.unref();
@@ -970,18 +972,18 @@ function dropWords(dir: string, sessionId: string): void {
     for (const f of [wordsFile(dir, sessionId), flushFile(dir, sessionId), lockFile(dir, sessionId)]) rmSync(f, { force: true });
 }
 
-function apiFor(config: HookConfig): RecollectApi {
-    return new RecollectApi({ baseUrl: config.url, token: config.token, agentName: 'Claude Code hook', timeoutMs: NET_TIMEOUT_MS, retryDelayMs: 100, runningDelayMs: 300 });
+function apiFor(config: HookConfig): KaagaApi {
+    return new KaagaApi({ baseUrl: config.url, token: config.token, agentName: 'Claude Code hook', timeoutMs: NET_TIMEOUT_MS, retryDelayMs: 100, runningDelayMs: 300 });
 }
 
 /** The rules' fetch: shorter, so a slow server never holds a session's start (the brief comes after it). */
-function rulesApiFor(config: HookConfig): RecollectApi {
-    return new RecollectApi({ baseUrl: config.url, token: config.token, agentName: 'Claude Code hook', timeoutMs: 2000, retryDelayMs: 100, runningDelayMs: 300 });
+function rulesApiFor(config: HookConfig): KaagaApi {
+    return new KaagaApi({ baseUrl: config.url, token: config.token, agentName: 'Claude Code hook', timeoutMs: 2000, retryDelayMs: 100, runningDelayMs: 300 });
 }
 
 /**
  * A folder no longer read in full (B10: a rule changed while a session was open): its waiting words
- * are moved to ~/.recollect/held/, never sent; one line in hook.log.
+ * are moved to ~/.kaaga/held/, never sent; one line in hook.log.
  */
 function holdWords(dir: string, sessionId: string, env: Env): void {
     if (!existsSync(wordsFile(dir, sessionId))) return;
@@ -997,7 +999,7 @@ function holdWords(dir: string, sessionId: string, env: Env): void {
  * changed mid-session holds: a work folder (`brief: false`) is titled by its project, never his
  * words; `commits: false` sends no branch or commit subjects; a folder no longer allowed sends nothing.
  */
-async function close(api: RecollectApi, file: string, endedAt: string, env: Env, now: Date = new Date()): Promise<void> {
+async function close(api: KaagaApi, file: string, endedAt: string, env: Env, now: Date = new Date()): Promise<void> {
     const dir = path.dirname(file);
     const sessionId = path.basename(file, '.json');
     const opened = readJson<OpenSession>(file);
@@ -1055,7 +1057,7 @@ async function close(api: RecollectApi, file: string, endedAt: string, env: Env,
     const titleIfNew = rule && (rule.office || !rule.brief) ? (rule.name || s.project) : (s.sessionTitle ?? s.firstPrompt);
     // EASY_SETUP_PLAN §7: the chat's time split where it changed what it is (one part when it never did).
     const pieces = splitSession(s.stamps, s.startedAt, end, speaksSetup(rules) ? parts : [], rule?.kind ?? 'personal');
-    const minMinutes = Number(env['RECOLLECT_HOOKS_MIN_MINUTES'] ?? 2);
+    const minMinutes = Number(envOf('KAAGA_HOOKS_MIN_MINUTES', env) ?? 2);
     try {
         for (const [i, piece] of pieces.entries()) {
             if (pieces.length > 1 && piece.minutes < minMinutes) continue;
@@ -1086,7 +1088,7 @@ async function close(api: RecollectApi, file: string, endedAt: string, env: Env,
 }
 
 /** PUT a session; an older server that refuses the newer fields (projectKind, chatKind, kindBy) gets it without them. */
-async function putSession(api: RecollectApi, key: string, body: Record<string, unknown>, extra: Record<string, unknown>): Promise<void> {
+async function putSession(api: KaagaApi, key: string, body: Record<string, unknown>, extra: Record<string, unknown>): Promise<void> {
     const url = `/api/sessions/by-key/${encodeURIComponent(key)}`;
     if (!Object.keys(extra).length) {
         await api.put(url, body);
@@ -1101,7 +1103,7 @@ async function putSession(api: RecollectApi, key: string, body: Record<string, u
 }
 
 /** Sessions whose window was closed without SessionEnd: last stamp over 30 minutes ago, or a failed close. */
-async function sweep(api: RecollectApi, dir: string, current: string, env: Env, now: Date): Promise<void> {
+async function sweep(api: KaagaApi, dir: string, current: string, env: Env, now: Date): Promise<void> {
     let names: string[] = [];
     try {
         names = readdirSync(dir).filter((n) => n.endsWith('.json') && !n.endsWith('.flush.json'));
@@ -1155,7 +1157,7 @@ async function readStdin(): Promise<Record<string, unknown>> {
 }
 
 export async function runHook(event: string, input: Record<string, unknown>, env: Env = process.env, now: Date = new Date()): Promise<string> {
-    if (/^(off|0|false|no)$/i.test(env['RECOLLECT_HOOKS'] ?? '')) return '';
+    if (/^(off|0|false|no)$/i.test(envOf('KAAGA_HOOKS', env) ?? '')) return '';
     if (input['agent_id']) return '';
     const config = loadHookConfig(env);
     if (!config) return '';
@@ -1235,7 +1237,7 @@ export async function runHook(event: string, input: Record<string, unknown>, env
         }
         // B10: in a `nudge` folder every prompt reminds the agent to save quietly (with the clock), and once a day to offer to log the work.
         const nudge = event === 'prompt' && rule.nudge ? [nudgeText(now), ...logReminders(clockProject, now, firstToday, env)] : [];
-        return [note ? `Recollect, from the user's buddy (pass it on in one sentence at a natural pause; skip it if they are in the middle of something): ${note.text}` : '', ...nudge]
+        return [note ? `Kaaga, from the user's buddy (pass it on in one sentence at a natural pause; skip it if they are in the middle of something): ${note.text}` : '', ...nudge]
             .filter(Boolean)
             .join('\n');
     }
@@ -1279,9 +1281,9 @@ export async function runHook(event: string, input: Record<string, unknown>, env
             writeFileSync(file, JSON.stringify({ ...session, notesShown: [...(session.notesShown ?? []), b.noteId].slice(-20) }));
         }
         return [
-            `Recollect (session-start hook): where the user stands. This Claude Code session is logged by the hook (key ${session.key}, project "${session.project}"). ` +
+            `Kaaga (session-start hook): where the user stands. This Claude Code session is logged by the hook (key ${session.key}, project "${session.project}"). ` +
                 `When you finish a piece of work here, call checkpoint once with that key, project "${session.project}", a short title and the nextStep, so the project's next step stays current. ` +
-                'If you study or practise with them, checkpoint as the recollect-study skill says, with the same key.',
+                'If you study or practise with them, checkpoint as the kaaga-study skill says, with the same key.',
             briefText(brief),
         ].join('\n');
     } catch (err) {

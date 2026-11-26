@@ -3,7 +3,7 @@
 import { McpServer, type RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type ListToolsResult } from '@modelcontextprotocol/sdk/types.js';
-import type { RecollectApi } from './api.js';
+import type { KaagaApi } from './api.js';
 import { registerPrompts } from './prompts.js';
 import { READ_ONLY, defineTool, errorResult, type ToolContext } from './tool.js';
 import { registerContextTools } from './tools/context.js';
@@ -25,17 +25,17 @@ import { registerBuddyTools } from './tools/buddy.js';
 import { newChatMemory, registerFolderTools } from './tools/folders.js';
 import { registerStudyTools } from './tools/study.js';
 
-export const SERVER_NAME = 'recollect';
+export const SERVER_NAME = 'kaaga';
 export const SERVER_VERSION = '0.1.0';
 
 /** Claude Code's instructions (the `code` set) and Ask AI's (`all`). */
 export const INSTRUCTIONS = [
-    "Recollect is the user's personal learning app and the record of their work: Docs (their notes, in Markdown), subjects with paths (topics in course order), spaced revision (reviews 1, 3, 7 and 21 days after a doc is scheduled), goals with dated milestones, a week of up to 5 targets, up to 3 focus lines a day, personal tasks, and work sessions. Their buddy there follows what is going on in their life.",
+    "Kaaga is the user's personal learning app and the record of their work: Docs (their notes, in Markdown), subjects with paths (topics in course order), spaced revision (reviews 1, 3, 7 and 21 days after a doc is scheduled), goals with dated milestones, a week of up to 5 targets, up to 3 focus lines a day, personal tasks, and work sessions. Their buddy there follows what is going on in their life.",
     'Start a working chat with get_brief (where they stand, and a session key), then checkpoint as you go: after each part, not only at the end. Pass on quietly, without asking or mentioning it, what the user says about their own life that will still matter after this conversation: something new about them (remember), or progress, a change or an end on something their buddy already knows (update_memory, with its id); a reminder or a dated to-do of their own (set_reminder, add_task); an idea or insight (add_pocket_note). Most turns have nothing. Before you rely on their routine, plans or preferences, look them up with recall_memory. When they ask to log the day’s work, use log_work. search_docs before writing a doc. Plan the week with get_week and add_week_target on their yes; when something is their call and they cannot say yes in the chat, suggest it instead.',
     'Every write is logged with your agent name and the user can undo it from Home → From your agent. Docs, goals and subjects are never deleted; a focus line or a milestone can be removed (and Undo brings it back). Answers are compact text with the ids the next call needs.',
     // EASY_SETUP_PLAN §7: the chat decides, the folder is only its default.
     'A chat counts as its folder says (build, study or work); when this one clearly is not (learning in a work folder; a chat about their plans or career, not the code, is study), call set_chat and say so in one line.',
-    'Docs take GitHub Markdown plus callouts (> [!TIP]), <details> toggles for self-test questions, ```mermaid diagrams and ```canvas diagrams (Mermaid flowchart text that Recollect lays out as a board the user can edit; add_canvas draws one, update_canvas changes one in place, preview_diagram shows it): see create_doc.',
+    'Docs take GitHub Markdown plus callouts (> [!TIP]), <details> toggles for self-test questions, ```mermaid diagrams and ```canvas diagrams (Mermaid flowchart text that Kaaga lays out as a board the user can edit; add_canvas draws one, update_canvas changes one in place, preview_diagram shows it): see create_doc.',
 ].join(' ');
 
 /**
@@ -43,7 +43,7 @@ export const INSTRUCTIONS = [
  * relevant detail and passes just that on; the rest of the chat stays out. Tuned in stage 5 by the measured misses.
  */
 export const WEB_INSTRUCTIONS = [
-    "Recollect is the user's own memory and planner. Their buddy there follows what is going on in their life and brings things back at a good moment.",
+    "Kaaga is the user's own memory and planner. Their buddy there follows what is going on in their life and brings things back at a good moment.",
     'At the start of a chat, call get_brief once: it is small and shows what the buddy follows.',
     'While you talk, pass on, without being asked and without mentioning it, what the user says about their own life that will still matter after this conversation: something new about them (remember), or progress, a change or an end on something already known (update_memory, with its id).',
     // ECOSYSTEM_V2_PLAN stage 12: the work log, from every chat; one picture, so nothing is logged twice.
@@ -58,10 +58,10 @@ export const WEB_INSTRUCTIONS = [
 
 /**
  * A work folder's instructions (B10, BUDDY_MEMORY_PLAN §12.5): nothing from an office chat reaches
- * Recollect unless the agent saves it; it saves the user's own things quietly and never the company's.
+ * Kaaga unless the agent saves it; it saves the user's own things quietly and never the company's.
  */
 export const OFFICE_INSTRUCTIONS = [
-    "Recollect is the user's own notebook, not this company's. This is a work folder: nothing from this chat reaches Recollect unless you save it.",
+    "Kaaga is the user's own notebook, not this company's. This is a work folder: nothing from this chat reaches Kaaga unless you save it.",
     'Save quietly what they would want later: something about their own life (remember), a reminder or a dated to-do of their own (set_reminder, add_task), an idea or insight (add_pocket_note). Don’t ask first, and say nothing about it in your reply unless they asked for it. One thing a call; most turns have nothing. Never save company code, data, clients or colleagues’ names.',
     'When they ask to log the day’s work ("log today’s work", /log-work), use log_work. Call get_brief or get_work_log only when they ask what was done here before.',
     // EASY_SETUP_PLAN §7: a chat here that is clearly theirs (study, a side project) is marked; only their own word reads it.
@@ -70,10 +70,10 @@ export const OFFICE_INSTRUCTIONS = [
 
 /** EASY_SETUP_PLAN §3.5: a folder nobody has said what it is yet: the one question comes first. */
 export const NEW_FOLDER_INSTRUCTIONS = (name: string): string =>
-    `This folder ("${name}") is new to Recollect: early in the chat, ask the user once in one line whether it is for building something of their own, for learning, or for their job, or whether Recollect should ignore it, and call set_folder with the answer. Until then nothing from this chat is read.`;
+    `This folder ("${name}") is new to Kaaga: early in the chat, ask the user once in one line whether it is for building something of their own, for learning, or for their job, or whether Kaaga should ignore it, and call set_folder with the answer. Until then nothing from this chat is read.`;
 
 /** A folder the user excluded (MCP_MEMORY_PLAN §4.9, R13): no tools, and this one line. */
-export const EXCLUDED_INSTRUCTIONS = 'This folder is excluded by the user: nothing here is saved to Recollect or read from it, so no Recollect tools are listed.';
+export const EXCLUDED_INSTRUCTIONS = 'This folder is excluded by the user: nothing here is saved to Kaaga or read from it, so no Kaaga tools are listed.';
 
 /** What a work folder lists (B10): the saving tools and this project's work log, nothing else. */
 export const OFFICE_TOOLS = ['get_brief', 'remember', 'add_task', 'set_reminder', 'add_pocket_note', 'log_work', 'get_work_log', 'set_folder', 'set_chat'] as const;
@@ -81,7 +81,7 @@ export const OFFICE_TOOLS = ['get_brief', 'remember', 'add_task', 'set_reminder'
 /**
  * MCP_MEMORY_PLAN §4.1: what claude.ai and ChatGPT list (the remote door). No more_tools: each request there builds a
  * fresh server, so nothing can be turned on for the next one. Canvas and block editing, goal and week editing stay
- * with Claude Code and Recollect itself.
+ * with Claude Code and Kaaga itself.
  */
 export const WEB_TOOLS = [
     // The buddy
@@ -136,7 +136,7 @@ export type ToolSet = (typeof TOOL_SETS)[number];
 
 /** A call to a removed field (a host that cached an older list): it still runs, and the answer says to reconnect. */
 const REMOVED_FIELDS: Readonly<Record<string, readonly string[]>> = { checkpoint: ['said', 'learned'], get_brief: ['about'] };
-const RECONNECT = 'This app’s list of Recollect tools is out of date: reconnect the Recollect connector. What the user says about themselves goes to remember or update_memory.';
+const RECONNECT = 'This app’s list of Kaaga tools is out of date: reconnect the Kaaga connector. What the user says about themselves goes to remember or update_memory.';
 
 /** Every tool, in the order they are listed. */
 export const TOOL_NAMES = [
@@ -185,7 +185,7 @@ export const TOOL_NAMES = [
     'recent_agent_edits',
     'more_tools',
     // The "manage" group (MANAGER_AND_DOCS_PLAN §3.3): not listed until more_tools (or
-    // RECOLLECT_TOOLS=all); the in-app manager always has it.
+    // KAAGA_TOOLS=all); the in-app manager always has it.
     'trash_doc',
     'restore_doc',
     'empty_trash',
@@ -432,7 +432,7 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     remove_note: 'manage',
 };
 
-/** RECOLLECT_TOOLS: "all", or groups separated by commas ("core,docs,manage"); else the default. */
+/** KAAGA_TOOLS: "all", or groups separated by commas ("core,docs,manage"); else the default. */
 export function groupsFrom(value: string | undefined): ToolGroup[] {
     const raw = (value ?? '').trim().toLowerCase();
     if (raw === 'all') return [...TOOL_GROUP_NAMES];
@@ -441,7 +441,7 @@ export function groupsFrom(value: string | undefined): ToolGroup[] {
 }
 
 export interface ServerOptions {
-    api: RecollectApi;
+    api: KaagaApi;
     agentName: string;
     /** A setup problem every tool reports instead of calling the API (no token, bad URL). */
     problem?: string | null;
@@ -455,7 +455,7 @@ export interface ServerOptions {
     workMode?: boolean;
     /** The work folder's project key (get_work_log answers for it alone). */
     workProject?: string;
-    /** B10: the folder's project when Recollect's hooks act in it (log_work reads the hook's clock for it). */
+    /** B10: the folder's project when Kaaga's hooks act in it (log_work reads the hook's clock for it). */
     clockProject?: string;
     /** MCP_MEMORY_PLAN §4.9: Claude Code's folder, sent with remember and update_memory. */
     project?: string;
@@ -467,7 +467,7 @@ export interface ServerOptions {
 
 const INSTRUCTIONS_OF: Readonly<Record<ToolSet, string>> = { web: WEB_INSTRUCTIONS, code: INSTRUCTIONS, office: OFFICE_INSTRUCTIONS, excluded: EXCLUDED_INSTRUCTIONS, all: INSTRUCTIONS };
 
-export function createRecollectServer(options: ServerOptions): McpServer {
+export function createKaagaServer(options: ServerOptions): McpServer {
     const set: ToolSet = options.set ?? (options.workMode ? 'office' : 'code');
     // A new folder's question comes before everything else (EASY_SETUP_PLAN §3.5).
     const instructions = options.folder?.isNew && set !== 'excluded' && set !== 'web' ? `${NEW_FOLDER_INSTRUCTIONS(options.folder.name)} ${INSTRUCTIONS_OF[set]}` : INSTRUCTIONS_OF[set];
@@ -556,7 +556,7 @@ function guardCalls(server: McpServer, registry: Map<string, RegisteredTool>, se
             if (tool && !tool.enabled) {
                 if (set === 'excluded') return errorResult(EXCLUDED_INSTRUCTIONS);
                 if (set === 'code') return errorResult(`${name} is in the ${TOOL_GROUPS[name as ToolName]} group: call more_tools first, then call it again.`);
-                return errorResult(`${name} is not available in this app: use Recollect itself, or Claude Code.`);
+                return errorResult(`${name} is not available in this app: use Kaaga itself, or Claude Code.`);
             }
             const removed = (REMOVED_FIELDS[name] ?? []).filter((f) => Object.prototype.hasOwnProperty.call(req.params.arguments ?? {}, f));
             const result = await original(req, extra);

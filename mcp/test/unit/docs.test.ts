@@ -82,7 +82,7 @@ describe('read_doc', () => {
         expect(first.text).toMatch(/^Added a note under "Why it works" in doc docA, right after the paragraph you quoted, with the day and your app under it\./);
         expect((await add({ heading: 'Why it works' })).text).toMatch(/at the end of that section/);
         expect((await add({ heading: 'Why it works' })).text).toBe('Already in that section ("Why it works"): not added again.');
-        expect((await add({ heading: 'Why it works' })).text).toMatch(/^Appended 2 blocks to the end of doc docA \(this Recollect server is older/);
+        expect((await add({ heading: 'Why it works' })).text).toMatch(/^Appended 2 blocks to the end of doc docA \(this Kaaga server is older/);
         expect((await add({ after: 'start one pointer' })).isError).toBe(true);
         expect(h.requests).toHaveLength(4);
     });
@@ -212,7 +212,7 @@ describe('create_doc', () => {
         h = await connect({ 'POST /api/agent/docs': fail(403, 'This access token lacks the "docs:write" scope') });
         const res = await h.call('create_doc', { title: 'T', markdown: 'x' });
         expect(res.isError).toBe(true);
-        expect(res.text).toBe('The Recollect token lacks the "docs:write" scope this tool needs. Make a token with "docs:write" in Settings → Agents.');
+        expect(res.text).toBe('The Kaaga token lacks the "docs:write" scope this tool needs. Make a token with "docs:write" in Settings → Agents.');
     });
 
     it('describes the Markdown dialect in short; guide: true answers the whole guide and creates nothing (MCP_MEMORY_PLAN §4.10)', async () => {

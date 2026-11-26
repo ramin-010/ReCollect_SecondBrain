@@ -1,26 +1,31 @@
 // End-to-end smoke test: the BUILT server (dist/index.js) over stdio, driven by the SDK's client,
-// against a running Recollect API. Run with `npm run test:smoke` (builds first).
+// against a running Kaaga API. Run with `npm run test:smoke` (builds first).
 //
-// It logs in as the dev user, makes a token with all three scopes, then: reads (search, today,
+// It logs in as the QA user, makes a token with all three scopes, then: reads (search, today,
 // due, subjects, overview, goals), creates a doc (callout, toggle, mermaid), reads it, appends,
 // adds a canvas (and reads its fence back), replaces a section (and a wrong heading first, to see
 // the heading list), lists the agent edits;
 // checks that a read-only token is refused writes with the missing scope named. No focus, pocket
-// or goal writes (real dev data). Cleanup with the cookie: undo the doc-create edit (archives the
+// or goal writes. Cleanup with the cookie: undo the doc-create edit (archives the
 // doc), mark the smoke edits seen, revoke the tokens, and check a revoked token is refused.
 //
-// Env: RECOLLECT_URL (default http://localhost:8002), RECOLLECT_SMOKE_EMAIL / _PASSWORD (default the
-// dev user), SMOKE_TRANSCRIPT (a file to write the transcript to).
-import { writeFileSync } from 'node:fs';
+// Env: KAAGA_URL (default http://localhost:8002), KAAGA_SMOKE_EMAIL / _PASSWORD (default the
+// QA user), SMOKE_TRANSCRIPT (a file to write the transcript to). The server runs in a scratch home, so it never
+// reads or writes the real ~/.kaaga or ~/.recollect.
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { envOf } from '../../src/config.js';
 import { TOOL_NAMES } from '../../src/server.js';
 
-const API = (process.env['RECOLLECT_URL'] ?? 'http://localhost:8002').replace(/\/+$/, '');
-const EMAIL = process.env['RECOLLECT_SMOKE_EMAIL'] ?? 'dev@recollect.local';
-const PASSWORD = process.env['RECOLLECT_SMOKE_PASSWORD'] ?? 'devpass123';
+const API = (envOf('KAAGA_URL') ?? 'http://localhost:8002').replace(/\/+$/, '');
+const EMAIL = envOf('KAAGA_SMOKE_EMAIL') ?? 'qa@recollect.local';
+const PASSWORD = envOf('KAAGA_SMOKE_PASSWORD') ?? 'qapass123';
+const HOME = mkdtempSync(path.join(tmpdir(), 'kaaga-smoke-home-'));
 const SERVER = fileURLToPath(new URL('../../dist/index.js', import.meta.url));
 const AGENT = 'MCP smoke test';
 const UNDO = 'Undo: the user can undo this from Home → From your agent.';
@@ -105,13 +110,13 @@ async function spawn(token: string): Promise<Client> {
     const transport = new StdioClientTransport({
         command: process.execPath,
         args: [SERVER],
-        env: { ...getDefaultEnvironment(), RECOLLECT_URL: API, RECOLLECT_TOKEN: token, RECOLLECT_AGENT_NAME: AGENT },
+        env: { ...getDefaultEnvironment(), USERPROFILE: HOME, HOME, KAAGA_HOOKS_HOME: HOME, KAAGA_URL: API, KAAGA_TOKEN: token, KAAGA_AGENT_NAME: AGENT },
         stderr: 'pipe',
     });
     transport.stderr?.on('data', (chunk: Buffer) => {
         stderr += chunk.toString();
     });
-    const c = new Client({ name: 'recollect-smoke', version: '1.0.0' });
+    const c = new Client({ name: 'kaaga-smoke', version: '1.0.0' });
     await c.connect(transport);
     return c;
 }
@@ -167,7 +172,7 @@ async function undoDocCreate(): Promise<void> {
     transcript.push(`(cookie) undo doc_create edit ${create!.id} → archived doc ${docId}; marked ${ours.length} other smoke edits seen`);
 }
 
-describe('recollect-mcp end to end (built server over stdio, live API)', () => {
+describe('kaaga-mcp end to end (built server over stdio, live API)', () => {
     it('lists the 20 tools', async () => {
         const { tools } = await client!.listTools();
         expect(tools.map((t) => t.name)).toEqual([...TOOL_NAMES]);
@@ -279,7 +284,7 @@ describe('recollect-mcp end to end (built server over stdio, live API)', () => {
         await revoke(tokens[0]!.id);
         const res = await call(client!, 'list_subjects');
         expect(res.isError).toBe(true);
-        expect(res.text).toMatch(/^The Recollect token is invalid or revoked: make a new one in Settings → Agents/);
+        expect(res.text).toMatch(/^The Kaaga token is invalid or revoked: make a new one in Settings → Agents/);
     });
 
     it('the token never appears in the server log or in any answer', () => {

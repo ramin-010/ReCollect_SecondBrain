@@ -42,9 +42,9 @@ describe('the flow with numbers', () => {
      */
     function setup(opts: { capture?: number; lose?: number; paused?: number; down?: boolean; reuse?: boolean; asks?: Array<{ _id: string; text: string; answers: string[]; until: string }> } = {}) {
         if (!opts.reuse || !home) {
-            home = mkdtempSync(path.join(os.tmpdir(), 'recollect-numbers-'));
+            home = mkdtempSync(path.join(os.tmpdir(), 'kaaga-numbers-'));
             const allow = [{ path: 'E:/PERSONAL_PROJECTS/', mode: 'full', brief: true }];
-            writeFileSync(path.join(home, 'hooks.json'), JSON.stringify({ url: 'http://recollect.test', token: `rcl_${'a'.repeat(43)}`, allow, brief: true }));
+            writeFileSync(path.join(home, 'hooks.json'), JSON.stringify({ url: 'http://kaaga.test', token: `rcl_${'a'.repeat(43)}`, allow, brief: true }));
         }
         const calls: Call[] = [];
         const read = new Map<string, number>();
@@ -93,7 +93,7 @@ describe('the flow with numbers', () => {
             }
             return json({ session: {} });
         });
-        return { env: { RECOLLECT_HOOKS_HOME: home, RECOLLECT_HOOKS_FLUSH: 'inline' }, calls, taken, read };
+        return { env: { KAAGA_HOOKS_HOME: home, KAAGA_HOOKS_FLUSH: 'inline' }, calls, taken, read };
     }
 
     const input = (over: Record<string, unknown> = {}) => ({ session_id: 's1', cwd: 'E:/PERSONAL_PROJECTS/second_brain', source: 'startup', ...over });
@@ -103,7 +103,7 @@ describe('the flow with numbers', () => {
     it('each message goes as it is typed, numbered, the last one read coming along as context with the end of the reply', async () => {
         const { env, calls, taken } = setup();
         await runHook('start', input(), env, t(0));
-        expect(serverCapture({ url: 'http://recollect.test' }, env)).toBe(2);
+        expect(serverCapture({ url: 'http://kaaga.test' }, env)).toBe(2);
         await runHook('prompt', input({ prompt: 'I want to get back to running three mornings a week' }), env, t(1));
         expect(words(calls)).toHaveLength(1);
         expect(words(calls)[0]!.body).toMatchObject({ v: 2, canHold: true, sessionKey: 'cc_s1', seq: 1, messages: [{ n: 1, text: 'I want to get back to running three mornings a week' }] });
@@ -166,7 +166,7 @@ describe('the flow with numbers', () => {
         await runHook('start', input({ session_id: 's2' }), back.env, t(30));
         expect(back.taken.map((m) => m.text)).toEqual(['I need to call the landlord about the heating this week', 'and book the dentist before the end of the month']);
         // The session itself is logged once, now that the server answers.
-        expect(back.calls.filter((c) => c.method === 'PUT').map((c) => c.url)).toEqual(['http://recollect.test/api/sessions/by-key/cc_s1']);
+        expect(back.calls.filter((c) => c.method === 'PUT').map((c) => c.url)).toEqual(['http://kaaga.test/api/sessions/by-key/cc_s1']);
         expect(readdirSync(path.join(home, 'open')).sort()).toEqual(['s2.json']);
         void calls;
     });
@@ -212,7 +212,7 @@ describe('the flow with numbers', () => {
         await runHook('prompt', input({ session_id: 'w1', prompt: 'a long first message '.repeat(120) }), upgraded.env, t(1));
         await runHook('stop', input({ session_id: 'w1', last_assistant_message: 'ok' }), upgraded.env, t(2));
         expect(words(upgraded.calls)[0]!.body).not.toHaveProperty('v');
-        expect(serverCapture({ url: 'http://recollect.test' }, upgraded.env)).toBe(2);
+        expect(serverCapture({ url: 'http://kaaga.test' }, upgraded.env)).toBe(2);
         await runHook('prompt', input({ session_id: 'w1', prompt: 'and here is the next thing I wanted' }), upgraded.env, t(3));
         // Midway to numbers: message 1 was sent as a piece, so only message 2 is new (1 comes as context).
         expect(words(upgraded.calls).at(-1)!.body.messages.map((m: { n: number; context?: boolean }) => [m.n, !!m.context])).toEqual([

@@ -89,7 +89,7 @@ describe('remember', () => {
         });
         const res = await h.call('remember', { text: 'Studies best after 9 pm', said_on: '2026-11-17' });
         expect(h.requests.map((r) => r.body)).toEqual([{ text: 'Studies best after 9 pm', saidOn: '2026-11-17', inferred: false }, { text: 'Studies best after 9 pm' }]);
-        expect(res.text).toBe('Saved: "Studies best after 9 pm" (fact) · id mem1\nThis Recollect server is older: saved without when it was said and whose word it is (it takes them from its next release).');
+        expect(res.text).toBe('Saved: "Studies best after 9 pm" (fact) · id mem1\nThis Kaaga server is older: saved without when it was said and whose word it is (it takes them from its next release).');
         await h.close();
         h = await connect({ 'POST /api/buddy/remember': fail(400, 'text: Too long') });
         expect((await h.call('remember', { text: 'x' })).isError).toBe(true);
@@ -198,7 +198,7 @@ describe('update_memory', () => {
 
     it('an older server (no route for tokens) says to use remember; an unknown id stays an error', async () => {
         h = await connect({ 'POST /api/buddy/update': [fail(403, 'Access tokens cannot be used for this endpoint'), fail(404, 'Nothing with that id: look it up with recall_memory')] });
-        expect((await h.call('update_memory', { on: 'mem1', text: 'x' })).text).toBe('This Recollect server is older: it takes update_memory from its next release. Save it with remember for now.');
+        expect((await h.call('update_memory', { on: 'mem1', text: 'x' })).text).toBe('This Kaaga server is older: it takes update_memory from its next release. Save it with remember for now.');
         const unknown = await h.call('update_memory', { on: 'nope', text: 'x' });
         expect(unknown.isError).toBe(true);
         expect(unknown.text).toMatch(/Nothing with that id/);
@@ -228,7 +228,7 @@ describe('recall_memory and forget', () => {
         expect(res.text).toBe(
             [
                 '"Studies best after 9 pm" (fact, seen 5×, said 2026-06-03, last 2026-11-16, via ChatGPT) · id mem1',
-                '"Wants a backend offer" (aim, pinned, their own, said 2026-11-16, via Recollect) · id mem2',
+                '"Wants a backend offer" (aim, pinned, their own, said 2026-11-16, via Kaaga) · id mem2',
                 '"Studies after work" (fact, closed: "Changed: now Studies best after 9 pm", replaced by "Studies best after 9 pm" (id mem1), said 2026-05-01, last 2026-06-01, via Claude) · id mem0',
                 '"Walks in the mornings" (pattern, inferred, check: said two ways, which one holds is not settled) · id mem4',
             ].join('\n')

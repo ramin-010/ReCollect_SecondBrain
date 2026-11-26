@@ -11,16 +11,16 @@ import { clockDir, localDay, runHook } from '../../src/hook.js';
 
 let h: Harness | undefined;
 let home = '';
-const saved = process.env['RECOLLECT_HOOKS_HOME'];
+const saved = process.env['KAAGA_HOOKS_HOME'];
 beforeEach(() => {
-    home = mkdtempSync(path.join(os.tmpdir(), 'recollect-worklog-'));
-    process.env['RECOLLECT_HOOKS_HOME'] = home;
+    home = mkdtempSync(path.join(os.tmpdir(), 'kaaga-worklog-'));
+    process.env['KAAGA_HOOKS_HOME'] = home;
 });
 afterEach(async () => {
     await h?.close();
     h = undefined;
-    if (saved === undefined) delete process.env['RECOLLECT_HOOKS_HOME'];
-    else process.env['RECOLLECT_HOOKS_HOME'] = saved;
+    if (saved === undefined) delete process.env['KAAGA_HOOKS_HOME'];
+    else process.env['KAAGA_HOOKS_HOME'] = saved;
     rmSync(home, { recursive: true, force: true });
 });
 
@@ -28,8 +28,8 @@ afterEach(async () => {
 async function clockDay(day: Date, turns: Array<[number, number, string, number]>) {
     const { writeFileSync } = await import('node:fs');
     const allow = [{ path: 'D:/erp-workspace/', mode: 'light', brief: false, nudge: true, commits: false }];
-    writeFileSync(path.join(home, 'hooks.json'), JSON.stringify({ url: 'http://recollect.test', token: `rcl_${'a'.repeat(43)}`, allow, brief: true }));
-    const env = { RECOLLECT_HOOKS_HOME: home };
+    writeFileSync(path.join(home, 'hooks.json'), JSON.stringify({ url: 'http://kaaga.test', token: `rcl_${'a'.repeat(43)}`, allow, brief: true }));
+    const env = { KAAGA_HOOKS_HOME: home };
     const input = { session_id: 'o1', cwd: 'D:/erp-workspace/erp' };
     for (const [hour, minute, prompt, took] of turns) {
         await runHook('prompt', { ...input, prompt }, env, new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, minute));

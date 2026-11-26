@@ -1,6 +1,6 @@
-// The remote door (MCP_MEMORY_PLAN §4.1, stage 1): claude.ai and ChatGPT reach Recollect through the stateless
+// The remote door (MCP_MEMORY_PLAN §4.1, stage 1): claude.ai and ChatGPT reach Kaaga through the stateless
 // POST /mcp, a fresh server for every request. This drives handleMcpHttp over real HTTP, one request at a time,
-// against a fake Recollect API: every tool the web set lists can be called, no answer says "disabled", and
+// against a fake Kaaga API: every tool the web set lists can be called, no answer says "disabled", and
 // more_tools is not listed (nothing turned on in one request could last to the next).
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -143,7 +143,7 @@ describe('the remote door (POST /mcp, a fresh server per request)', () => {
         for (const name of ['more_tools', 'list_sessions', 'update_canvas']) {
             const result = await client.callTool({ name, arguments: {} });
             expect(result.isError, name).toBe(true);
-            expect((result.content as Array<{ text: string }>)[0]!.text).toBe(`${name} is not available in this app: use Recollect itself, or Claude Code.`);
+            expect((result.content as Array<{ text: string }>)[0]!.text).toBe(`${name} is not available in this app: use Kaaga itself, or Claude Code.`);
         }
         await client.close();
     });

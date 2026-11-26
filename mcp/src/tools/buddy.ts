@@ -164,11 +164,11 @@ export const zNoteFields = {
     private: z.boolean().optional().describe('Health, money, family, other people, fears, work conflicts (a state is, by default).'),
 };
 
-/** Where a memory came from: its app, or Recollect itself. */
+/** Where a memory came from: its app, or Kaaga itself. */
 function viaOf(m: Memory): string | null {
     if (m.agentName) return m.agentName;
     if (!m.source) return null;
-    return m.source === 'hook' ? 'Claude Code' : m.source === 'buddy' ? 'the buddy' : m.source === 'agent' ? 'an agent' : 'Recollect';
+    return m.source === 'hook' ? 'Claude Code' : m.source === 'buddy' ? 'the buddy' : m.source === 'agent' ? 'an agent' : 'Kaaga';
 }
 
 /** A memory as one line: its words, then its marks (kind, whose word, when said and last seen, where from, its chain), then its id. */
@@ -252,7 +252,7 @@ export function listsText(related: Related | undefined, inMotion: InMotion[] | u
     return lines.join('\n');
 }
 
-const OLDER_SERVER_SAVE = 'This Recollect server is older: saved without when it was said and whose word it is (it takes them from its next release).';
+const OLDER_SERVER_SAVE = 'This Kaaga server is older: saved without when it was said and whose word it is (it takes them from its next release).';
 
 interface UpdateAnswer {
     paused: boolean;
@@ -342,7 +342,7 @@ export function registerBuddyTools(server: McpServer, ctx: ToolContext): void {
             try {
                 r = await api.post('/api/buddy/remember', body);
             } catch (err) {
-                // An older Recollect server (before the deploy) refuses the new fields: it saves without them.
+                // An older Kaaga server (before the deploy) refuses the new fields: it saves without them.
                 if (!(err instanceof ApiError) || err.status !== 400 || !/saidOn|inferred|unrecognized/i.test(err.message)) throw err;
                 r = await api.post('/api/buddy/remember', { ...note, ...(ctx.project ? { project: ctx.project } : {}) });
                 older = true;
@@ -382,9 +382,9 @@ export function registerBuddyTools(server: McpServer, ctx: ToolContext): void {
             try {
                 r = await api.post('/api/buddy/update', { on, update: update ?? 'said', text, inferred: inferred ?? false, ...(said_on ? { saidOn: said_on } : {}), ...(ctx.project ? { project: ctx.project } : {}) });
             } catch (err) {
-                // An older Recollect server has no update route (tokens are refused there).
+                // An older Kaaga server has no update route (tokens are refused there).
                 if (err instanceof ApiError && (err.status === 404 || err.status === 403) && /cannot be used for this endpoint|not found/i.test(err.message) && !/nothing with that id/i.test(err.message)) {
-                    return 'This Recollect server is older: it takes update_memory from its next release. Save it with remember for now.';
+                    return 'This Kaaga server is older: it takes update_memory from its next release. Save it with remember for now.';
                 }
                 throw err;
             }
@@ -649,9 +649,9 @@ function registerWebLogWork(server: McpServer, ctx: ToolContext): void {
             try {
                 r = await api.post<LogLineAnswer>('/api/buddy/work/line', body);
             } catch (err) {
-                // An older Recollect server (before the deploy) has no such route: tokens are refused there.
+                // An older Kaaga server (before the deploy) has no such route: tokens are refused there.
                 if (err instanceof ApiError && (err.status === 404 || err.status === 403) && /cannot be used for this endpoint|not found/i.test(err.message)) {
-                    return 'This Recollect server is older: it takes work lines from its next release.';
+                    return 'This Kaaga server is older: it takes work lines from its next release.';
                 }
                 throw err;
             }
@@ -662,7 +662,7 @@ function registerWebLogWork(server: McpServer, ctx: ToolContext): void {
                     ...r.lines.map(outcomeText),
                     ...linkNudges(r.lines, r.picture),
                     r.picture ? pictureText(r.picture) : '',
-                    anySaved ? 'Logged quietly: say nothing about it in your reply unless they asked for it.' : r.lines.some((o) => o.status === 'full') ? 'If it matters, they can add it in Recollect.' : '',
+                    anySaved ? 'Logged quietly: say nothing about it in your reply unless they asked for it.' : r.lines.some((o) => o.status === 'full') ? 'If it matters, they can add it in Kaaga.' : '',
                 ]
                     .filter(Boolean)
                     .join('\n');
@@ -689,7 +689,7 @@ function registerWebLogWork(server: McpServer, ctx: ToolContext): void {
                 case 'removed':
                     return 'Not logged: they removed a line that says the same from their log.';
                 case 'full':
-                    return 'Not logged: 30 new work lines from chats in a day is the most (news on a known line still goes, with on). If it matters, they can add it in Recollect.';
+                    return 'Not logged: 30 new work lines from chats in a day is the most (news on a known line still goes, with on). If it matters, they can add it in Kaaga.';
                 case 'off':
                     return WEB_LOG_OFF;
                 default:
@@ -739,7 +739,7 @@ function registerChatLogWork(server: McpServer, ctx: ToolContext): void {
             const name = (project ?? ctx.clockProject ?? '').trim().toLowerCase();
             if (!lines?.length) {
                 const already = await alreadyLogged(theDay, name);
-                if (!ctx.clockProject) return ['No clock here (Recollect’s hooks don’t run in this folder): send the lines without times, with the project.', already].filter(Boolean).join('\n');
+                if (!ctx.clockProject) return ['No clock here (Kaaga’s hooks don’t run in this folder): send the lines without times, with the project.', already].filter(Boolean).join('\n');
                 const clock = readClock(name, theDay);
                 return [clock.length ? clockText(name, theDay, clock) : `No turns on the clock for ${name} on ${theDay}: send the lines without times.`, already].filter(Boolean).join('\n');
             }

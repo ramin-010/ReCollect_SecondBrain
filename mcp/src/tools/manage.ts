@@ -307,12 +307,12 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
             try {
                 r = await api.post<Reminder>('/api/reminders', { ...base, ...(ring ? { ring } : {}), ...(repeat ? { repeat } : {}) });
             } catch (err) {
-                // An older Recollect server (before stage 7's release) refuses ring and repeat: there a reminder rings, once.
+                // An older Kaaga server (before stage 7's release) refuses ring and repeat: there a reminder rings, once.
                 if (!(err instanceof ApiError) || err.status !== 400 || !(ring || repeat) || !/\b(ring|repeat)\b/.test(err.message)) throw err;
                 r = await api.post<Reminder>('/api/reminders', base);
             }
             // An older server says nothing of how it rings: there every reminder rings (an alarm on the phone, an email), once.
-            const kind = r.ring === undefined ? ' (this Recollect server rings every reminder, once: silent and repeating ones come with its next release)' : ` (${howItRings(r)})`;
+            const kind = r.ring === undefined ? ' (this Kaaga server rings every reminder, once: silent and repeating ones come with its next release)' : ` (${howItRings(r)})`;
             return quietly(ctx.workMode, withUndo(`Reminder set: ${quote(r.task)} at ${r.when}${kind}${r.createdTask ? ' (a new task)' : ''} · id ${r._id}.`));
         }
     );
@@ -448,7 +448,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Share a doc with someone (needs their tap)',
             description:
-                'Ask to give someone with a Recollect account access to a doc of theirs by their email: role "viewer" (can view), "editor" (can edit), or "remove" to take it away. It only asks: they tap "Do it" on Home.',
+                'Ask to give someone with a Kaaga account access to a doc of theirs by their email: role "viewer" (can view), "editor" (can edit), or "remove" to take it away. It only asks: they tap "Do it" on Home.',
             input: {
                 docId: zDocId,
                 email: z.string().trim().email().max(200),

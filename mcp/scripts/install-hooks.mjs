@@ -1,4 +1,4 @@
-// Installs Recollect's Claude Code hooks (SYNC_SPINE_SPEC 1.4): coding sessions in allowed folders
+// Installs Kaaga's Claude Code hooks (SYNC_SPINE_SPEC 1.4): coding sessions in allowed folders
 // log themselves, and a session starts with the brief.
 //   npm run install:hooks                         asks for the token once (Settings → Agents: read + sessions:write)
 //   npm run install:hooks -- --token rcl_… --allow "E:/PERSONAL_PROJECTS/" --url http://localhost:8002
@@ -7,10 +7,11 @@
 //                      are: personal and study folders are read in full and briefed; a work folder is logged for time
 //                      only (no brief, no commit subjects, the reminder to save). They replace the folders in hooks.json.
 //                      A folder none of them names is not heard. The app's Settings › Tracking can change a folder later.
-//   --settings <file>  another settings file (tests: a throwaway one)   --home <dir>  instead of ~/.recollect
-// Writes ~/.recollect/hooks.json, and merges four hooks into ~/.claude/settings.json after saving a
-// backup beside it (settings.json.bak-<time>). Our hooks are the ones whose command runs mcp/dist/hook.js;
-// nothing else in the file is touched.
+//   --settings <file>  another settings file (tests: a throwaway one)   --home <dir>  instead of ~/.kaaga
+// Writes ~/.kaaga/hooks.json (starting from the one in ~/.recollect, from before the rename, when ~/.kaaga has
+// none), and merges four hooks into ~/.claude/settings.json after saving a backup beside it
+// (settings.json.bak-<time>). Our hooks are the ones whose command runs mcp/dist/hook.js; nothing else in
+// the file is touched. `npx kaaga-setup` moves the rest of ~/.recollect over.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -33,12 +34,14 @@ const kindRules = [
 const here = path.dirname(fileURLToPath(import.meta.url));
 const hookJs = path.resolve(here, '../dist/hook.js').replace(/\\/g, '/');
 const settingsFile = path.resolve(flag('--settings') ?? path.join(os.homedir(), '.claude', 'settings.json'));
-const home = path.resolve(flag('--home') ?? process.env.RECOLLECT_HOOKS_HOME ?? path.join(os.homedir(), '.recollect'));
+const home = path.resolve(flag('--home') ?? (process.env.KAAGA_HOOKS_HOME || process.env.RECOLLECT_HOOKS_HOME || path.join(os.homedir(), '.kaaga')));
+/** The hooks.json from before the rename (KAAGA_REBRAND_PLAN D7), read when the new folder has none. */
+const oldConfigFile = path.join(os.homedir(), '.recollect', 'hooks.json');
 const MARK = 'mcp/dist/hook.js';
-/** Ours: this checkout's hook.js, or the one `npx recollect-setup` installed (EASY_SETUP_PLAN). */
+/** Ours: this checkout's hook.js, or the one `npx kaaga-setup` (or the older recollect-setup) installed (EASY_SETUP_PLAN). */
 const isOurs = (command) => {
     const c = String(command ?? '').replace(/\\/g, '/');
-    return c.includes(MARK) || (/dist\/hook\.js/.test(c) && /re-collect|recollect/i.test(c));
+    return c.includes(MARK) || (/dist\/hook\.js/.test(c) && /kaaga|re-collect|recollect/i.test(c));
 };
 
 /** [event, hook.js argument, extra group fields, timeout in seconds] */
@@ -54,10 +57,11 @@ if (!remove && !existsSync(hookJs)) {
     process.exit(1);
 }
 
-// ── ~/.recollect/hooks.json ─────────────────────────────────────────────
+// ── ~/.kaaga/hooks.json ─────────────────────────────────────────────────
 if (!remove) {
     const configFile = path.join(home, 'hooks.json');
-    const config = existsSync(configFile) ? JSON.parse(readFileSync(configFile, 'utf8')) : {};
+    const from = existsSync(configFile) ? configFile : !flag('--home') && existsSync(oldConfigFile) ? oldConfigFile : null;
+    const config = from ? JSON.parse(readFileSync(from, 'utf8')) : {};
     config.url = flag('--url') ?? config.url ?? 'http://localhost:8002';
     config.allow =
         kindRules.length > 0 || flag('--allow')
@@ -67,15 +71,15 @@ if (!remove) {
     let token = flag('--token') ?? config.token;
     if (!token) {
         if (!process.stdin.isTTY) {
-            console.error('No token yet: make one in Recollect (Settings → Agents) with read and sessions:write, then run again with --token rcl_…');
+            console.error('No token yet: make one in Kaaga (Settings → Agents) with read and sessions:write, then run again with --token rcl_…');
             process.exit(1);
         }
         const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-        token = (await rl.question('Recollect token for the hooks (Settings → Agents, scopes read + sessions:write): ')).trim();
+        token = (await rl.question('Kaaga token for the hooks (Settings → Agents, scopes read + sessions:write): ')).trim();
         rl.close();
     }
     if (!token.startsWith('rcl_')) {
-        console.error('That does not look like a Recollect token (they start with rcl_).');
+        console.error('That does not look like a Kaaga token (they start with rcl_).');
         process.exit(1);
     }
     config.token = token;
@@ -110,6 +114,6 @@ mkdirSync(path.dirname(settingsFile), { recursive: true });
 writeFileSync(settingsFile, `${JSON.stringify(settings, null, 2)}\n`);
 console.log(
     remove
-        ? `Removed Recollect's hooks from ${settingsFile}.`
-        : `Added Recollect's hooks to ${settingsFile}: SessionStart (the brief), UserPromptSubmit and Stop (active minutes), SessionEnd (logs the session). Turn them off for one run with RECOLLECT_HOOKS=off.`
+        ? `Removed Kaaga's hooks from ${settingsFile}.`
+        : `Added Kaaga's hooks to ${settingsFile}: SessionStart (the brief), UserPromptSubmit and Stop (active minutes), SessionEnd (logs the session). Turn them off for one run with KAAGA_HOOKS=off.`
 );

@@ -1,4 +1,4 @@
-// The Recollect REST API, as an agent (personal access token) sees it.
+// The Kaaga REST API, as an agent (personal access token) sees it.
 //
 //   - Every request: Authorization: Bearer rcl_…, X-Agent-Name, Accept: application/json.
 //   - Every write (POST/PUT/PATCH): an Idempotency-Key (a fresh uuid per write request), reused on
@@ -50,7 +50,7 @@ export class ApiError extends Error {
     }
 }
 
-export const USER_AGENT = 'recollect-mcp/0.1.0';
+export const USER_AGENT = 'kaaga-mcp/0.1.0';
 
 const sleep = (ms: number) => (ms > 0 ? new Promise<void>((resolve) => setTimeout(resolve, ms)) : Promise.resolve());
 
@@ -93,7 +93,7 @@ export function networkReason(err: unknown): string {
     return err instanceof Error ? err.message : String(err);
 }
 
-export class RecollectApi {
+export class KaagaApi {
     readonly baseUrl: string;
     private readonly token: string;
     private readonly agentName: string;
@@ -216,7 +216,7 @@ export class RecollectApi {
                 if (status >= 500) this.log(`${label}: HTTP ${status}`);
                 throw new ApiError(status, messageOf(status, parsed, text), code, label, isStillRunning(status, parsed));
             }
-            if (parsed?.success !== true) throw new ApiError(status, 'Recollect sent an answer this server does not understand', null, label);
+            if (parsed?.success !== true) throw new ApiError(status, 'Kaaga sent an answer this server does not understand', null, label);
             return { data: parsed.data as T, status, replayed };
         }
     }

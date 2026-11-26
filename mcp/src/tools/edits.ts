@@ -22,7 +22,7 @@ export function registerEditTools(server: McpServer, ctx: ToolContext, agentName
         {
             title: 'Recent agent edits',
             description:
-                'What agents (you included) recently wrote in Recollect, newest first: each edit with its doc id and whether the user kept it, undid it or has not reviewed it yet. ' +
+                'What agents (you included) recently wrote in Kaaga, newest first: each edit with its doc id and whether the user kept it, undid it or has not reviewed it yet. ' +
                 'Check it to avoid repeating work, or after an error to see whether a write went through.',
             input: {
                 limit: z.number().int().min(1).max(100).optional().describe('How many edits, 1–100 (default 10).'),

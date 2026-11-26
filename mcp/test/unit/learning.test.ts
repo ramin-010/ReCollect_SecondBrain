@@ -216,7 +216,7 @@ describe('get_today', () => {
         h = await connect({ 'GET /api/today': fail(401, 'This access token was revoked') });
         const res = await h.call('get_today');
         expect(res.isError).toBe(true);
-        expect(res.text).toMatch(/^The Recollect token is invalid or revoked: make a new one in Settings → Agents/);
+        expect(res.text).toMatch(/^The Kaaga token is invalid or revoked: make a new one in Settings → Agents/);
     });
 });
 

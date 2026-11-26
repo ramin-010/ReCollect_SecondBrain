@@ -35,8 +35,8 @@ describe('the session tells the server its folder’s kind', () => {
     });
 
     function setup(allow: AllowEntry[], refuseKind = false) {
-        home = mkdtempSync(path.join(os.tmpdir(), 'recollect-kinds-'));
-        writeFileSync(path.join(home, 'hooks.json'), JSON.stringify({ url: 'http://recollect.test', token: `rcl_${'a'.repeat(43)}`, allow, brief: true }));
+        home = mkdtempSync(path.join(os.tmpdir(), 'kaaga-kinds-'));
+        writeFileSync(path.join(home, 'hooks.json'), JSON.stringify({ url: 'http://kaaga.test', token: `rcl_${'a'.repeat(43)}`, allow, brief: true }));
         const puts: unknown[] = [];
         vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
             const body = init?.body ? JSON.parse(String(init.body)) : undefined;
@@ -49,7 +49,7 @@ describe('the session tells the server its folder’s kind', () => {
             const data = String(url).includes('/api/brief') ? { now: { day: '2026-11-23', weekday: 'Mon', time: '10:00', timezone: 'Asia/Kolkata' }, profile: null, goals: [], today: { revisions: { planned: 0, estMinutes: 0, done: 0, waiting: 0 }, focus: [] }, next: [], recent: [], recall: { days: 7, finished: 0, weakTopics: [] }, project: null, session: { key: 'cc_k1' } } : { session: {} };
             return new Response(JSON.stringify({ success: true, data }), { status: 200, headers: { 'content-type': 'application/json' } });
         });
-        return { env: { RECOLLECT_HOOKS_HOME: home }, puts };
+        return { env: { KAAGA_HOOKS_HOME: home }, puts };
     }
 
     const run = async (env: Record<string, string>, cwd: string) => {

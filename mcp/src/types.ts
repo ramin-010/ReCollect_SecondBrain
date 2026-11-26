@@ -1,4 +1,4 @@
-// The parts of the Recollect API responses these tools read (the `data` of `{ success, data }`).
+// The parts of the Kaaga API responses these tools read (the `data` of `{ success, data }`).
 // Shapes follow backend/src/db/serializers/learning.ts and backend/src/services/agent/*.
 
 export type DayString = string; // 'YYYY-MM-DD'

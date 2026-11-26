@@ -1,9 +1,9 @@
 // The time zone agents see times in: the user's learning time zone (Settings), so a
 // change list and "updated" days match the app. Read once per connection; UTC if it can't be read.
-import type { RecollectApi } from './api.js';
+import type { KaagaApi } from './api.js';
 import type { LearningSettings } from './types.js';
 
-const zones = new WeakMap<RecollectApi, Promise<string>>();
+const zones = new WeakMap<KaagaApi, Promise<string>>();
 
 function valid(zone: unknown): string {
     if (typeof zone !== 'string' || !zone) return 'UTC';
@@ -15,7 +15,7 @@ function valid(zone: unknown): string {
     }
 }
 
-export function userTimeZone(api: RecollectApi): Promise<string> {
+export function userTimeZone(api: KaagaApi): Promise<string> {
     let zone = zones.get(api);
     if (!zone) {
         zone = api

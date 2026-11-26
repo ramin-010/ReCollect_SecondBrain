@@ -9,7 +9,7 @@ export class ToolError extends Error {
     }
 }
 
-export const INVALID_TOKEN_MESSAGE = 'The Recollect token is invalid or revoked: make a new one in Settings → Agents';
+export const INVALID_TOKEN_MESSAGE = 'The Kaaga token is invalid or revoked: make a new one in Settings → Agents';
 
 /**
  * The learning API answers a missing (or someone else's) id with a bare 404 "Not found": say
@@ -31,16 +31,16 @@ export function describeError(err: unknown, baseUrl: string): string {
 
     if (err.status === 0) {
         const write = !err.request.startsWith('GET ');
-        return `Can't reach Recollect at ${baseUrl} (${err.message}). Is the backend running?${write ? ' If it comes back, check recent_agent_edits before trying this write again.' : ''}`;
+        return `Can't reach Kaaga at ${baseUrl} (${err.message}). Is the backend running?${write ? ' If it comes back, check recent_agent_edits before trying this write again.' : ''}`;
     }
-    if (err.status === 401) return `${INVALID_TOKEN_MESSAGE}, and update RECOLLECT_TOKEN for this MCP server.`;
+    if (err.status === 401) return `${INVALID_TOKEN_MESSAGE}, and update KAAGA_TOKEN for this MCP server.`;
     if (err.status === 403) {
         const scope = /lacks the "([^"]+)" scope/.exec(err.message)?.[1];
-        if (scope) return `The Recollect token lacks the "${scope}" scope this tool needs. Make a token with "${scope}" in Settings → Agents.`;
-        if (/cannot be used for this endpoint/i.test(err.message)) return `Recollect refused this call for agent tokens (${err.request}).`;
+        if (scope) return `The Kaaga token lacks the "${scope}" scope this tool needs. Make a token with "${scope}" in Settings → Agents.`;
+        if (/cannot be used for this endpoint/i.test(err.message)) return `Kaaga refused this call for agent tokens (${err.request}).`;
         return err.message;
     }
-    if (err.stillRunning) return 'Recollect is still working on this request. Wait a moment, then check recent_agent_edits before trying again.';
-    if (err.status >= 500) return `Recollect had a server error (HTTP ${err.status}): ${err.message}. It was retried once; try again later.`;
+    if (err.stillRunning) return 'Kaaga is still working on this request. Wait a moment, then check recent_agent_edits before trying again.';
+    if (err.status >= 500) return `Kaaga had a server error (HTTP ${err.status}): ${err.message}. It was retried once; try again later.`;
     return err.message;
 }

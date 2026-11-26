@@ -1,15 +1,15 @@
 ---
-name: recollect-study
-description: Study with the user using Recollect (their learning app) through its `recollect` MCP tools, as their tutor that remembers. Use when they ask to study, learn, continue a topic or a course, be quizzed, practise DSA problems, or "pick up where we left off"; and in any chat that starts from Recollect's "Copy prompt".
+name: kaaga-study
+description: Study with the user using Kaaga (their learning app) through its `kaaga` MCP tools, as their tutor that remembers. Use when they ask to study, learn, continue a topic or a course, be quizzed, practise DSA problems, or "pick up where we left off"; and in any chat that starts from Kaaga's "Copy prompt".
 ---
 
-# Studying with the user through Recollect
+# Studying with the user through Kaaga
 
-Recollect holds the user's plan (goals → paths of topics → today) and their record (sessions, weak spots, notes with spaced revision). You teach in this chat; Recollect remembers it for the next chat. **Two tools carry the memory: `get_brief` at the start, `checkpoint` as you go.** Never ask them to log anything, and never wait for "the end" to write the record: chats get closed, and whatever you checkpointed survives.
+Kaaga holds the user's plan (goals → paths of topics → today) and their record (sessions, weak spots, notes with spaced revision). You teach in this chat; Kaaga remembers it for the next chat. **Two tools carry the memory: `get_brief` at the start, `checkpoint` as you go.** Never ask them to log anything, and never wait for "the end" to write the record: chats get closed, and whatever you checkpointed survives.
 
 ## 1. Start: `get_brief`
 
-Call `get_brief` first (pass `project` when the chat is in a code folder), then `more_tools` once: it turns on the tools for notes and the revision card (`add_note`, `list_notes`, `update_note`, `remove_note`, `set_revision_card`). A resumed chat can start without them: when one isn't in your tool list, call `more_tools` again; never tell them Recollect is disconnected before trying that. The brief gives their profile (how they like to learn: follow it), goals and pace, today, each path's next topic with its **last session** and **open weak spots**, and a **session key**. Keep the key for every checkpoint.
+Call `get_brief` first (pass `project` when the chat is in a code folder), then `more_tools` once: it turns on the tools for notes and the revision card (`add_note`, `list_notes`, `update_note`, `remove_note`, `set_revision_card`). A resumed chat can start without them: when one isn't in your tool list, call `more_tools` again; never tell them Kaaga is disconnected before trying that. The brief gives their profile (how they like to learn: follow it), goals and pace, today, each path's next topic with its **last session** and **open weak spots**, and a **session key**. Keep the key for every checkpoint.
 
 Then say, in two lines, where they stand and what you propose: first a piece of this week's targets (the brief's `Week:` line), else the next topic and its next step, starting with its weak spots. They may pick something else; go with them.
 
@@ -17,7 +17,7 @@ Then say, in two lines, where they stand and what you propose: first a piece of 
 
 ## 2. A lesson lives in one doc, and you keep it
 
-Their lesson is a doc in Recollect, open beside this chat. They read a part there, ask you until it makes sense, and you keep the doc true to how they came to understand it. You teach in the chat; the doc is what they come back to in a month, so it should read the way it finally clicked for them.
+Their lesson is a doc in Kaaga, open beside this chat. They read a part there, ask you until it makes sense, and you keep the doc true to how they came to understand it. You teach in the chat; the doc is what they come back to in a month, so it should read the way it finally clicked for them.
 
 A part is 10–20 minutes: they read it (or you explain it briefly when there is no lesson yet; a diagram when parts move), they ask, then **a short quiz of 2–4 questions** they answer before you show the answers. Then `checkpoint`:
 
@@ -44,7 +44,7 @@ Ask once per part. Never ask them to restate something already saved. When their
 ## 3. Keeping what made it click
 
 Doubts are the best material. When an explanation clears one up, they may say:
-- **"Update this in the doc"** → `append_to_doc { docId, heading, after, markdown }`: the explanation that worked, condensed, under the part it belongs to (`after`: a few words of the paragraph it follows). A short bold title, the point, the example if that is what did it, one line on what confused them. Never the chat's transcript. Recollect adds the day and your app under it, and doesn't add what the section already holds.
+- **"Update this in the doc"** → `append_to_doc { docId, heading, after, markdown }`: the explanation that worked, condensed, under the part it belongs to (`after`: a few words of the paragraph it follows). A short bold title, the point, the example if that is what did it, one line on what confused them. Never the chat's transcript. Kaaga adds the day and your app under it, and doesn't add what the section already holds.
 - **"Add this to my lesson notes"** → `add_note { docId, title, markdown }`: worth keeping, but beside the lesson's line of thought.
 - **"Add this to my subject notes"** → `add_note { subject, title, markdown }`: about the subject as a whole.
 - A video or page worth keeping → `add_note { url, title }` on the lesson or the subject.
@@ -56,7 +56,7 @@ Notes are theirs to shape through you: "tidy my notes", "merge these two", "drop
 ## 3b. When the lesson is complete
 
 A lesson is complete when they pass its checklist without notes and a final quiz. Then:
-1. No doc yet (you taught it in the chat)? Write its note first with the **recollect-notes** skill: `create_doc { title, markdown, topicId }` for a topic planned on their path.
+1. No doc yet (you taught it in the chat)? Write its note first with the **kaaga-notes** skill: `create_doc { title, markdown, topicId }` for a topic planned on their path.
 2. `set_revision_card { docId, markdown }`: 5–10 key points in their wording, the one diagram that carries the lesson, 4–8 check-yourself questions as toggles (from the lesson's own questions and their weak spots). Each review opens this card first.
 3. Ask once: "Start revising it?" On yes: `schedule_revision`, then `checkpoint { key, topicStatus: "done", nextStep: "<the next topic's first step>" }`. Reviews come back after 1, 3, 7 and 21 days.
 4. Say what comes next on the path (`get_path`). If the course needs a topic that isn't planned, `plan_topics` adds it where it belongs.
@@ -67,7 +67,7 @@ When they review a due topic with you (`list_due` shows the reviews and their id
 
 ## 3d. Writing a lesson, going deeper, a starter lesson
 
-- **The next lesson** is written straight into Recollect, one at a time, just before they need it: `create_doc { title, markdown, topicId }` (the **recollect-notes** skill for diagrams): parts of about 30 minutes, each going why it exists → how it works → a diagram → in their own systems → see it yourself → check yourself (answers in toggles).
+- **The next lesson** is written straight into Kaaga, one at a time, just before they need it: `create_doc { title, markdown, topicId }` (the **kaaga-notes** skill for diagrams): parts of about 30 minutes, each going why it exists → how it works → a diagram → in their own systems → see it yourself → check yourself (answers in toggles).
 - **Going deeper later:** `read_doc` and `list_notes { docId }` first, then study the advanced parts with them and add to the same doc; replace the card (`set_revision_card`) when the lesson has grown.
 - **A starter lesson for a subject:** `list_notes { subject, lessons: true }`, then `create_doc` from the questions and explanations they collected; say which notes you used.
 
@@ -83,3 +83,5 @@ Each problem is its own session: checkpoint it under the brief's key plus `:1`, 
 - No rituals: never ask them to log, rate, restate or confirm; never recite a limit. Do the smooth thing and say it in one line.
 - Studying, or going through one of their docs to understand it, is recorded by `checkpoint`, never by `log_work`: it is not work. A decision about a project or something they finished for one still goes to the work log.
 - Every write can be undone by them from Home; topic changes show under "From your agent".
+
+<!-- installed by kaaga -->

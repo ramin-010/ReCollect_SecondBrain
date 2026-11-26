@@ -27,7 +27,8 @@ async function serverIn(allow: unknown[]): Promise<{ client: Client; folder: str
             command: process.execPath,
             args: [ENTRY],
             cwd: folder,
-            env: { ...process.env, RECOLLECT_HOOKS_HOME: home, RECOLLECT_URL: 'http://127.0.0.1:9', RECOLLECT_TOKEN: `rcl_${'c'.repeat(43)}` } as Record<string, string>,
+            // The scratch folder is its home too, so no build (an older dist-next reads other names) can reach the real one.
+            env: { ...process.env, USERPROFILE: home, HOME: home, KAAGA_HOOKS_HOME: home, KAAGA_URL: 'http://127.0.0.1:9', KAAGA_TOKEN: `rcl_${'c'.repeat(43)}` } as Record<string, string>,
             stderr: 'ignore',
         })
     );

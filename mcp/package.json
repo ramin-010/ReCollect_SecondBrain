@@ -1,9 +1,9 @@
 {
-  "name": "recollect-setup",
-  "version": "0.3.2",
-  "description": "Recollect for your AI coding tools: `npx recollect-setup` signs this computer in (you approve it in your browser) and adds Recollect's tools, hooks and skills to Claude Code, Antigravity and Cursor.",
+  "name": "kaaga-setup",
+  "version": "0.4.0",
+  "description": "Kaaga for your AI coding tools: `npx kaaga-setup` signs this computer in (you approve it in your browser) and adds Kaaga's tools, hooks and skills to Claude Code, Antigravity and Cursor.",
   "keywords": [
-    "recollect",
+    "kaaga",
     "mcp",
     "claude-code",
     "antigravity",
@@ -14,7 +14,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "bin": {
-    "recollect-setup": "dist/cli.js"
+    "kaaga-setup": "dist/cli.js"
   },
   "main": "dist/index.js",
   "files": [

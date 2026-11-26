@@ -4,11 +4,11 @@ import type { McpServer, RegisteredTool } from '@modelcontextprotocol/sdk/server
 import type { ZodRawShapeCompat } from '@modelcontextprotocol/sdk/server/zod-compat.js';
 import type { CallToolResult, ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import type { z } from 'zod';
-import type { RecollectApi } from './api.js';
+import type { KaagaApi } from './api.js';
 import { describeError } from './errors.js';
 
 export interface ToolContext {
-    api: RecollectApi;
+    api: KaagaApi;
     /** A setup problem (no token, bad URL): every tool answers with it instead of calling the API. */
     problem: string | null;
     /** Every tool registered, by name (the server turns groups on and off with it). */
@@ -17,7 +17,7 @@ export interface ToolContext {
     workMode?: boolean;
     /** In a work folder: its project key (get_work_log answers for it alone). */
     workProject?: string;
-    /** B10: the folder's project when Recollect's hooks act in it (log_work reads the hook's clock). */
+    /** B10: the folder's project when Kaaga's hooks act in it (log_work reads the hook's clock). */
     clockProject?: string;
     /** MCP_MEMORY_PLAN §4.9: Claude Code's folder, sent with remember and update_memory. */
     project?: string;

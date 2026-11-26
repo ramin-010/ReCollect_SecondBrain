@@ -1,30 +1,32 @@
-# recollect-setup: Recollect for your AI coding tools
+# kaaga-setup: Kaaga for your AI coding tools
 
-Recollect keeps what you learn and what you work on: notes with real diagrams, study paths and spaced revision, goals, a work log, and a buddy that remembers what you tell it across chats. This package connects your AI coding tools to it: the Recollect MCP server (the tools an agent calls), Claude Code's hooks (chats log their own time), and the skills.
+Kaaga keeps what you learn and what you work on: notes with real diagrams, study paths and spaced revision, goals, a work log, and a buddy that remembers what you tell it across chats. This package connects your AI coding tools to it: the Kaaga MCP server (the tools an agent calls), Claude Code's hooks (chats log their own time), and the skills.
 
 ## Set up (one command)
 
-Needs Node.js 22 or newer and an account on [re-collect.in](https://re-collect.in).
+Needs Node.js 22 or newer and an account on [kaaga.in](https://kaaga.in).
 
 ```sh
-npx recollect-setup
+npx kaaga-setup
 ```
 
-1. It shows a code and opens re-collect.in: check that the page shows the same code and press **Approve** (no token to copy).
-2. It installs the app in `~/.recollect/app` and adds Recollect to every AI tool it finds on this computer:
-   - **Claude Code:** the tools (user scope), four hooks (each chat logs its own time; your words reach your buddy where the folder allows it), and the skills `/log-work`, `/recollect-study`, `/recollect-notes`, `/study`, `/build`, `/work`.
+1. It shows a code and opens kaaga.in: check that the page shows the same code and press **Approve** (no token to copy).
+2. It installs the app in `~/.kaaga/app` and adds Kaaga to every AI tool it finds on this computer:
+   - **Claude Code:** the tools (user scope), four hooks (each chat logs its own time; your words reach your buddy where the folder allows it), and the skills `/log-work`, `/kaaga-study`, `/kaaga-notes`, `/study`, `/build`, `/work`.
    - **Antigravity:** the tools and the skills. It has no hooks for this, so its chats log themselves through the tools (`checkpoint`).
    - **Cursor:** the tools; its chats log themselves through the tools.
-3. Start a new chat. The first chat in a new folder asks you once what the folder is: for **building** something of your own, for **learning**, or for your **work** (work time is logged for your work log, its words aren't read, and it doesn't count as progress), or to ignore it. Change any folder later in Recollect › Settings › Tracking, where you also pick what is logged (everything, the time only, nothing) and what new folders do.
+3. Start a new chat. The first chat in a new folder asks you once what the folder is: for **building** something of your own, for **learning**, or for your **work** (work time is logged for your work log, its words aren't read, and it doesn't count as progress), or to ignore it. Change any folder later in Kaaga › Settings › Tracking, where you also pick what is logged (everything, the time only, nothing) and what new folders do.
 4. A chat can differ from its folder: type `/study`, `/build` or `/work` (or just say so), and the agent may mark one itself, saying so in one line. A change in the middle of a chat splits its time there.
 
 ```sh
-npx recollect-setup status    # what is set up, who it is signed in as
-npx recollect-setup@latest update    # the newest version, set up again (@latest: npx may keep an older copy)
-npx recollect-setup remove    # take it all out (the sign-in ends itself)
+npx kaaga-setup status    # what is set up, who it is signed in as
+npx kaaga-setup@latest update    # the newest version, set up again (@latest: npx may keep an older copy)
+npx kaaga-setup remove    # take it all out (the sign-in ends itself)
 ```
 
-Options: `--url <server>` (default `https://api.re-collect.in`), `--login` (sign in again), `--tools claude,antigravity,cursor`, `--no-open` (print the link only). Every file it changes gets a backup beside it first, and only Recollect's own entries are touched. The token lives in `~/.recollect/config.json` only.
+Options: `--url <server>` (default `https://api.kaaga.in`), `--login` (sign in again), `--tools claude,antigravity,cursor`, `--no-open` (print the link only). Every file it changes gets a backup beside it first, and only Kaaga's own entries are touched. The token lives in `~/.kaaga/config.json` only.
+
+**Set up with `recollect-setup` before?** `npx kaaga-setup` moves it over in one run, and nothing changes until the new app is in place: the sign-in and everything in `~/.recollect` (folder rules, open chats, the day's clock) go to `~/.kaaga`; the `recollect` MCP server, its hooks and the skills `/recollect-study` and `/recollect-notes` give way to Kaaga's, each only when the older setup made it; and the old address becomes `https://api.kaaga.in` once that answers (the old one works until 22 Jan 2027). Until it runs, the new app still finds `~/.recollect`.
 
 ## Set up by hand (developers)
 
@@ -36,27 +38,29 @@ Options: `--url <server>` (default `https://api.re-collect.in`), `--login` (sign
    npm run build
    ```
 
-2. Make a token in Recollect: **Settings → Agents**. Give it the scopes the tools need (below); all of them for full use. The token (`rcl_…`) is shown once.
+2. Make a token in Kaaga: **Settings → Agents**. Give it the scopes the tools need (below); all of them for full use. The token (`rcl_…`) is shown once.
 
 3. Add the server to Claude Code:
 
    ```sh
-   claude mcp add recollect -s user -e RECOLLECT_URL=http://localhost:8002 -e RECOLLECT_TOKEN=rcl_… -- node /path/to/mcp/dist/index.js
+   claude mcp add kaaga -s user -e KAAGA_URL=http://localhost:8002 -e KAAGA_TOKEN=rcl_… -- node /path/to/mcp/dist/index.js
    ```
 
-   Check it with `claude mcp list`, or `/mcp` inside Claude Code. In Windows PowerShell, type `claude.cmd` instead of `claude` (here and for `npm`, `npm.cmd`): the `.ps1` shims drop the `--`, and the command then fails. Without `RECOLLECT_TOKEN` the server reads `~/.recollect/config.json` (what `npx recollect-setup` writes).
+   Check it with `claude mcp list`, or `/mcp` inside Claude Code. In Windows PowerShell, type `claude.cmd` instead of `claude` (here and for `npm`, `npm.cmd`): the `.ps1` shims drop the `--`, and the command then fails. Without `KAAGA_TOKEN` the server reads `~/.kaaga/config.json` (what `npx kaaga-setup` writes).
 
 | Variable | Default | |
 |---|---|---|
-| `RECOLLECT_TOKEN` | `~/.recollect/config.json` | The `rcl_…` token. Without it (and no setup) the server still starts, and every tool says how to fix it. |
-| `RECOLLECT_URL` | `http://localhost:8002` | The API origin. A trailing `/` or `/api` is fine. |
-| `RECOLLECT_AGENT_NAME` (or `RECOLLECT_AGENT`) | `Claude Code` | Sent as `X-Agent-Name`; Home shows it on "From your agent". Give each connection its own, e.g. `RECOLLECT_AGENT=study-chat`. |
-| `RECOLLECT_TIMEOUT_MS` | `30000` | Per request. |
-| `RECOLLECT_FOLDERS` | on | `off`: assume no folder (a tool that doesn't start its servers in the project folder: Antigravity, Cursor). |
-| `RECOLLECT_DEBUG` | off | `1`: one stderr line per API call (method, path, status, time). |
+| `KAAGA_TOKEN` | `~/.kaaga/config.json` | The `rcl_…` token. Without it (and no setup) the server still starts, and every tool says how to fix it. |
+| `KAAGA_URL` | `http://localhost:8002` | The API origin. A trailing `/` or `/api` is fine. |
+| `KAAGA_AGENT_NAME` (or `KAAGA_AGENT`) | `Claude Code` | Sent as `X-Agent-Name`; Home shows it on "From your agent". Give each connection its own, e.g. `KAAGA_AGENT=study-chat`. |
+| `KAAGA_TIMEOUT_MS` | `30000` | Per request. |
+| `KAAGA_FOLDERS` | on | `off`: assume no folder (a tool that doesn't start its servers in the project folder: Antigravity, Cursor). |
+| `KAAGA_DEBUG` | off | `1`: one stderr line per API call (method, path, status, time). |
+
+Each variable is still read by its older `RECOLLECT_*` name when the `KAAGA_*` one isn't set.
 
 ### Over HTTP (remote MCP, stage 6)
-The backend serves the same catalogue at `POST <api origin>/mcp` (MCP Streamable HTTP, stateless): `claude mcp add --transport http recollect http://localhost:8002/mcp --header "Authorization: Bearer rcl_…"`. The token's scopes and the edit log apply as for the stdio server; it lists the `web` set (no `more_tools`: each request is a fresh server). Without a token it answers 401 pointing at `/.well-known/oauth-protected-resource/mcp`, and **an app can sign in instead of using a pasted token** (OAuth 2.1, 2026-11-15): `claude mcp add --transport http recollect http://localhost:8002/mcp` with no header opens Recollect's consent page in the browser ("Allow Claude Code to use Recollect?"), and claude.ai's custom connector does the same once the API has a public HTTPS address. The connection shows in Settings → Agents ("Signed in from the app"); its token lasts an hour and renews itself; Revoke ends it. Details: ALWAYS_ON_SPEC 6.5.
+The backend serves the same catalogue at `POST <api origin>/mcp` (MCP Streamable HTTP, stateless): `claude mcp add --transport http kaaga http://localhost:8002/mcp --header "Authorization: Bearer rcl_…"`. The token's scopes and the edit log apply as for the stdio server; it lists the `web` set (no `more_tools`: each request is a fresh server). Without a token it answers 401 pointing at `/.well-known/oauth-protected-resource/mcp`, and **an app can sign in instead of using a pasted token** (OAuth 2.1, 2026-11-15): `claude mcp add --transport http kaaga http://localhost:8002/mcp` with no header opens Kaaga's consent page in the browser ("Allow Claude Code to use Kaaga?"), and claude.ai's custom connector does the same once the API has a public HTTPS address. The connection shows in Settings → Agents ("Signed in from the app"); its token lasts an hour and renews itself; Revoke ends it. Details: ALWAYS_ON_SPEC 6.5.
 
 ### claude.ai and ChatGPT (no hooks)
 A chat with no hooks (claude.ai or ChatGPT, on the web or the phone) is heard only through its tool calls. Set it up once:
@@ -64,7 +68,7 @@ A chat with no hooks (claude.ai or ChatGPT, on the web or the phone) is heard on
 2. Nothing else is required: the connector's instructions and the small brief `get_brief` returns tell the assistant to pass on what you say about your own life (`remember` for something new, `update_memory` for progress, a change or an end on something your buddy knows) and to leave the rest of the chat out.
 3. The **`catch_up`** prompt (where the app shows prompts) passes on, at the end of a chat, what you said about yourself (at most 3 things, never work details) and logs the session.
 
-Every save is kept at once with when it was said, the app and whether you said it or the assistant inferred it; an inference never changes anything. Your own words heard by Recollect (its chat, Claude Code's hooks) and what you said through an assistant weigh the same: the newest by the time said wins.
+Every save is kept at once with when it was said, the app and whether you said it or the assistant inferred it; an inference never changes anything. Your own words heard by Kaaga (its chat, Claude Code's hooks) and what you said through an assistant weigh the same: the newest by the time said wins.
 
 ## Scopes
 
@@ -76,14 +80,14 @@ Every save is kept at once with when it was said, the app and whether you said i
 | `tasks:write` | `add_task`, `update_task` (personal tasks only). Tokens that had `learning:write` got it with the migration. |
 | `learning:write` | `complete_revision`, `move_revision`, `update_settings`, `empty_trash`, `publish_doc`, `share_doc` (these three ask), `create_subject`, `schedule_revision`, `create_goal`, `update_goal`, `add_milestone`, `complete_milestone`, `update_milestone`, `remove_milestone`, `add_focus`, `update_focus`, `remove_focus`, `plan_topics`, `update_topic`, `add_pocket_note`, `add_week_target`, `update_week_target`, `suggest`, `log_decision`, and `create_subject_if_missing` on `create_doc`. |
 
-A call without the scope it needs fails with the scope named, e.g. `The Recollect token lacks the "docs:write" scope this tool needs. Make a token with "docs:write" in Settings → Agents.` A revoked or unknown token: `The Recollect token is invalid or revoked: make a new one in Settings → Agents…`
+A call without the scope it needs fails with the scope named, e.g. `The Kaaga token lacks the "docs:write" scope this tool needs. Make a token with "docs:write" in Settings → Agents.` A revoked or unknown token: `The Kaaga token is invalid or revoked: make a new one in Settings → Agents…`
 
 ## Tools
 
-82 tools (some rows below hold two or more), plus the `study`, `build`, `work`, `catch_up` and `note_recipe` prompts (and, on the web, `log_my_work`) and the skills (`npm run install:skill`, or `npx recollect-setup`).
+82 tools (some rows below hold two or more), plus the `study`, `build`, `work`, `catch_up` and `note_recipe` prompts (and, on the web, `log_my_work`) and the skills (`npm run install:skill`, or `npx kaaga-setup`).
 
-**A tool set per door** (MCP_MEMORY_PLAN §4.1, `createRecollectServer({ set })`):
-- **`code`, Claude Code (stdio):** the groups **core, docs, plan and record** from the start (the 40,000-character budget holds for these) and the **manage** group when it calls `more_tools` or the server runs with `RECOLLECT_TOOLS=all` (or a list such as `core,docs,manage`).
+**A tool set per door** (MCP_MEMORY_PLAN §4.1, `createKaagaServer({ set })`):
+- **`code`, Claude Code (stdio):** the groups **core, docs, plan and record** from the start (the 40,000-character budget holds for these) and the **manage** group when it calls `more_tools` or the server runs with `KAAGA_TOOLS=all` (or a list such as `core,docs,manage`).
 - **`web`, claude.ai and ChatGPT (the remote `/mcp`):** 32 tools (`WEB_TOOLS`: the buddy, tasks and reminders, the lock screen, quick capture, the plan to read, studying, docs, and since stage 12 the work log: `log_work` one outcome a call, `update_work_line`, `get_work_log`; at most 24,000 characters) and no `more_tools`, since each request there is a fresh server. Connect the connector and set its tools to "Always allow"; nothing else is needed.
 - **`office`, a work folder (`brief: false`):** the seven saving tools, `set_folder` and `set_chat`; answers carry no "Related" or "In motion".
 - **`excluded`, a folder whose rule is `off`:** no tools.
@@ -128,7 +132,7 @@ A tool a door doesn't list answers one line saying so, never "disabled". Each to
 | **manage:** `update_focus` / `remove_focus` | Change a focus line (text, done) or remove it; both undoable | `PATCH` / `DELETE /api/focus/:id` |
 | `add_pocket_note` | A pocket (quick) note, optionally pinned. Agents can add them, never read them | `PUT /api/quick-notes/:newUuid` |
 | **manage:** `recent_agent_edits` | What agents wrote lately, and whether the user kept or undid it | `GET /api/agent/edits` |
-| `remember` | Their buddy's memory (what Recollect learns about them across chats): one new thing they said about their own life (text, a kind: fact, preference, value, aim, idea, decision, pattern, state, thread, win; `said_on` when it was said earlier; `inferred` when the assistant concludes it; private for health, money, people, fears…). Code keeps it true: a repeat is "seen again", one marked wrong (or close to it) is not saved, a closed one comes back only when they say it on a later day, an inference is a working memory marked inferred; nothing is kept while the buddy is paused; every text passes a secret scrub. The answer lists what is related (with a hint when it looks like an old version) and what is in motion. Not an edit-log row: /you shows each memory with the app that saved it | `POST /api/buddy/remember` |
+| `remember` | Their buddy's memory (what Kaaga learns about them across chats): one new thing they said about their own life (text, a kind: fact, preference, value, aim, idea, decision, pattern, state, thread, win; `said_on` when it was said earlier; `inferred` when the assistant concludes it; private for health, money, people, fears…). Code keeps it true: a repeat is "seen again", one marked wrong (or close to it) is not saved, a closed one comes back only when they say it on a later day, an inference is a working memory marked inferred; nothing is kept while the buddy is paused; every text passes a secret scrub. The answer lists what is related (with a hint when it looks like an old version) and what is in motion. Not an edit-log row: /you shows each memory with the app that saved it | `POST /api/buddy/remember` |
 | `update_memory` | Progress on, a change to or the end of something known, by its id (`on`: a memory, or a thread): `update` progress, done, skipped, changed, paused, resumed, dropped, finished or said. Progress strengthens the one memory; a said change replaces the old version (kept as history, Undo); an older statement arriving late joins the history; two versions of one day in an unknown order are never guessed (the current one stays, marked check); an inference only adds a note | `POST /api/buddy/update` |
 | `recall_memory` | Search what their buddy knows (words or word starts), or list it by kind and status; each line says when it was said, the app it came from, and what replaced it; private ones are marked; a query also finds what is going on (threads) and their months (the buddy's chapters) | `GET /api/buddy/memories`, `GET /api/buddy/threads`, `GET /api/buddy/chapters` |
 | **manage:** `get_work_log` | Their work as one picture (stage 12): per project and day, each thing once at its newest (an open problem later fixed says so; a changed decision shows the newest), from every chat and app, with each line's app and id; `view` done, decided (with the decision it changed) or open; search words or pick days; in a work folder, that project only; a work folder's lines reach connected chats only while the person shares them. Listed on the web | `GET /api/buddy/work` |
@@ -165,17 +169,17 @@ GitHub Markdown, with headings `#` to `######` (a toggle heading folds its secti
 
 ## Claude Code hooks (coding sessions log themselves)
 
-`npx recollect-setup` adds four hooks to `~/.claude/settings.json` (a backup is saved beside it first); the url and token are in `~/.recollect/config.json`. By hand: `npm run install:hooks` (after `npm run build`) writes `~/.recollect/hooks.json` (`url`, `token`, `allow`, `brief`) instead; make that token in Settings → Agents with **read** and **sessions:write**. `npm run install:hooks -- --remove` takes the hooks out again.
+`npx kaaga-setup` adds four hooks to `~/.claude/settings.json` (a backup is saved beside it first); the url and token are in `~/.kaaga/config.json`. By hand: `npm run install:hooks` (after `npm run build`) writes `~/.kaaga/hooks.json` (`url`, `token`, `allow`, `brief`) instead; make that token in Settings → Agents with **read** and **sessions:write**. `npm run install:hooks -- --remove` takes the hooks out again.
 
-- **Folder rules (EASY_SETUP_PLAN, 11-23):** without an `allow` list the rules are the server's: what each folder is and what is logged there (Settings › Tracking), read at each session's start and kept 10 minutes in `~/.recollect/rules.json` (a prompt never waits for the network). A folder is known by its project folder: the outermost git repo it is in, below the home folder, else its own name; a project nobody decided on its own, inside a folder decided as work, is part of that work folder (`D:/erp-workspace/beta/app` → `erp-workspace` when `erp-workspace` is no repo itself; a personal or study folder doesn't take in what is inside it). A folder the server has never seen follows the account's default; by default it asks once: the start hook tells the agent to ask, `set_folder` saves the answer, and until then nothing is read and the session waits on the PC (14 days at most). An `allow` list in `hooks.json` is an override for that PC: a folder it doesn't name is not heard, and for one the server knows, the stricter of the two decides what is read.
-- **What a chat is:** `set_chat`, or a typed `/study`, `/build`, `/work` (`all` after it: from the chat's start), adds a line to `~/.recollect/open/<session>.kind.jsonl`. The session's time splits where it changed (`cc_<session>`, then `cc_<session>:k1`, …), each part sent with what it is and who said so. Their own word that a chat in a work folder is theirs reads its words from then on; an agent's guess never reads more, and a chat marked work reads no words.
+- **Folder rules (EASY_SETUP_PLAN, 11-23):** without an `allow` list the rules are the server's: what each folder is and what is logged there (Settings › Tracking), read at each session's start and kept 10 minutes in `~/.kaaga/rules.json` (a prompt never waits for the network). A folder is known by its project folder: the outermost git repo it is in, below the home folder, else its own name; a project nobody decided on its own, inside a folder decided as work, is part of that work folder (`D:/erp-workspace/beta/app` → `erp-workspace` when `erp-workspace` is no repo itself; a personal or study folder doesn't take in what is inside it). A folder the server has never seen follows the account's default; by default it asks once: the start hook tells the agent to ask, `set_folder` saves the answer, and until then nothing is read and the session waits on the PC (14 days at most). An `allow` list in `hooks.json` is an override for that PC: a folder it doesn't name is not heard, and for one the server knows, the stricter of the two decides what is read.
+- **What a chat is:** `set_chat`, or a typed `/study`, `/build`, `/work` (`all` after it: from the chat's start), adds a line to `~/.kaaga/open/<session>.kind.jsonl`. The session's time splits where it changed (`cc_<session>`, then `cc_<session>:k1`, …), each part sent with what it is and who said so. Their own word that a chat in a work folder is theirs reads its words from then on; an agent's guess never reads more, and a chat marked work reads no words.
 
-- **SessionStart:** in a folder the hooks act in, prints the brief into the session (with the key `cc_<session>` and the project), and opens the session in `~/.recollect/open/`. The header asks the model to `checkpoint` once with that key, the project, a title and the `nextStep` when it finishes a piece of work, so the project's next step stays current (a real run did it unasked).
+- **SessionStart:** in a folder the hooks act in, prints the brief into the session (with the key `cc_<session>` and the project), and opens the session in `~/.kaaga/open/`. The header asks the model to `checkpoint` once with that key, the project, a title and the `nextStep` when it finishes a piece of work, so the project's next step stays current (a real run did it unasked).
 - **UserPromptSubmit, Stop:** one timestamp each, no network: active minutes are the gaps between them, none over 5 minutes. The first real prompt (first line, not a slash command or a one-word reply) is kept as the session's title.
 - **SessionEnd:** logs a `build` session: the project is the first folder under the allowed root, or the outermost repo (`app/backend` → `app`), active minutes, the branch and the subjects of commits made during it (that folder's repo and the repos directly inside it). Its title: the first commit, else the session's own title or first prompt; a chat's title is never replaced. Under 2 active minutes or fewer than 2 prompts: nothing is logged.
 - A window closed without SessionEnd is logged by the next session start (the sweep: last activity over 30 minutes ago). A swept window used again logs the rest as a session of its own (`cc_<id>:r<time>`), as does a session that began before the hooks were installed.
-- Never blocks Claude Code: 3 s per call, failures go to `~/.recollect/hook.log`. Other folders, subagents and `RECOLLECT_HOOKS=off` do nothing. The transcript is never read. A study chat in an allowed folder checkpoints under the same key, so there is one entry, not two.
-- **The day's clock (B10):** in every folder the hooks act in, each prompt and each reply's end is stamped in `~/.recollect/times/<project>/<day>.jsonl` (the prompt's first 60 characters with it). It stays on the PC; `log_work` reads it for the turn times, and files older than two weeks are deleted.
+- Never blocks Claude Code: 3 s per call, failures go to `~/.kaaga/hook.log`. Other folders, subagents and `KAAGA_HOOKS=off` do nothing. The transcript is never read. A study chat in an allowed folder checkpoints under the same key, so there is one entry, not two.
+- **The day's clock (B10):** in every folder the hooks act in, each prompt and each reply's end is stamped in `~/.kaaga/times/<project>/<day>.jsonl` (the prompt's first 60 characters with it). It stays on the PC; `log_work` reads it for the turn times, and files older than two weeks are deleted.
 - **Folder kinds (PERSONAL_OFFICE_PLAN, 11-23):** an entry may say what the folder is, `{ path, kind: "personal" | "study" | "work" }`. The kind gives the defaults (personal and study: `full`, briefed; work: `light`, no brief, the nudge, no commit subjects); the knobs below still override, and `brief: false` without a kind still means work. The session tells the server the kind as a first guess for a folder it has never seen; after that the app's choice (Settings › Tracking) wins on every PC: a folder the server knows as work gets the work brief and its words and lines are office work whatever the PC says. Work time counts as progress only when the person says so. `npm run install:hooks -- --token rcl_… --personal "~/projects/" --work "~/job/"` writes such entries (repeatable; `--study` too); a folder none of them names is not heard.
 - **Folder entries** in `allow` are `{ path, mode, brief, nudge, commits }`: `mode` `full` (their typed words are read for their buddy), `light` (hours only: nothing leaves the PC until the session closes) or `off`; `brief: false` (a work folder) never shows their brief and titles its sessions by the project, never their words; `nudge: true` adds to each prompt a one-line reminder, with the time, to save quietly what they would want later, and once a day to offer to log the work (after 17:30 with an hour of work, or the next morning); `commits: false` sends no branch or commit subjects. A work folder's MCP lists only `get_brief`, `remember`, `add_task`, `set_reminder`, `add_pocket_note`, `log_work`, `get_work_log`, `set_folder` and `set_chat`, with instructions of its own (save quietly, never company code or data).
 
@@ -194,7 +198,7 @@ npm run typecheck     # src and tests
 npm run test:smoke    # builds, then drives dist/index.js over stdio against the running API
 ```
 
-`test:smoke` needs the API on `RECOLLECT_URL` (default `http://localhost:8002`). It logs in as the dev user (`RECOLLECT_SMOKE_EMAIL` / `RECOLLECT_SMOKE_PASSWORD` override it), makes its own tokens, creates one doc titled "MCP smoke test …", appends to it, adds a canvas and rewrites a section, checks that a read-only token is refused writes, then cleans up: it undoes the doc-create (the doc is archived), marks its other edits seen and revokes its tokens. It writes no focus lines, pocket notes or goals. `SMOKE_TRANSCRIPT=<file>` saves the transcript.
+`test:smoke` needs the API on `KAAGA_URL` (default `http://localhost:8002`). It logs in as the dev user (`KAAGA_SMOKE_EMAIL` / `KAAGA_SMOKE_PASSWORD` override it), makes its own tokens, creates one doc titled "MCP smoke test …", appends to it, adds a canvas and rewrites a section, checks that a read-only token is refused writes, then cleans up: it undoes the doc-create (the doc is archived), marks its other edits seen and revokes its tokens. It writes no focus lines, pocket notes or goals. `SMOKE_TRANSCRIPT=<file>` saves the transcript.
 
 Layout: `src/index.ts` (stdio entry), `src/server.ts` (tool list and instructions), `src/api.ts` (HTTP client: auth, idempotency, retries), `src/errors.ts` (agent-facing messages), `src/format.ts` (compact text), `src/subjects.ts` (subjects by name), `src/tools/*` (one file per area).
 

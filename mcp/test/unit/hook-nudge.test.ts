@@ -15,17 +15,17 @@ afterEach(() => {
 });
 
 const TOKEN = `rcl_${'a'.repeat(43)}`;
-const writeConfig = (allow: unknown[]) => writeFileSync(path.join(home, 'hooks.json'), JSON.stringify({ url: 'http://recollect.test', token: TOKEN, allow, brief: true }));
+const writeConfig = (allow: unknown[]) => writeFileSync(path.join(home, 'hooks.json'), JSON.stringify({ url: 'http://kaaga.test', token: TOKEN, allow, brief: true }));
 
 function setup(allow: unknown[]) {
-    home = mkdtempSync(path.join(os.tmpdir(), 'recollect-nudge-'));
+    home = mkdtempSync(path.join(os.tmpdir(), 'kaaga-nudge-'));
     writeConfig(allow);
     const calls: Array<{ method: string; url: string; body: any }> = []; // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
         calls.push({ method: init?.method ?? 'GET', url: String(url), body: init?.body ? JSON.parse(String(init.body)) : undefined });
         return new Response(JSON.stringify({ success: true, data: { session: {}, queued: 1 } }), { status: 200, headers: { 'content-type': 'application/json' } });
     });
-    return { env: { RECOLLECT_HOOKS_HOME: home, RECOLLECT_HOOKS_FLUSH: 'inline' }, calls };
+    return { env: { KAAGA_HOOKS_HOME: home, KAAGA_HOOKS_FLUSH: 'inline' }, calls };
 }
 
 const OFFICE = [
@@ -59,7 +59,7 @@ describe('an office folder', () => {
         const { env, calls } = setup(OFFICE);
         expect(await runHook('start', office(), env, at(10, 0))).toBe('');
         const out = await runHook('prompt', office({ prompt: 'fix the GST rounding in invoice_totals for client Acme\nmore' }), env, at(10, 12));
-        expect(out).toMatch(/^Recollect \[Mon 16 Nov, 10:12\]: before you finish this turn, if their message or your answer holds something the user would want later/);
+        expect(out).toMatch(/^Kaaga \[Mon 16 Nov, 10:12\]: before you finish this turn, if their message or your answer holds something the user would want later/);
         expect(out).toContain('Never save company code, data or client names.');
         await runHook('stop', office(), env, at(10, 19));
         await runHook('prompt', office({ prompt: 'now the tests' }), env, at(10, 25));
@@ -79,7 +79,7 @@ describe('an office folder', () => {
         // Nothing of what he typed left the PC.
         expect(JSON.stringify(calls)).not.toMatch(/GST|Acme|tests/);
         // A personal folder: stamped too, but no reminder (no nudge flag).
-        expect(await runHook('prompt', { session_id: 'p1', cwd: 'E:/PERSONAL_PROJECTS/upfly', prompt: 'next part of the landing page' }, env, at(11, 0))).not.toContain('Recollect [');
+        expect(await runHook('prompt', { session_id: 'p1', cwd: 'E:/PERSONAL_PROJECTS/upfly', prompt: 'next part of the landing page' }, env, at(11, 0))).not.toContain('Kaaga [');
         expect(readClock('upfly', '2026-11-16', env)).toHaveLength(1);
     });
 

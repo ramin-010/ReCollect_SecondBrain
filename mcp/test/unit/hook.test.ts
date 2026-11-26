@@ -1,5 +1,5 @@
 // Claude Code hooks (SYNC_SPINE_SPEC 1.4): the pure parts, and the whole flow against a fake API in
-// a scratch folder (no network, no ~/.recollect).
+// a scratch folder (no network, no ~/.kaaga).
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -24,6 +24,8 @@ describe('the pure parts', () => {
         expect(worthLogging({ prompts: 3 }, 1, {})).toBe(false);
         expect(worthLogging({ prompts: 1 }, 30, {})).toBe(false);
         expect(worthLogging({ prompts: 2 }, 2, {})).toBe(true);
+        expect(worthLogging({ prompts: 0 }, 0, { KAAGA_HOOKS_MIN_MINUTES: '0', KAAGA_HOOKS_MIN_PROMPTS: '0' })).toBe(true);
+        // KAAGA_REBRAND_PLAN D7: the older names still work.
         expect(worthLogging({ prompts: 0 }, 0, { RECOLLECT_HOOKS_MIN_MINUTES: '0', RECOLLECT_HOOKS_MIN_PROMPTS: '0' })).toBe(true);
     });
 
@@ -57,8 +59,8 @@ describe('the flow', () => {
     });
 
     function setup() {
-        home = mkdtempSync(path.join(os.tmpdir(), 'recollect-hook-'));
-        writeFileSync(path.join(home, 'hooks.json'), JSON.stringify({ url: 'http://recollect.test', token: `rcl_${'a'.repeat(43)}`, allow: ['E:/PERSONAL_PROJECTS/'], brief: true }));
+        home = mkdtempSync(path.join(os.tmpdir(), 'kaaga-hook-'));
+        writeFileSync(path.join(home, 'hooks.json'), JSON.stringify({ url: 'http://kaaga.test', token: `rcl_${'a'.repeat(43)}`, allow: ['E:/PERSONAL_PROJECTS/'], brief: true }));
         const calls: Array<{ method: string; url: string; body: unknown }> = [];
         vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
             calls.push({ method: init?.method ?? 'GET', url: String(url), body: init?.body ? JSON.parse(String(init.body)) : undefined });
@@ -77,7 +79,7 @@ describe('the flow', () => {
                 : { session: {} };
             return new Response(JSON.stringify({ success: true, data }), { status: 200, headers: { 'content-type': 'application/json' } });
         });
-        return { env: { RECOLLECT_HOOKS_HOME: home }, calls };
+        return { env: { KAAGA_HOOKS_HOME: home }, calls };
     }
 
     const input = (over: Record<string, unknown> = {}) => ({ session_id: 's1', cwd: 'E:/PERSONAL_PROJECTS/second_brain', source: 'startup', ...over });
@@ -98,25 +100,26 @@ describe('the flow', () => {
         const { env, calls } = setup();
         const t = (m: number) => new Date(Date.UTC(2026, 10, 14, 10, m));
         const out = await runHook('start', input(), env, t(0));
-        expect(out).toContain('Recollect (session-start hook)');
+        expect(out).toContain('Kaaga (session-start hook)');
         expect(out).toContain('Session key: cc_s1');
         // EASY_SETUP_PLAN: the start asks for the server's folder rules first (kept 10 minutes), then the brief.
-        expect(calls[0]!.url).toBe('http://recollect.test/api/projects/rules');
+        expect(calls[0]!.url).toBe('http://kaaga.test/api/projects/rules');
         expect(calls[1]!.url).toContain('/api/brief?project=second_brain&key=cc_s1');
         await runHook('prompt', input(), env, t(1));
         await runHook('stop', input(), env, t(4));
         await runHook('prompt', input(), env, t(5));
         await runHook('end', input({ reason: 'prompt_input_exit' }), env, t(9));
         const put = calls.find((c) => c.method === 'PUT')!;
-        expect(put.url).toBe('http://recollect.test/api/sessions/by-key/cc_s1');
+        expect(put.url).toBe('http://kaaga.test/api/sessions/by-key/cc_s1');
         expect(put.body).toMatchObject({ kindIfNew: 'build', source: 'hook', project: 'second_brain', minutes: 9, startedAt: t(0).toISOString(), endedAt: t(9).toISOString() });
         expect(readdirSync(path.join(home, 'open'))).toEqual([]);
     });
 
-    it('nothing outside the allowed folders, in subagents, or with RECOLLECT_HOOKS=off; too small is dropped quietly', async () => {
+    it('nothing outside the allowed folders, in subagents, or with KAAGA_HOOKS=off; too small is dropped quietly', async () => {
         const { env, calls } = setup();
         expect(await runHook('start', input({ cwd: 'C:/work/job-repo' }), env)).toBe('');
         expect(await runHook('start', input({ agent_id: 'a1' }), env)).toBe('');
+        expect(await runHook('start', input(), { ...env, KAAGA_HOOKS: 'off' })).toBe('');
         expect(await runHook('start', input(), { ...env, RECOLLECT_HOOKS: 'off' })).toBe('');
         expect(calls).toHaveLength(0);
         const t = new Date();

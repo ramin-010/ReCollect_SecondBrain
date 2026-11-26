@@ -1,5 +1,5 @@
 // Subjects by NAME (agents think in names, the API in ids): case-insensitive, spaces ignored.
-import type { RecollectApi } from './api.js';
+import type { KaagaApi } from './api.js';
 import { ToolError, describeError } from './errors.js';
 import { nameList, quote } from './format.js';
 import type { Subject } from './types.js';
@@ -13,7 +13,7 @@ export interface ResolvedSubject {
 
 const key = (name: string): string => name.trim().replace(/\s+/g, ' ').toLowerCase();
 
-export function listSubjects(api: RecollectApi): Promise<Subject[]> {
+export function listSubjects(api: KaagaApi): Promise<Subject[]> {
     return api.get<Subject[]>('/api/subjects');
 }
 
@@ -23,7 +23,7 @@ export function findSubject(subjects: readonly Subject[], name: string): Subject
     return subjects.find((s) => key(s.name) === wanted);
 }
 
-export async function resolveSubject(api: RecollectApi, name: string, options: { createIfMissing?: boolean | undefined } = {}): Promise<ResolvedSubject> {
+export async function resolveSubject(api: KaagaApi, name: string, options: { createIfMissing?: boolean | undefined } = {}): Promise<ResolvedSubject> {
     const subjects = await listSubjects(api);
     const found = findSubject(subjects, name);
     if (found) return { id: found._id, name: found.name, created: false };
@@ -41,7 +41,7 @@ export async function resolveSubject(api: RecollectApi, name: string, options: {
  * The write that follows resolveSubject. If create_subject_if_missing made the subject and this
  * write then fails, the error says the subject exists now (so the agent's picture stays true).
  */
-export async function afterSubject<T>(api: RecollectApi, subject: ResolvedSubject | null, write: Promise<T>): Promise<T> {
+export async function afterSubject<T>(api: KaagaApi, subject: ResolvedSubject | null, write: Promise<T>): Promise<T> {
     try {
         return await write;
     } catch (err) {
@@ -51,7 +51,7 @@ export async function afterSubject<T>(api: RecollectApi, subject: ResolvedSubjec
 }
 
 /** Every name must exist (goals link only existing subjects). */
-export async function resolveSubjects(api: RecollectApi, names: readonly string[]): Promise<ResolvedSubject[]> {
+export async function resolveSubjects(api: KaagaApi, names: readonly string[]): Promise<ResolvedSubject[]> {
     if (names.length === 0) return [];
     const subjects = await listSubjects(api);
     const found: ResolvedSubject[] = [];

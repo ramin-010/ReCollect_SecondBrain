@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError, RecollectApi, USER_AGENT } from '../../src/api.js';
-import { cleanAgentName, loadConfig, normalizeBaseUrl } from '../../src/config.js';
+import { ApiError, KaagaApi, USER_AGENT } from '../../src/api.js';
+import { cleanAgentName, envOf, loadConfig, normalizeBaseUrl } from '../../src/config.js';
 import { INVALID_TOKEN_MESSAGE, describeError, ToolError } from '../../src/errors.js';
 import { BASE, TOKEN, UUID_RE, fail, fakeFetch, ok, refused, type Routes } from './harness.js';
 
-function api(routes: Routes, extra: Partial<ConstructorParameters<typeof RecollectApi>[0]> = {}) {
+function api(routes: Routes, extra: Partial<ConstructorParameters<typeof KaagaApi>[0]> = {}) {
     const fake = fakeFetch(routes);
     const logs: string[] = [];
-    const client = new RecollectApi({
+    const client = new KaagaApi({
         baseUrl: BASE,
         token: TOKEN,
         agentName: 'Claude Code',
@@ -20,7 +20,7 @@ function api(routes: Routes, extra: Partial<ConstructorParameters<typeof Recolle
     return { client, requests: fake.requests, logs };
 }
 
-describe('RecollectApi: request shape', () => {
+describe('KaagaApi: request shape', () => {
     it('GET sends the bearer token, X-Agent-Name and Accept, no Idempotency-Key, and the query without empty values', async () => {
         const { client, requests } = api({ 'GET /api/agent/docs': ok([]) });
         await client.get('/api/agent/docs', { query: 'postgres locks', limit: 5, empty: '', none: undefined });
@@ -56,7 +56,7 @@ describe('RecollectApi: request shape', () => {
     });
 });
 
-describe('RecollectApi: retries', () => {
+describe('KaagaApi: retries', () => {
     it('retries a 5xx once with the SAME Idempotency-Key', async () => {
         const { client, requests, logs } = api({ 'POST /api/agent/docs': [fail(502, 'Bad gateway'), ok({ id: 'd1' }, 201)] });
         await expect(client.post('/api/agent/docs', { title: 't' })).resolves.toEqual({ id: 'd1' });
@@ -133,7 +133,7 @@ describe('RecollectApi: retries', () => {
             calls += 1;
             return new Promise((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal!.reason)));
         };
-        const client = new RecollectApi({ baseUrl: BASE, token: TOKEN, agentName: 'A', fetch: hang, timeoutMs: 20, retryDelayMs: 0 });
+        const client = new KaagaApi({ baseUrl: BASE, token: TOKEN, agentName: 'A', fetch: hang, timeoutMs: 20, retryDelayMs: 0 });
         const err = (await client.get('/api/today').catch((e: unknown) => e)) as ApiError;
         expect(err.status).toBe(0);
         expect(err.message).toBe('no answer in time');
@@ -141,7 +141,7 @@ describe('RecollectApi: retries', () => {
     });
 });
 
-describe('RecollectApi: errors', () => {
+describe('KaagaApi: errors', () => {
     it('keeps the API message and code', async () => {
         const { client } = api({ 'GET /api/agent/docs/d1': fail(404, 'Doc not found') });
         const err = (await client.get('/api/agent/docs/d1').catch((e: unknown) => e)) as ApiError;
@@ -175,7 +175,7 @@ describe('describeError', () => {
     });
     it('no answer → is the backend running? (a write also says to check recent_agent_edits)', () => {
         const write = describeError(e(0, 'connection refused'), BASE);
-        expect(write).toMatch(/^Can't reach Recollect at http:\/\/recollect\.test \(connection refused\)\. Is the backend running\?/);
+        expect(write).toMatch(/^Can't reach Kaaga at http:\/\/kaaga\.test \(connection refused\)\. Is the backend running\?/);
         expect(write).toContain('recent_agent_edits');
         const read = describeError(new ApiError(0, 'connection refused', null, 'GET /api/today'), BASE);
         expect(read).not.toContain('recent_agent_edits');
@@ -198,24 +198,33 @@ describe('describeError', () => {
 
 describe('config', () => {
     it('defaults: localhost:8002 and "Claude Code"', () => {
-        const config = loadConfig({ RECOLLECT_TOKEN: TOKEN });
+        const config = loadConfig({ KAAGA_TOKEN: TOKEN });
         expect(config).toMatchObject({ baseUrl: 'http://localhost:8002', agentName: 'Claude Code', problem: null, timeoutMs: 30_000, debug: false });
     });
     it('normalizes the URL (trailing slashes, a trailing /api)', () => {
         expect(normalizeBaseUrl('http://localhost:8002/')).toBe('http://localhost:8002');
-        expect(normalizeBaseUrl('https://api.re-collect.in/api/')).toBe('https://api.re-collect.in');
+        expect(normalizeBaseUrl('https://api.kaaga.in/api/')).toBe('https://api.kaaga.in');
         expect(normalizeBaseUrl('  ')).toBe('http://localhost:8002');
     });
     it('a missing or malformed token is a problem every tool reports (never echoing the value)', () => {
-        expect(loadConfig({ RECOLLECT_HOOKS_HOME: 'Z:/no/such/home' }).problem).toMatch(/not signed in on this computer: run `npx recollect-setup`/);
-        const bad = loadConfig({ RECOLLECT_TOKEN: 'ghp_secretvalue123' });
+        expect(loadConfig({ KAAGA_HOOKS_HOME: 'Z:/no/such/home' }).problem).toMatch(/not signed in on this computer: run `npx kaaga-setup`/);
+        const bad = loadConfig({ KAAGA_TOKEN: 'ghp_secretvalue123' });
         expect(bad.problem).toMatch(/start with rcl_/);
         expect(bad.problem).not.toContain('secretvalue');
-        expect(loadConfig({ RECOLLECT_TOKEN: TOKEN, RECOLLECT_URL: 'localhost:8002' }).problem).toMatch(/http\(s\) URL/);
+        expect(loadConfig({ KAAGA_TOKEN: TOKEN, KAAGA_URL: 'localhost:8002' }).problem).toMatch(/http\(s\) URL/);
     });
-    it('each connection can name itself: RECOLLECT_AGENT_NAME, or the short RECOLLECT_AGENT', () => {
-        expect(loadConfig({ RECOLLECT_TOKEN: TOKEN, RECOLLECT_AGENT: 'study-chat' }).agentName).toBe('study-chat');
-        expect(loadConfig({ RECOLLECT_TOKEN: TOKEN, RECOLLECT_AGENT_NAME: 'work', RECOLLECT_AGENT: 'study-chat' }).agentName).toBe('work');
+    it('each connection can name itself: KAAGA_AGENT_NAME, or the short KAAGA_AGENT', () => {
+        expect(loadConfig({ KAAGA_TOKEN: TOKEN, KAAGA_AGENT: 'study-chat' }).agentName).toBe('study-chat');
+        expect(loadConfig({ KAAGA_TOKEN: TOKEN, KAAGA_AGENT_NAME: 'work', KAAGA_AGENT: 'study-chat' }).agentName).toBe('work');
+    });
+    it('KAAGA_REBRAND_PLAN D7: the older RECOLLECT_* names still work; a KAAGA_* one wins; an empty one counts as not set', () => {
+        const old = { RECOLLECT_TOKEN: TOKEN, RECOLLECT_URL: 'http://old.test/', RECOLLECT_AGENT: 'study-chat', RECOLLECT_TOOLS: 'all', RECOLLECT_DEBUG: '1', RECOLLECT_TIMEOUT_MS: '5000' };
+        expect(loadConfig(old)).toMatchObject({ baseUrl: 'http://old.test', token: TOKEN, agentName: 'study-chat', tools: 'all', debug: true, timeoutMs: 5000, problem: null });
+        expect(loadConfig({ ...old, KAAGA_URL: 'http://new.test', KAAGA_AGENT_NAME: 'work' })).toMatchObject({ baseUrl: 'http://new.test', agentName: 'work' });
+        expect(loadConfig({ RECOLLECT_HOOKS_HOME: 'Z:/no/such/home' }).problem).toMatch(/not signed in/);
+        expect(envOf('KAAGA_URL', { KAAGA_URL: '', RECOLLECT_URL: 'http://old.test' })).toBe('http://old.test');
+        expect(envOf('KAAGA_URL', { RECOLLECT_URL: '' })).toBeUndefined();
+        expect(envOf('KAAGA_URL', {})).toBeUndefined();
     });
     it('agent names are printable ASCII, at most 60 characters', () => {
         expect(cleanAgentName('  Claude\tCode \u{1F916} ')).toBe('Claude Code');

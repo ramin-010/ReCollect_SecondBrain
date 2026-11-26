@@ -63,7 +63,7 @@ describe('the server', () => {
         const got = await h.client.getPrompt({ name: 'note_recipe', arguments: { topic: 'consistent hashing' } });
         const text = (got.messages[0]!.content as { text: string }).text;
         expect(text).toContain('## The canvas language');
-        expect(text).toContain('Write a Recollect note on: consistent hashing.');
+        expect(text).toContain('Write a Kaaga note on: consistent hashing.');
         expect(text.startsWith('---')).toBe(false);
     });
 
@@ -74,10 +74,10 @@ describe('the server', () => {
     });
 
     it('with a setup problem every tool answers it and never calls the API', async () => {
-        h = await connect({}, { problem: 'RECOLLECT_TOKEN is not set.' });
+        h = await connect({}, { problem: 'KAAGA_TOKEN is not set.' });
         for (const name of ['get_today', 'create_doc', 'add_focus']) {
             const args = name === 'create_doc' ? { title: 'T', markdown: 'x' } : name === 'add_focus' ? { text: 'x' } : {};
-            expect(await h.call(name, args)).toEqual({ text: 'RECOLLECT_TOKEN is not set.', isError: true });
+            expect(await h.call(name, args)).toEqual({ text: 'KAAGA_TOKEN is not set.', isError: true });
         }
         expect(h.requests).toHaveLength(0);
     });
@@ -110,7 +110,7 @@ describe('a tool set per door (MCP_MEMORY_PLAN §4.1)', () => {
         expect(await names()).not.toContain('more_tools');
         expect(h.client.getInstructions()).toBe(WEB_INSTRUCTIONS);
         const other = await h.call('update_canvas', { docId: 'd1', canvasId: 'c1', diagram: 'flowchart LR\n a --> b' });
-        expect(other).toEqual({ text: 'update_canvas is not available in this app: use Recollect itself, or Claude Code.', isError: true });
+        expect(other).toEqual({ text: 'update_canvas is not available in this app: use Kaaga itself, or Claude Code.', isError: true });
         expect(other.text).not.toMatch(/disabled/);
     });
 

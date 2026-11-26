@@ -6,8 +6,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { RecollectApi } from './api.js';
-import { createRecollectServer, TOOL_LEVELS, type ToolName } from './server.js';
+import { KaagaApi } from './api.js';
+import { createKaagaServer, TOOL_LEVELS, type ToolName } from './server.js';
 
 export interface CatalogueTool {
     name: string;
@@ -47,8 +47,8 @@ export async function handleMcpHttp(
     res: ServerResponse,
     options: CatalogueOptions,
 ): Promise<void> {
-    const api = new RecollectApi({ baseUrl: options.baseUrl, token: options.token, agentName: options.agentName, timeoutMs: options.timeoutMs ?? 30_000, log: () => {} });
-    const server = createRecollectServer({ api, agentName: options.agentName, problem: null, set: 'web', ...(options.trace ? { trace: options.trace } : {}) });
+    const api = new KaagaApi({ baseUrl: options.baseUrl, token: options.token, agentName: options.agentName, timeoutMs: options.timeoutMs ?? 30_000, log: () => {} });
+    const server = createKaagaServer({ api, agentName: options.agentName, problem: null, set: 'web', ...(options.trace ? { trace: options.trace } : {}) });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on('close', () => {
         void transport.close();
@@ -59,9 +59,9 @@ export async function handleMcpHttp(
 }
 
 export async function openCatalogue(options: CatalogueOptions): Promise<Catalogue> {
-    const api = new RecollectApi({ baseUrl: options.baseUrl, token: options.token, agentName: options.agentName, timeoutMs: options.timeoutMs ?? 30_000, log: () => {} });
-    const server = createRecollectServer({ api, agentName: options.agentName, problem: null, set: 'all' });
-    const client = new Client({ name: 'recollect-manager', version: '1.0.0' });
+    const api = new KaagaApi({ baseUrl: options.baseUrl, token: options.token, agentName: options.agentName, timeoutMs: options.timeoutMs ?? 30_000, log: () => {} });
+    const server = createKaagaServer({ api, agentName: options.agentName, problem: null, set: 'all' });
+    const client = new Client({ name: 'kaaga-manager', version: '1.0.0' });
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
     const { tools } = await client.listTools();

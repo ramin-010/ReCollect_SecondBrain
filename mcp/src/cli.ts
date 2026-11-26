@@ -1,34 +1,34 @@
 #!/usr/bin/env node
-// recollect-setup: Recollect for your AI coding tools (EASY_SETUP_PLAN §3).
+// kaaga-setup: Kaaga for your AI coding tools (EASY_SETUP_PLAN §3; KAAGA_REBRAND_PLAN D7: recollect-setup before).
 //
-//   npx recollect-setup            sign this computer in (approve in the browser) and add Recollect to Claude Code,
-//                                  Antigravity and Cursor; safe to run again (also `npx recollect-setup setup`)
-//   npx recollect-setup status     what is set up here
-//   npx recollect-setup remove     take it all out again
-//   npx recollect-setup@latest update   the newest version, set up again
-//   npx recollect-setup mcp        run the MCP server (the tools start dist/index.js, the hooks dist/hook.js, directly)
+//   npx kaaga-setup            sign this computer in (approve in the browser) and add Kaaga to Claude Code,
+//                              Antigravity and Cursor; safe to run again (also `npx kaaga-setup setup`)
+//   npx kaaga-setup status     what is set up here
+//   npx kaaga-setup remove     take it all out again
+//   npx kaaga-setup@latest update   the newest version, set up again
+//   npx kaaga-setup mcp        run the MCP server (the tools start dist/index.js, the hooks dist/hook.js, directly)
 //
-// Options: --url <server> (default https://api.re-collect.in), --login (sign in again), --tools claude,antigravity,cursor,
+// Options: --url <server> (default https://api.kaaga.in), --login (sign in again), --tools claude,antigravity,cursor,
 // --no-open (print the link, don't open the browser), --keep-token (remove: leave the sign-in), --from <dir|.tgz> and
 // --here (developers: install a local build, or use this checkout in place), --home <dir> (everything under another
 // home folder: tests).
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { packageVersion, realIo, runRemove, runSetup, runStatus } from './setup.js';
+import { DEFAULT_SERVER, packageVersion, realIo, runRemove, runSetup, runStatus } from './setup.js';
 
-const HELP = `recollect-setup ${packageVersion()}: Recollect for your AI coding tools.
+const HELP = `kaaga-setup ${packageVersion()}: Kaaga for your AI coding tools.
 
-  npx recollect-setup            Sign this computer in (you approve it in your browser) and add
-                                 Recollect to Claude Code, Antigravity and Cursor. Safe to run again.
-  npx recollect-setup status     What is set up here.
-  npx recollect-setup remove     Take it all out again.
-  npx recollect-setup@latest update   Get the newest version and set up again (@latest, or npx
-                                      may run the copy it kept from before).
-  npx recollect-setup help       This.
+  npx kaaga-setup            Sign this computer in (you approve it in your browser) and add
+                             Kaaga to Claude Code, Antigravity and Cursor. Safe to run again.
+  npx kaaga-setup status     What is set up here.
+  npx kaaga-setup remove     Take it all out again.
+  npx kaaga-setup@latest update   Get the newest version and set up again (@latest, or npx
+                                  may run the copy it kept from before).
+  npx kaaga-setup help       This.
 
-Options: --url <server>  --login  --tools claude,antigravity,cursor  --no-open  --keep-token
-Folders: each new folder asks once (building, learning or work); change them in Recollect › Settings › Tracking.`;
+Options: --url <server> (default ${DEFAULT_SERVER})  --login  --tools claude,antigravity,cursor  --no-open  --keep-token
+Folders: each new folder asks once (building, learning or work); change them in Kaaga › Settings › Tracking.`;
 
 function flag(args: string[], name: string): string | undefined {
     const i = args.indexOf(name);

@@ -75,7 +75,7 @@ describe('get_brief', () => {
         // on, and the answer says to reconnect.
         const old = await h.call('get_brief', { about: 'Help me plan a calm week before the exam' });
         expect(h.requests[1]!.query).toEqual({});
-        expect(lastLine(old.text)).toBe('about was not passed on. This app’s list of Recollect tools is out of date: reconnect the Recollect connector. What the user says about themselves goes to remember or update_memory.');
+        expect(lastLine(old.text)).toBe('about was not passed on. This app’s list of Kaaga tools is out of date: reconnect the Kaaga connector. What the user says about themselves goes to remember or update_memory.');
     });
 });
 
@@ -119,7 +119,7 @@ describe('checkpoint', () => {
         // MCP_MEMORY_PLAN §4.2: `said` and `learned` went (one way in: remember, update_memory); an old list's call runs without them.
         const old = await h.call('checkpoint', { key: 's_k', title: 'Heaps', said: ['I want to do one DP problem a day this month'], learned: [{ text: 'x' }] });
         expect(h.requests.filter((r) => r.method === 'PUT').at(-1)!.body).toEqual({ title: 'Heaps' });
-        expect(lastLine(old.text)).toMatch(/^said and learned were not passed on\. .*reconnect the Recollect connector/);
+        expect(lastLine(old.text)).toMatch(/^said and learned were not passed on\. .*reconnect the Kaaga connector/);
         const done = await h.call('checkpoint', { key: 's_k', topicStatus: 'done' });
         expect(lastLine(done.text)).toBe(UNDO);
         expect((await h.call('checkpoint', { key: 's_k' })).text).toMatch(/^Send at least a title/);

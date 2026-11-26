@@ -7,11 +7,11 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { addPart, folderOf, partAt, projectFolder, readParts, readRules, refreshRules, slashKind, workFolderAbove } from '../../src/folders.js';
 import { chatMode, resolveRule, runHook, splitSession, type HookConfig, type ResolvedRule } from '../../src/hook.js';
-import { RecollectApi } from '../../src/api.js';
+import { KaagaApi } from '../../src/api.js';
 import { connect, fail, ok, type Harness } from './harness.js';
 
 const TOKEN = `rcl_${'a'.repeat(43)}`;
-const URL_ = 'http://recollect.test';
+const URL_ = 'http://kaaga.test';
 
 describe('the folder’s key (server mode)', () => {
     const repos = new Set(['E:/p/app/.git', 'E:/p/app/backend/.git', 'C:/Users/me/.git', 'C:/Users/me/code/tool/.git']);
@@ -153,10 +153,10 @@ describe('the rules', () => {
 
     it('kept 10 minutes; an older server is remembered as such; no answer keeps what the PC had', async () => {
         home = mkdtempSync(path.join(os.tmpdir(), 'rc-rules-'));
-        const env = { RECOLLECT_HOOKS_HOME: home };
+        const env = { KAAGA_HOOKS_HOME: home };
         let answer: () => Response = () => new Response(JSON.stringify({ success: true, data: { newFolders: 'ask', folders: [{ key: 'erp', name: 'ERP', kind: 'work', tracking: 'light', decided: true }] } }), { status: 200, headers: { 'content-type': 'application/json' } });
         let calls = 0;
-        const api = new RecollectApi({ baseUrl: URL_, token: TOKEN, agentName: 't', retryDelayMs: 0, fetch: (async () => (calls++, answer())) as typeof fetch });
+        const api = new KaagaApi({ baseUrl: URL_, token: TOKEN, agentName: 't', retryDelayMs: 0, fetch: (async () => (calls++, answer())) as typeof fetch });
         const t0 = new Date('2026-11-23T10:00:00Z');
         expect((await refreshRules(api, URL_, env, t0))?.folders['erp']).toMatchObject({ name: 'ERP', kind: 'work' });
         await refreshRules(api, URL_, env, new Date(t0.getTime() + 9 * 60_000));
@@ -195,7 +195,7 @@ describe('the hooks in server mode', () => {
                     : { session: {} };
             return new Response(JSON.stringify({ success: true, data }), { status: 200, headers: { 'content-type': 'application/json' } });
         });
-        return { env: { RECOLLECT_HOOKS_HOME: home, RECOLLECT_HOOKS_FLUSH: 'inline' }, calls, state };
+        return { env: { KAAGA_HOOKS_HOME: home, KAAGA_HOOKS_FLUSH: 'inline' }, calls, state };
     }
     const t = (m: number) => new Date(Date.UTC(2026, 10, 23, 5, m));
     const input = (cwd: string, over: Record<string, unknown> = {}) => ({ session_id: 'k1', cwd, source: 'startup', ...over });
@@ -205,7 +205,7 @@ describe('the hooks in server mode', () => {
         const cwd = path.join(home, 'Side-Project');
         mkdirSync(cwd);
         const out = await runHook('start', input(cwd), env, t(0));
-        expect(out).toContain('this folder, "Side-Project", is new to Recollect');
+        expect(out).toContain('this folder, "Side-Project", is new to Kaaga');
         expect(out).toContain('call set_folder');
         await runHook('prompt', input(cwd, { prompt: 'I want to understand how consensus works in raft' }), env, t(1));
         await runHook('prompt', input(cwd, { prompt: 'and now the log replication part please' }), env, t(4));
@@ -257,7 +257,7 @@ describe('the hooks in server mode', () => {
         const { env, calls } = setup([{ key: 'notes', kind: 'personal', tracking: 'full', decided: true }]);
         const cwd = path.join(home, 'notes');
         mkdirSync(cwd);
-        expect(await runHook('start', input(cwd), env, t(0))).toContain('Recollect (session-start hook): where the user stands');
+        expect(await runHook('start', input(cwd), env, t(0))).toContain('Kaaga (session-start hook): where the user stands');
         await runHook('prompt', input(cwd, { prompt: 'I am finally learning to cook on weekends' }), env, t(1));
         await runHook('prompt', input(cwd, { prompt: '/work' }), env, t(3));
         await runHook('prompt', input(cwd, { prompt: 'the ACME client wants the export by friday' }), env, t(5));
@@ -287,8 +287,8 @@ describe('set_folder and set_chat', () => {
     });
     const scratch = () => {
         home = mkdtempSync(path.join(os.tmpdir(), 'rc-tools-'));
-        vi.stubEnv('RECOLLECT_HOOKS_HOME', home);
-        writeFileSync(path.join(home, 'config.json'), JSON.stringify({ url: 'http://recollect.test', token: TOKEN }));
+        vi.stubEnv('KAAGA_HOOKS_HOME', home);
+        writeFileSync(path.join(home, 'config.json'), JSON.stringify({ url: 'http://kaaga.test', token: TOKEN }));
     };
 
     it('set_folder: this folder by default, ignore = nothing logged; this PC’s hooks follow it at once', async () => {
@@ -300,7 +300,7 @@ describe('set_folder and set_chat', () => {
         const r = await h.call('set_folder', { kind: 'work' });
         expect(r.text).toContain('Side-Project is work');
         expect(h.requests[0]).toMatchObject({ method: 'PUT', path: '/api/projects/by-key/side-project', body: { kind: 'work', name: 'Side-Project' } });
-        expect(readRules('http://recollect.test', { RECOLLECT_HOOKS_HOME: home })?.folders['side-project']).toMatchObject({ kind: 'work', tracking: 'light', decided: true });
+        expect(readRules('http://kaaga.test', { KAAGA_HOOKS_HOME: home })?.folders['side-project']).toMatchObject({ kind: 'work', tracking: 'light', decided: true });
         expect((await h.call('set_folder', { kind: 'ignore', folder: 'Old Stuff' })).text).toContain('ignores Old Stuff');
         expect(h.requests[1]).toMatchObject({ path: '/api/projects/by-key/old%20stuff', body: { tracking: 'off' } });
         // build is stored as personal (an older personal still means build).
@@ -351,9 +351,9 @@ describe('set_folder and set_chat', () => {
         h = await connect({ 'GET /api/brief': ok(brief), 'PATCH /api/sessions/by-key/*': fail(404, 'No session has that key yet', 'NO_SESSION') }, { set: 'office', workMode: true, workProject: 'erp', folder: { key: 'erp', name: 'erp' } });
         const tools = async () => (await h!.client.listTools()).tools.map((t) => t.name);
         expect(await tools()).not.toContain('create_doc');
-        expect((await h.call('set_chat', { kind: 'study', by: 'agent', key: 's_k' })).text).not.toContain('full Recollect tools');
+        expect((await h.call('set_chat', { kind: 'study', by: 'agent', key: 's_k' })).text).not.toContain('full Kaaga tools');
         expect(await tools()).not.toContain('create_doc');
-        expect((await h.call('set_chat', { kind: 'study', by: 'user', key: 's_k' })).text).toContain('Their full Recollect tools are on now');
+        expect((await h.call('set_chat', { kind: 'study', by: 'user', key: 's_k' })).text).toContain('Their full Kaaga tools are on now');
         expect(await tools()).toEqual(expect.arrayContaining(['create_doc', 'get_week', 'set_chat']));
         await h.call('get_brief', { key: 's_k' });
         expect(h.requests.filter((r) => r.path === '/api/brief').at(-1)!.query).not.toHaveProperty('work');
@@ -366,6 +366,6 @@ describe('set_folder and set_chat', () => {
 
     it('a new folder’s instructions ask the question first', async () => {
         h = await connect({}, { folder: { key: 'x', name: 'X-Repo', isNew: true } });
-        expect(h.client.getInstructions()).toMatch(/^This folder \("X-Repo"\) is new to Recollect/);
+        expect(h.client.getInstructions()).toMatch(/^This folder \("X-Repo"\) is new to Kaaga/);
     });
 });

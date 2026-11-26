@@ -1,11 +1,11 @@
 ---
-name: recollect-notes
-description: Write study notes into Recollect (the user's learning app) with its `recollect` MCP tools, above all system-design notes with real diagrams (architecture boards, sequence and ER diagrams). Use when asked to write, make, save or improve a note or doc in Recollect, or to add or fix a diagram in one.
+name: kaaga-notes
+description: Write study notes into Kaaga (the user's learning app) with its `kaaga` MCP tools, above all system-design notes with real diagrams (architecture boards, sequence and ER diagrams). Use when asked to write, make, save or improve a note or doc in Kaaga, or to add or fix a diagram in one.
 ---
 
-# Writing notes in Recollect
+# Writing notes in Kaaga
 
-Recollect is the user's learning app; they revise what they write there. You write into it with the `recollect` MCP tools. A note is Markdown with diagram fences, and **one `create_doc` call writes the whole note, diagrams included**. You never place boxes: you say what is in a diagram, and Recollect lays it out.
+Kaaga is the user's learning app; they revise what they write there. You write into it with the `kaaga` MCP tools. A note is Markdown with diagram fences, and **one `create_doc` call writes the whole note, diagrams included**. You never place boxes: you say what is in a diagram, and Kaaga lays it out.
 
 ## The workflow: two calls at most
 
@@ -29,7 +29,7 @@ Don't ask the user to arrange anything, and never write coordinates.
 
 ## The canvas language
 
-A Mermaid flowchart, a subset. Recollect checks it and names the line of any mistake.
+A Mermaid flowchart, a subset. Kaaga checks it and names the line of any mistake.
 
 ````
 ```canvas
@@ -47,14 +47,14 @@ flowchart
 ```
 ````
 
-- **Direction**: leave it out (`flowchart` alone) and Recollect picks the one that reads bigger in a doc. Write `flowchart LR` only for a short chain (5 steps or fewer in a row); a long left-to-right board shrinks to unreadable in a doc column.
+- **Direction**: leave it out (`flowchart` alone) and Kaaga picks the one that reads bigger in a doc. Write `flowchart LR` only for a short chain (5 steps or fewer in a row); a long left-to-right board shrinks to unreadable in a doc column.
 - **Boxes**: `id[box]`, `id(rounded)`, `id([pill])`, `id[(database)]`, `id((circle))`, `id{decision}`, `id[[queue]]`. Ids are letters, digits and `_`. Quote labels with brackets in them: `id["GET /items (cached)"]`; `<br>` breaks a line.
 - **Arrows**: `-->`, `-.->` (dashed: async or occasional), `<-->` (both ways), `---` (no head); a label with `-->|label|`; chains `a --> b --> c`; `&` fans out: `a --> b & c`.
 - **Zones**: `subgraph id [Title] … end`, nestable: "Client", "Edge", "API tier", "Data", a region or VPC.
 - **Colour**: `:::blue`, `:::green`, `:::yellow`, `:::red`, `:::gray`. Use few, with a meaning: blue storage, green your services, gray external, yellow async, red a risk or bottleneck.
 - **Kinds** give a box its icon and shape: `id@{ kind: database }`. Kinds: client, user, mobile, service, worker, function, database, cache, queue, stream, storage, search, cdn, dns, gateway, lb, auth, external, monitor, scheduler, notify, model.
 - **Notes**: `note for id: text` (a sticky beside that box) or `note: text`.
-- Not supported (Recollect says so): `classDef`, `style`, `linkStyle`, `click`.
+- Not supported (Kaaga says so): `classDef`, `style`, `linkStyle`, `click`.
 
 **Read it well**: 5–15 boxes per board, labels under 40 characters, every box on an arrow, one idea per board. Split a big system into two boards (the write path, the read path) rather than one crowded one.
 
@@ -193,3 +193,5 @@ The acknowledgement can be lost after the work is done, so the job is delivered 
 
 </details>
 ````
+
+<!-- installed by kaaga -->

@@ -46,9 +46,9 @@ describe('the flow with words', () => {
     });
 
     function setup(opts: { failWords?: number; briefNote?: boolean } = {}) {
-        home = mkdtempSync(path.join(os.tmpdir(), 'recollect-words-'));
+        home = mkdtempSync(path.join(os.tmpdir(), 'kaaga-words-'));
         const allow = [{ path: 'E:/PERSONAL_PROJECTS/', mode: 'full', brief: true }, { path: '*', mode: 'full', brief: false }];
-        writeFileSync(path.join(home, 'hooks.json'), JSON.stringify({ url: 'http://recollect.test', token: `rcl_${'a'.repeat(43)}`, allow, brief: true }));
+        writeFileSync(path.join(home, 'hooks.json'), JSON.stringify({ url: 'http://kaaga.test', token: `rcl_${'a'.repeat(43)}`, allow, brief: true }));
         const calls: Array<{ method: string; url: string; body: any }> = []; // eslint-disable-line @typescript-eslint/no-explicit-any
         let fails = opts.failWords ?? 0;
         vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
@@ -79,7 +79,7 @@ describe('the flow with words', () => {
             }
             return json({ session: {} });
         });
-        return { env: { RECOLLECT_HOOKS_HOME: home, RECOLLECT_HOOKS_FLUSH: 'inline' }, calls };
+        return { env: { KAAGA_HOOKS_HOME: home, KAAGA_HOOKS_FLUSH: 'inline' }, calls };
     }
 
     const input = (over: Record<string, unknown> = {}) => ({ session_id: 's1', cwd: 'E:/PERSONAL_PROJECTS/second_brain', source: 'startup', ...over });
@@ -152,7 +152,7 @@ describe('the flow with words', () => {
 
     it('a light folder (a plain string) never reads words', async () => {
         const { env, calls } = setup();
-        writeFileSync(path.join(home, 'hooks.json'), JSON.stringify({ url: 'http://recollect.test', token: `rcl_${'a'.repeat(43)}`, allow: ['E:/PERSONAL_PROJECTS/'], brief: true }));
+        writeFileSync(path.join(home, 'hooks.json'), JSON.stringify({ url: 'http://kaaga.test', token: `rcl_${'a'.repeat(43)}`, allow: ['E:/PERSONAL_PROJECTS/'], brief: true }));
         await runHook('start', input(), env, t(0));
         await runHook('prompt', input({ prompt: 'I am worried about the deadline this week' }), env, t(1));
         await runHook('end', input(), env, t(40));

@@ -3,7 +3,7 @@
 export type Logger = (message: string) => void;
 
 export const stderrLogger: Logger = (message) => {
-    process.stderr.write(`[recollect-mcp] ${message}\n`);
+    process.stderr.write(`[kaaga-mcp] ${message}\n`);
 };
 
 export const silentLogger: Logger = () => {};
