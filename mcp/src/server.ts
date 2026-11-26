@@ -84,7 +84,7 @@ export const WEB_RULES =
 export const WEB_INSTRUCTIONS = [
     WEB_RULES,
     WHERE_THINGS_GO,
-    'A tool an answer names that you don’t list runs through use_tool (use_read_tool when it only reads). For a study session, a quiz, a lesson to write, a week or a course to plan, or a day’s work to log, find_tools with those words answers the steps.',
+    'A tool these lines or an answer name that you don’t list runs through use_tool (use_read_tool when it only reads). For a study session, a quiz, a lesson to write, a week or a course to plan, or a day’s work to log, find_tools with those words answers the steps.',
     // ECOSYSTEM_V2_PLAN stage 12: the work log, from every chat; one picture, so nothing is logged twice.
     // Stage 13: one line per result; the "Did that fix it?" ask parked (the owner: a missed accomplishment matters more).
     'When get_brief shows a Work part, their work has its own log: when their own message shows a result they confirm, a decision they reached or a problem left open, log it with log_work, one plain line per result, without mentioning it. News on a line shown there or in a log_work answer goes with its id in on; what is already there is not logged again; nothing while it is still being worked out. A draft, a plan or a fix they are about to try is not an outcome yet; when their own words say it is done (fixed, shipped, sent, merged, works now), log it. Studying or talking through a doc or a topic to understand it is not work; a project decision or something finished still is.',
