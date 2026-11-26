@@ -35,7 +35,13 @@ export function fakeFetch(routes: Routes) {
         const url = new URL(String(input));
         const method = (init?.method ?? 'GET').toUpperCase();
         const headers = Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>).map(([k, v]) => [k.toLowerCase(), String(v)]));
-        const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+        // A multipart body (attach_file from disk) is recorded as its fields: name → file name (or the text).
+        const body =
+            typeof init?.body === 'string'
+                ? JSON.parse(init.body)
+                : init?.body instanceof FormData
+                  ? Object.fromEntries([...init.body.entries()].map(([k, v]) => [k, typeof v === 'string' ? v : { file: (v as File).name, size: (v as File).size }]))
+                  : undefined;
         const req: Recorded = { method, path: url.pathname, query: Object.fromEntries(url.searchParams), headers, body };
         requests.push(req);
 

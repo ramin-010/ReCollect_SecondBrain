@@ -12,7 +12,7 @@ afterEach(async () => {
     h = undefined;
 });
 
-const READS = ['get_brief', 'list_sessions', 'get_week', 'get_standing', 'list_tasks', 'list_decisions', 'get_today', 'get_learning_overview', 'search_docs', 'read_doc', 'preview_diagram', 'list_subjects', 'get_path', 'list_due', 'list_goals', 'recent_agent_edits', 'get_settings', 'list_suggestions', 'list_reminders', 'get_quiz_results', 'get_sharing', 'get_outline', 'recall_memory', 'get_work_log', 'list_notes', 'find_tools', 'use_read_tool'];
+const READS = ['get_brief', 'list_sessions', 'get_week', 'get_standing', 'list_tasks', 'list_decisions', 'get_today', 'get_learning_overview', 'search_docs', 'read_doc', 'preview_diagram', 'list_subjects', 'get_path', 'list_due', 'list_goals', 'recent_agent_edits', 'get_settings', 'list_suggestions', 'list_reminders', 'get_quiz_results', 'get_sharing', 'get_outline', 'recall_memory', 'get_work_log', 'list_notes', 'list_pocket_notes', 'read_note_file', 'find_tools', 'use_read_tool'];
 /** What the code door can run (use_read_tool is the web's: a coding tool runs a read through use_tool). */
 const CODE_NAMES = TOOL_NAMES.filter((n) => n !== 'use_read_tool');
 
@@ -26,9 +26,10 @@ describe('the server', () => {
             expect(tool.description!.length, tool.name).toBeGreaterThan(40);
             expect(tool.inputSchema.type).toBe('object');
         }
-        // Nothing deletes docs, goals or subjects; a focus line or a milestone can be removed (undoable).
-        // ...and a doc's blocks (delete_blocks; Undo brings them back), and a note on a lesson or a subject (remove_note, undoable).
-        expect(tools.filter((t) => /delete|remove/i.test(t.name)).map((t) => t.name)).toEqual(['remove_milestone', 'remove_focus', 'delete_blocks', 'remove_note']);
+        // Nothing deletes docs or goals; a focus line or a milestone can be removed (undoable), a doc's blocks
+        // (delete_blocks), a note on a lesson or a subject (remove_note), a pocket note while they allow it, and a subject
+        // (empty at once with Undo, else only on their tap): TOOL_ACCESS_PLAN §4.7.
+        expect(tools.filter((t) => /delete|remove/i.test(t.name)).map((t) => t.name)).toEqual(['remove_milestone', 'remove_focus', 'delete_blocks', 'remove_note', 'delete_pocket_note', 'delete_subject', 'remove_file']);
     });
 
     it('marks reads read-only and writes not; every tool has a level (1 = reads), level 3 only asks', async () => {

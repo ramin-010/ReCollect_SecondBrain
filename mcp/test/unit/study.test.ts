@@ -51,10 +51,10 @@ describe('the study tools', () => {
             ALL
         );
         const note = await h.call('add_note', { docId: 'doc1', title: 'Why DNS uses UDP', markdown: 'No handshake for one small question.' });
-        expect(note.text).toBe(`Saved the note "Why DNS uses UDP" on the lesson "How DNS works" (doc doc1) · id n1.\n${UNDO}`);
+        expect(note.text).toBe(`Saved the note "Why DNS uses UDP" on the lesson "How DNS works" (doc doc1) · id n1. attach_file adds a file to it.\n${UNDO}`);
         expect(h.requests[0]!.body).toEqual({ docId: 'doc1', title: 'Why DNS uses UDP', markdown: 'No handshake for one small question.' });
         const link = await h.call('add_note', { subject: 'Networking', title: 'DNS in 10 minutes', url: 'https://www.youtube.com/watch?v=abc' });
-        expect(link.text).toBe(`Saved the link "DNS in 10 minutes" on the subject Networking · id n2.\n${UNDO}`);
+        expect(link.text).toBe(`Saved the link "DNS in 10 minutes" on the subject Networking · id n2. attach_file adds a file to it.\n${UNDO}`);
         expect(h.requests[1]!.body).toEqual({ subject: 'Networking', title: 'DNS in 10 minutes', url: 'https://www.youtube.com/watch?v=abc' });
         const again = await h.call('add_note', { docId: 'doc1', title: 'Why DNS uses UDP', markdown: 'x' });
         expect(again.text).toBe('Already saved on the lesson "How DNS works" (doc doc1): "Why DNS uses UDP" · id n1. Nothing added.');

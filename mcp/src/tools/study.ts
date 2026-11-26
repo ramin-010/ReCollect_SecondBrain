@@ -9,6 +9,7 @@ import { userTimeZone } from '../timezone.js';
 import { zDocId, zId, zMarkdown, zSubjectName } from '../schemas.js';
 import { ADDS, CHANGES, READ_ONLY, defineTool, type ToolContext } from '../tool.js';
 import { canvasLine } from './docs.js';
+import { filesLine, type NoteFile } from './files.js';
 import type { CanvasReport } from '../types.js';
 
 /** The API's limits (backend/src/services/agent/agentNotes.service.ts, docCard.ts). */
@@ -38,6 +39,8 @@ interface NoteItem {
     text: string;
     day: string;
     by: string;
+    /** TOOL_ACCESS_PLAN §11.3 (an older server sends none). */
+    files?: NoteFile[];
     lesson: Lesson | null;
     subject: string | null;
 }
@@ -125,7 +128,7 @@ export function registerStudyTools(server: McpServer, ctx: ToolContext): void {
             if (!markdown?.trim() && !url) throw new ToolError('Send the note (markdown) or a link (url).');
             const note = await api.post<NoteAdded>('/api/agent/notes', { ...(docId ? { docId } : { subject }), title, ...(markdown ? { markdown } : {}), ...(url ? { url } : {}) });
             if (note.already) return `Already saved on ${where(note.lesson, note.subject)}: ${quote(note.title, 80)} · id ${note.id}. Nothing added.`;
-            return withUndo(`Saved ${note.kind === 'link' ? 'the link' : 'the note'} ${quote(note.title, 80)} on ${where(note.lesson, note.subject)} · id ${note.id}.`);
+            return withUndo(`Saved ${note.kind === 'link' ? 'the link' : 'the note'} ${quote(note.title, 80)} on ${where(note.lesson, note.subject)} · id ${note.id}. attach_file adds a file to it.`);
         }
     );
 
@@ -160,6 +163,7 @@ export function registerStudyTools(server: McpServer, ctx: ToolContext): void {
             const blocks = list.notes.map((n) => {
                 const meta = [`id ${n.id}`, n.kind, dayOf(n.day, zone), n.by === 'the user' ? 'theirs' : `by ${n.by}`];
                 if (n.lesson && !docId) meta.push(`lesson ${quote(n.lesson.title ?? '', 60)}`);
+                if (n.files?.length) meta.push(filesLine(n.files));
                 const body = [n.url ? `<${n.url}>` : '', n.text.trim()].filter(Boolean).join('\n');
                 return `### ${n.title}\n(${meta.join(' · ')})${body ? `\n${body}` : ''}`;
             });

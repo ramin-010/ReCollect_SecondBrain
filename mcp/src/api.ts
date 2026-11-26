@@ -130,6 +130,11 @@ export class KaagaApi {
         return this.request<T>('PUT', path, { body }).then((r) => r.data);
     }
 
+    /** TOOL_ACCESS_PLAN §11.4: a file from disk, as multipart (fetch sets the boundary). */
+    postForm<T>(path: string, form: FormData): Promise<T> {
+        return this.request<T>('POST', path, { form }).then((r) => r.data);
+    }
+
     patch<T>(path: string, body: unknown): Promise<T> {
         return this.request<T>('PATCH', path, { body }).then((r) => r.data);
     }
@@ -159,11 +164,11 @@ export class KaagaApi {
         };
     }
 
-    async request<T>(method: HttpMethod, path: string, init: { query?: Query | undefined; body?: unknown } = {}): Promise<ApiResponse<T>> {
+    async request<T>(method: HttpMethod, path: string, init: { query?: Query | undefined; body?: unknown; form?: FormData | undefined } = {}): Promise<ApiResponse<T>> {
         const url = this.url(path, init.query);
         const label = `${method} ${path}`;
         const hasBody = init.body !== undefined;
-        const body = hasBody ? JSON.stringify(init.body) : undefined;
+        const body: string | FormData | undefined = init.form ?? (hasBody ? JSON.stringify(init.body) : undefined);
         // One key per write request: the retry below reuses it.
         const key = method === 'GET' ? null : this.newKey();
         let retried = false;

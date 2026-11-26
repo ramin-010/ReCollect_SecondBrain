@@ -19,6 +19,9 @@ export const DESTRUCTIVE: ReadonlySet<string> = new Set([
     'set_revision_card',
     'clear_lock_line',
     'cancel_reminder',
+    'delete_pocket_note',
+    'delete_subject',
+    'remove_file',
 ]);
 
 /** Sets a value: the same call again changes nothing more. */
@@ -36,6 +39,8 @@ export const IDEMPOTENT: ReadonlySet<string> = new Set([
     'update_week_target',
     'update_doc',
     'move_revision',
+    'update_pocket_note',
+    'update_subject',
 ]);
 
 export function hintsFor(name: string, base: ToolAnnotations): ToolAnnotations {

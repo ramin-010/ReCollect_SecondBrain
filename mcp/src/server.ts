@@ -27,6 +27,8 @@ import { registerBlockTools } from './tools/blocks.js';
 import { registerBuddyTools } from './tools/buddy.js';
 import { newChatMemory, registerFolderTools } from './tools/folders.js';
 import { registerStudyTools } from './tools/study.js';
+import { registerPocketTools } from './tools/pocket.js';
+import { registerFileTools } from './tools/files.js';
 
 export const SERVER_NAME = 'kaaga';
 export const SERVER_VERSION = '0.1.0';
@@ -45,7 +47,7 @@ export const INSTRUCTIONS = [
     'Start a working chat with get_brief (where they stand, and a session key), then checkpoint as you go: after each part, not only at the end. Pass on quietly, without asking or mentioning it, what the user says about their own life that will still matter after this conversation: something new about them (remember), or progress, a change or an end on something their buddy already knows (update_memory, with its id); a reminder or a dated to-do of their own (set_reminder, add_task); an idea or insight (add_pocket_note). Most turns have nothing. Before you rely on their routine, plans or preferences, look them up with recall_memory. When they ask to log the day’s work, use log_work. search_docs before writing a doc. Plan the week with get_week and add_week_target on their yes; when something is their call and they cannot say yes in the chat, suggest_to_user instead.',
     // TOOL_ACCESS_PLAN §5.2: the rest of the catalogue is a search away; any tool runs by its name.
     'The listed tools are the everyday ones: find_tools with the job in plain words answers the rest (goals, reviews, notes on a lesson, the trash, sharing, settings…) and adds them to your list; any Kaaga tool runs by its name. For a study session, a quiz, a lesson to write, a week or a course to plan, find_tools with those words answers the steps.',
-    'Every write is logged with your agent name and the user can undo it from Home → From your agent. Docs, goals and subjects are never deleted; a focus line or a milestone can be removed (and Undo brings it back). Answers are compact text with the ids the next call needs.',
+    'Every write is logged with your agent name and the user can undo it from Home → From your agent. Docs go to the trash (30 days), goals are never deleted, and a subject that holds anything is deleted only on their tap; a focus line or a milestone can be removed (and Undo brings it back). Answers are compact text with the ids the next call needs.',
     // EASY_SETUP_PLAN §7: the chat decides, the folder is only its default.
     'A chat counts as its folder says (build, study or work); when this one clearly is not (learning in a work folder; a chat about their plans or career, not the code, is study), call set_chat and say so in one line.',
     'Docs take GitHub Markdown plus callouts (> [!TIP]), <details> toggles for self-test questions, ```mermaid diagrams and ```canvas diagrams (Mermaid flowchart text that Kaaga lays out as a board the user can edit; add_canvas draws one, update_canvas changes one in place, preview_diagram shows it): see create_doc.',
@@ -249,6 +251,16 @@ export const TOOL_NAMES = [
     'list_notes',
     'update_note',
     'remove_note',
+    // TOOL_ACCESS_PLAN §4.7: their pocket (only while they allow it) and subjects.
+    'list_pocket_notes',
+    'update_pocket_note',
+    'delete_pocket_note',
+    'update_subject',
+    'delete_subject',
+    // TOOL_ACCESS_PLAN §11: files on a note.
+    'attach_file',
+    'remove_file',
+    'read_note_file',
     // TOOL_ACCESS_PLAN §3: find any tool by the job, and run one that isn't listed.
     'find_tools',
     'use_read_tool',
@@ -347,6 +359,15 @@ export const TOOL_LEVELS: Readonly<Record<ToolName, 1 | 2 | 3>> = {
     list_notes: 1,
     update_note: 2,
     remove_note: 2,
+    list_pocket_notes: 1,
+    update_pocket_note: 2,
+    delete_pocket_note: 2,
+    update_subject: 2,
+    // An empty subject goes at once (Undo); one that holds anything only asks (the delete_subject action, their tap).
+    delete_subject: 2,
+    attach_file: 2,
+    remove_file: 2,
+    read_note_file: 1,
     find_tools: 1,
     use_read_tool: 1,
     // Runs any tool: the level of what it runs is that tool's own.
@@ -455,6 +476,14 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     list_notes: 'manage',
     update_note: 'manage',
     remove_note: 'manage',
+    list_pocket_notes: 'manage',
+    update_pocket_note: 'manage',
+    delete_pocket_note: 'manage',
+    update_subject: 'manage',
+    delete_subject: 'manage',
+    attach_file: 'manage',
+    remove_file: 'manage',
+    read_note_file: 'manage',
     find_tools: 'core',
     use_read_tool: 'core',
     use_tool: 'core',
@@ -578,6 +607,8 @@ export function createKaagaServer(options: ServerOptions): McpServer {
     registerBuddyTools(server, ctx);
     registerFolderTools(server, ctx);
     registerStudyTools(server, ctx);
+    registerPocketTools(server, ctx);
+    registerFileTools(server, ctx);
     if (set === 'web' || set === 'code' || set === 'office') registerFindTools(server, ctx);
     registerPrompts(server, set);
     const everything = leanToolList(server, policy);

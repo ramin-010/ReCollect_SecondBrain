@@ -447,6 +447,73 @@ export const CARDS: Readonly<Record<ToolName, ToolCard>> = {
         keywords: ['history', 'what changed', 'edits', 'did it save', 'went through', 'errored', 'activity', 'changes made', 'last call'],
     },
 
+    // ─── Files on a note (TOOL_ACCESS_PLAN §11) ───────────────────────────
+    attach_file: {
+        use: '"add this screenshot to my caching note", "attach budget.xlsx to that lesson note", "save this cheat sheet as a file on the note".',
+        not: 'a link (add_note with url); an image inside a lesson’s text (Markdown ![…](…) in the doc).',
+        params: { path: 'a file on their computer: coding tools only (the web can’t pass on an uploaded file)', text: "the file's text, with name (md, csv, json…)", base64: 'its bytes, at most 1 MB, with name' },
+        returns: 'the file attached, and the note’s files with their numbers (Undo on Home).',
+        example: { noteId: 'note_cheat', name: 'cheatsheet.md', text: '# Sliding window\n\nShrink from the left while the window is invalid.' },
+        keywords: ['attach', 'attach file', 'upload', 'file', 'screenshot', 'excel', 'spreadsheet', 'pdf', 'image to note', 'add a file'],
+    },
+    remove_file: {
+        use: '"take the pdf off my lesson note", "remove that attachment".',
+        not: 'the whole note (remove_note).',
+        params: { n: 'its number on the note (list_notes)' },
+        returns: 'the note’s files now (Undo on Home puts it back).',
+        example: { noteId: 'note_cheat', name: 'cheatsheet.md' },
+        keywords: ['remove attachment', 'remove file', 'delete file', 'take off', 'detach'],
+    },
+    read_note_file: {
+        use: '"what\'s in cheatsheet.md on my sliding window note", "open the file on that note".',
+        not: 'the note’s own text (list_notes); a doc (read_doc).',
+        params: { file: 'its number on the note, or its name' },
+        returns: 'a text file’s text (the first 60,000 characters); any other file’s name, type, size and link.',
+        example: { noteId: 'note_cheat', file: 1 },
+        keywords: ['read file', 'open file', 'attachment', 'whats inside', 'file content', 'download link'],
+    },
+
+    // ─── The pocket and subjects (TOOL_ACCESS_PLAN §4.7) ───────────────────
+    list_pocket_notes: {
+        use: '"what did I jot down in my pocket", "read my pocket notes", only while they allow chats at their pocket (Settings › Agents).',
+        not: 'notes on a lesson (list_notes); their docs (search_docs).',
+        params: { id: 'one note in full (each in the list is cut at 300 characters)' },
+        returns: 'their pocket notes, pinned first, with ids; or that it is private (they allow it in Settings › Agents).',
+        example: { limit: 20 },
+        keywords: ['pocket', 'pocket notes', 'quick notes', 'jotted', 'scratch notes', 'read pocket', 'inbox', 'what did i jot down'],
+    },
+    update_pocket_note: {
+        use: '"reword that pocket note", "pin it to the top".',
+        not: 'a note on a lesson (update_note).',
+        params: { id: 'from list_pocket_notes', text: 'its whole new text' },
+        returns: 'the note as it is now (Undo on Home).',
+        example: { id: 'pn_idea', pinned: true },
+        keywords: ['edit pocket note', 'change pocket note', 'pin', 'unpin', 'reword pocket'],
+    },
+    delete_pocket_note: {
+        use: '"delete the habit tracker idea from my pocket", on their word.',
+        not: 'a note on a lesson (remove_note); a doc (trash_doc).',
+        params: { id: 'from list_pocket_notes' },
+        returns: 'that it is gone (Undo on Home brings it back).',
+        example: { id: 'pn_idea' },
+        keywords: ['delete pocket note', 'remove pocket note', 'clear pocket', 'drop from pocket'],
+    },
+    update_subject: {
+        use: '"rename my DSA course to Algorithms", "describe this subject".',
+        not: 'a topic on its path (update_topic); a doc (update_doc).',
+        params: { subject: 'its id or its name', description: 'null clears it' },
+        returns: 'the subject as it is now (Undo on Home).',
+        example: { subject: 'DSA', name: 'Algorithms' },
+        keywords: ['rename subject', 'rename course', 'subject name', 'subject description', 'describe course'],
+    },
+    delete_subject: {
+        use: '"delete the DSA subject", "get rid of that course", on their word.',
+        not: 'one topic (update_topic with status skipped); a doc (trash_doc).',
+        returns: 'an empty subject: deleted (Undo on Home); one that holds topics, notes or docs: a card on Home that waits for their tap.',
+        example: { subject: 'DSA', reason: 'They finished with it' },
+        keywords: ['delete subject', 'delete course', 'remove subject', 'get rid of course', 'drop course'],
+    },
+
     // ─── Subjects and goals ───────────────────────────────────────────────
     create_subject: {
         use: '"make a subject for system design", "start a new course".',
@@ -664,6 +731,8 @@ export const AREAS: Readonly<Record<string, readonly ToolName[]>> = {
     'Study: subjects, paths, reviews': [
         'list_subjects',
         'create_subject',
+        'update_subject',
+        'delete_subject',
         'get_path',
         'plan_topics',
         'update_topic',
@@ -697,7 +766,7 @@ export const AREAS: Readonly<Record<string, readonly ToolName[]>> = {
         'restore_doc',
         'empty_trash',
     ],
-    'Notes and the pocket': ['add_note', 'list_notes', 'update_note', 'remove_note', 'add_pocket_note'],
+    'Notes and the pocket': ['add_note', 'list_notes', 'update_note', 'remove_note', 'attach_file', 'remove_file', 'read_note_file', 'add_pocket_note', 'list_pocket_notes', 'update_pocket_note', 'delete_pocket_note'],
     'Work log': ['log_work', 'get_work_log', 'update_work_line', 'log_decision', 'list_decisions'],
     'Settings and sharing': ['get_settings', 'update_settings', 'update_project', 'get_sharing', 'publish_doc', 'share_doc', 'recent_agent_edits', 'set_folder', 'set_chat'],
     'Finding tools': ['find_tools', 'use_read_tool', 'use_tool'],
