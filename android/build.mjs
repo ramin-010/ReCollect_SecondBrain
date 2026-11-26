@@ -3,9 +3,9 @@
 // aapt2, d8, aapt, zipalign and apksigner. Needs a JDK 17+ and the Android SDK's build tools and one
 // platform (android.jar); nothing is downloaded.
 //
-//   node build.mjs             -> build/recollect.apk
+//   node build.mjs             -> build/kaaga.apk (the web address it opens: --home <url>, default https://kaaga.in)
 //   node build.mjs --install   -> and installs it on the phone over USB (adb install -r)
-//   node build.mjs --qa        -> build/recollect-qa.apk: "Your day QA" (app.recollect.phone.qa), a second
+//   node build.mjs --qa        -> build/kaaga-qa.apk: "Kaaga QA" (app.recollect.phone.qa), a second
 //                                 app beside his for tests with the QA account; it never sets a wallpaper
 //                                 unless switched on, so his own app, connection and screens stay as they are
 //
@@ -25,7 +25,9 @@ const KEYS = path.join(ROOT, 'keys');
  * app stays 0.6.0 until his OK, and gets all of it as 0.7.0 after his deploy.
  */
 const QA_BUILD = process.argv.includes('--qa');
-const VERSION = '0.7.5';
+// 0.8.0 (11-26): Kaaga (KAAGA_REBRAND_PLAN): its name, icon and address. The package id stays app.recollect.phone, so it
+// installs over the app already on a phone.
+const VERSION = '0.8.0';
 const MIN_SDK = 26;
 const TARGET_SDK = 34;
 /** Grows with every build (minutes since 2026-01-01), so `adb install -r` always takes the new one. */
@@ -33,6 +35,11 @@ const TARGET_SDK = 34;
 const DEBUG = process.argv.includes('--debug');
 /** --qa: the test app beside his (its own package, label and data). */
 const QA = process.argv.includes('--qa');
+/** --home <url>: the web app his app opens (the QA app opens the computer's). */
+const HOME = (() => {
+    const i = process.argv.indexOf('--home');
+    return (i > 0 && process.argv[i + 1] ? process.argv[i + 1] : 'https://kaaga.in').replace(/\/+$/, '');
+})();
 const VERSION_CODE = Math.floor((Date.now() - Date.UTC(2026, 0, 1)) / 60000);
 
 const win = process.platform === 'win32';
@@ -158,7 +165,7 @@ const jdk = findJdk();
 console.log(`SDK build tools: ${tools}\nPlatform: ${androidJar}\nJDK: ${jdk}`);
 
 // Start clean, but keep the other variant's APK (his app's and the QA app's sit side by side).
-const keep = path.join(BUILD, QA ? 'recollect.apk' : 'recollect-qa.apk');
+const keep = path.join(BUILD, QA ? 'kaaga.apk' : 'kaaga-qa.apk');
 const kept = fs.existsSync(keep) ? fs.readFileSync(keep) : null;
 fs.rmSync(BUILD, { recursive: true, force: true });
 for (const d of ['gen', 'classes', 'dex']) fs.mkdirSync(path.join(BUILD, d), { recursive: true });
@@ -167,7 +174,7 @@ if (kept) fs.writeFileSync(keep, kept);
 // 1. BuildConfig
 const pkgDir = path.join(BUILD, 'gen', 'app', 'recollect', 'phone');
 fs.mkdirSync(pkgDir, { recursive: true });
-fs.writeFileSync(path.join(pkgDir, 'BuildConfig.java'), `package app.recollect.phone;\n\n/** Made by build.mjs. */\npublic final class BuildConfig {\n    public static final String VERSION = "${VERSION}${QA ? '-qa' : ''}";\n    public static final int VERSION_CODE = ${VERSION_CODE};\n    /** The test app beside his (build.mjs --qa): no wallpaper unless switched on. */\n    public static final boolean QA = ${QA};\n\n    private BuildConfig() {}\n}\n`);
+fs.writeFileSync(path.join(pkgDir, 'BuildConfig.java'), `package app.recollect.phone;\n\n/** Made by build.mjs. */\npublic final class BuildConfig {\n    public static final String VERSION = "${VERSION}${QA ? '-qa' : ''}";\n    public static final int VERSION_CODE = ${VERSION_CODE};\n    /** The test app beside his (build.mjs --qa): no wallpaper unless switched on. */\n    public static final boolean QA = ${QA};\n    /** The web app his app opens (build.mjs --home). */\n    public static final String HOME = "${HOME}";\n\n    private BuildConfig() {}\n}\n`);
 
 // 2. Resources: compile, then link with the manifest (writes R.java)
 const aapt2 = path.join(tools, exe('aapt2'));
@@ -177,7 +184,7 @@ const qaRes = [];
 if (QA) {
     const dir = path.join(BUILD, 'qa-res', 'values');
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, 'strings.xml'), '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="app_name">Your day QA</string>\n    <string name="widget_name">Your day QA</string>\n</resources>\n');
+    fs.writeFileSync(path.join(dir, 'strings.xml'), '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="app_name">Kaaga QA</string>\n    <string name="widget_name">Kaaga QA</string>\n</resources>\n');
     run(aapt2, ['compile', '--dir', path.join(BUILD, 'qa-res'), '-o', path.join(BUILD, 'qa.zip')]);
     qaRes.push('--rename-manifest-package', 'app.recollect.phone.qa', '-R', path.join(BUILD, 'qa.zip'));
 }
@@ -201,20 +208,22 @@ run(path.join(tools, exe('aapt')), ['add', path.join(BUILD, 'unaligned.apk'), 'c
 run(path.join(tools, exe('zipalign')), ['-f', '4', path.join(BUILD, 'unaligned.apk'), path.join(BUILD, 'aligned.apk')]);
 const key = signingKey(jdk);
 const apksigner = path.join(tools, 'lib', 'apksigner.jar');
-const apk = path.join(BUILD, QA ? 'recollect-qa.apk' : 'recollect.apk');
+const apk = path.join(BUILD, QA ? 'kaaga-qa.apk' : 'kaaga.apk');
 run(path.join(jdk, exe('java')), ['-jar', apksigner, 'sign', '--ks', key.store, '--ks-key-alias', 'recollect', '--ks-pass', `file:${key.pass}`, '--out', apk, path.join(BUILD, 'aligned.apk')]);
 run(path.join(jdk, exe('java')), ['-jar', apksigner, 'verify', apk]);
 for (const f of ['base.apk', 'unaligned.apk', 'aligned.apk', 'res.zip', 'qa.zip', 'classes.jar', 'sources.txt', 'AndroidManifest.xml']) fs.rmSync(path.join(BUILD, f), { force: true });
 fs.rmSync(path.join(BUILD, 'qa-res'), { recursive: true, force: true });
 
-console.log(`\nBuilt ${path.relative(process.cwd(), apk)}: ${(fs.statSync(apk).size / 1024).toFixed(0)} KB, version ${VERSION} (${VERSION_CODE}), in ${((Date.now() - started) / 1000).toFixed(1)} s`);
+console.log(`\nBuilt ${path.relative(process.cwd(), apk)}: ${(fs.statSync(apk).size / 1024).toFixed(0)} KB, version ${VERSION} (${VERSION_CODE}), opens ${QA ? 'http://localhost:3005' : HOME}, in ${((Date.now() - started) / 1000).toFixed(1)} s`);
 
-// The release build rides with the backend (the owner, 11-23 night): backend/assets/phone/recollect.apk is committed in
+// The release build rides with the backend (the owner, 11-23 night): backend/assets/phone/kaaga.apk is committed in
 // the backend's repo, so every backend deploy carries the newest app and Settings > Phone app offers it. Never the QA one.
 if (!QA) {
-    const served = path.join(ROOT, '..', 'backend', 'assets', 'phone', 'recollect.apk');
+    const served = path.join(ROOT, '..', 'backend', 'assets', 'phone', 'kaaga.apk');
     fs.mkdirSync(path.dirname(served), { recursive: true });
     fs.copyFileSync(apk, served);
+    // The file before the rename goes, so the server serves this one.
+    fs.rmSync(path.join(path.dirname(served), 'recollect.apk'), { force: true });
     console.log(`Copied to ${path.relative(process.cwd(), served)}: commit it in the backend repo; its next deploy serves it.`);
 }
 

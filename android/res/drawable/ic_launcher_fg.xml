@@ -1,16 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Recollect's mark (components/brand/Logo.tsx, a 48 grid) centred in the adaptive icon's 108 grid, inside its 66 dp safe zone. -->
+<!-- Kaaga's mark (KAAGA_REBRAND_PLAN; the logo set's app icon): one circle in four slices, the third pulled out to the
+     right, at the logo set's app-icon scale and centred on its visual centre in the adaptive icon's 108 grid (inside the
+     66 dp safe zone). Drawn from recollect/components/brand/kaaga (the same geometry). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <group android:translateX="9.2" android:translateY="16.4" android:scaleX="1.6" android:scaleY="1.6">
-        <path android:fillColor="@color/icon_ink" android:fillAlpha="0.12"
-            android:pathData="M16,24C16,19 19,16 22,16C25,16 26.5,17.5 28,19.5C29.5,17.5 31,16 34,16C37,16 40,19 40,24C40,29 37,32 34,32C31,32 29.5,30.5 28,28.5C26.5,30.5 25,32 22,32C19,32 16,29 16,24Z" />
-        <path android:strokeColor="@color/icon_ink" android:strokeWidth="3"
-            android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"
-            android:pathData="M16,24C16,19 19,16 22,16C25,16 26.5,17.5 28,19.5M28,19.5C29.5,17.5 31,16 34,16C37,16 40,19 40,24C40,29 37,32 34,32C31,32 29.5,30.5 28,28.5M28,28.5C26.5,30.5 25,32 22,32C19,32 16,29 16,24M28,19.5V28.5" />
-        <path android:fillColor="@color/icon_ink" android:pathData="M19.5,16a2.5,2.5 0,1 0,5 0a2.5,2.5 0,1 0,-5 0Z" />
-        <path android:fillColor="@color/icon_ink" android:pathData="M31.5,16a2.5,2.5 0,1 0,5 0a2.5,2.5 0,1 0,-5 0Z" />
-        <path android:fillColor="@color/icon_ink" android:pathData="M25,24a3,3 0,1 0,6 0a3,3 0,1 0,-6 0Z" />
+    <group android:translateX="22.950" android:translateY="25.200" android:scaleX="0.1125" android:scaleY="0.1125">
+        <path android:fillColor="@color/icon_ink" android:pathData="M256,80L256,80A176,176 0 0,1 401.86,157.5L110.14,157.5A176,176 0 0,1 256,80Z" />
+        <path android:fillColor="@color/icon_ink" android:pathData="M101.61,171.5L410.39,171.5A176,176 0 0,1 431.86,249L80.14,249A176,176 0 0,1 101.61,171.5Z" />
+        <path android:fillColor="@color/icon_ink" android:pathData="M120.14,263L471.86,263A176,176 0 0,1 450.39,340.5L141.61,340.5A176,176 0 0,1 120.14,263Z" />
+        <path android:fillColor="@color/icon_ink" android:pathData="M110.14,354.5L401.86,354.5A176,176 0 0,1 256,432L256,432A176,176 0 0,1 110.14,354.5Z" />
     </group>
 </vector>

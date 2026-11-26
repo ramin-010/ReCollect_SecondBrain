@@ -1,6 +1,6 @@
-# Your day: Recollect's phone app (Android)
+# Kaaga's phone app (Android)
 
-A small Android app that puts **the picture of your day** from Recollect on the phone's **lock screen** (and the home screen, if you like), and keeps a **home-screen widget** with the same lines. The picture changes with the day: dawn in the morning, daylight while you work, dusk in the evening, a starry night once the day is done, a soft mist on a light day. Recollect's backend draws it (`src/services/ambient/wallpaperArt.ts` there); the app fetches it at the screen's exact size.
+A small Android app that puts **the picture of your day** from Kaaga on the phone's **lock screen** (and the home screen, if you like), and keeps a **home-screen widget** with the same lines. The picture changes with the day: dawn in the morning, daylight while you work, dusk in the evening, a starry night once the day is done, a soft mist on a light day. Kaaga's backend draws it (`src/services/ambient/wallpaperArt.ts` there); the app fetches it at the screen's exact size.
 
 - **What it can read:** only the picture and its lines. It connects with its own token (the `ambient` scope), which opens nothing else.
 - **No Play Store, nothing hosted:** it is one APK file, installed over USB or opened on the phone.
@@ -11,10 +11,10 @@ A small Android app that puts **the picture of your day** from Recollect on the 
 You need a JDK (17 or newer) and the Android SDK's **build tools** and **one platform** (`platforms/android-34` or newer, for `android.jar`). The build finds them in `ANDROID_SDK_ROOT`, `ANDROID_HOME`, `android/.toolchain/`, `C:/Android/sdk` or the usual Android Studio folder, and finds the JDK through `JAVA_HOME`.
 
 ```sh
-node build.mjs             # build/recollect.apk
+node build.mjs             # build/kaaga.apk
 node build.mjs --install   # and install it on the phone over USB (adb install -r)
 node build.mjs --debug     # a test build adb can look inside (run-as); never for daily use
-node build.mjs --qa        # build/recollect-qa.apk: "Your day QA", a second app beside the real one for tests
+node build.mjs --qa        # build/kaaga-qa.apk: "Kaaga QA", a second app beside the real one for tests
                            # (its own package and data, no wallpaper unless switched on, a widget preview)
 ```
 
@@ -22,7 +22,7 @@ The first build creates the signing key in `keys/` (git-ignored). **Back up `key
 
 ## Connect
 
-1. On the computer: Recollect → **Settings → Phone app**. Choose where the phone finds Recollect (the public address after the deploy; before it, the computer's address on the same Wi-Fi or hotspot, or `localhost` over USB with `adb reverse tcp:8002 tcp:8002`). Then **Make the connect code**.
+1. On the computer: Kaaga → **Settings → Phone app**. Choose where the phone finds Kaaga (the public address after the deploy; before it, the computer's address on the same Wi-Fi or hotspot, or `localhost` over USB with `adb reverse tcp:8002 tcp:8002`). Then **Make the connect code**.
 2. Point the phone's camera at the code and open the link. The page that opens offers the APK if the app isn't installed yet.
 3. Tap **Open the phone app**, then **Connect**. "Keep a copy of my wallpaper" lets Disconnect put your own wallpaper back.
 

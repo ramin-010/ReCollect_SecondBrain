@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Words as in the web app: plain, sentence case; a button says what happens. -->
 <resources>
-    <!-- "Your day", like the widget: the web app installed on the phone is "Recollect". -->
-    <string name="app_name">Your day</string>
-    <string name="widget_name">Your day</string>
-    <string name="widget_description">One thing from Recollect to pick up or coming up, with Later to bring it back when you can act; or your day.</string>
+    <!-- Kaaga (KAAGA_REBRAND_PLAN, 11-26): the app, its widget and its live wallpaper carry the name. -->
+    <string name="app_name">Kaaga</string>
+    <string name="widget_name">Kaaga</string>
+    <string name="widget_description">One thing from Kaaga to pick up or coming up, with Later to bring it back when you can act; or your day.</string>
 
     <string name="connected_toast_off">Connected.</string>
 
     <!-- Problems: what went wrong and what to do next -->
-    <string name="bad_link">This link isn\'t a Recollect connect link. Make a new code in Settings → Phone app.</string>
-    <string name="bad_link_http">For an address on the internet, Recollect needs https. Check the address in Settings → Phone app.</string>
-    <string name="fail_unreachable">Couldn\'t reach Recollect at %1$s. Until Recollect is online, the phone needs your computer on and the same Wi-Fi or hotspot, or the USB cable.</string>
-    <string name="fail_refused">Recollect didn\'t accept this phone\'s code just now. The app keeps it and tries again; if it keeps happening, make a new one on your computer in Settings → Phone app.</string>
+    <string name="bad_link">This link isn\'t a Kaaga connect link. Make a new code in Settings → Phone app.</string>
+    <string name="bad_link_http">For an address on the internet, Kaaga needs https. Check the address in Settings → Phone app.</string>
+    <string name="fail_unreachable">Couldn\'t reach Kaaga at %1$s. Until Kaaga is online, the phone needs your computer on and the same Wi-Fi or hotspot, or the USB cable.</string>
+    <string name="fail_refused">Kaaga didn\'t accept this phone\'s code just now. The app keeps it and tries again; if it keeps happening, make a new one on your computer in Settings → Phone app.</string>
     <string name="fail_revoked">This phone\'s code was ended. Make a new one on your computer in Settings → Phone app.</string>
     <string name="fail_forbidden">This code can\'t read the picture. Make a new one in Settings → Phone app.</string>
-    <string name="fail_server">Recollect answered with an error (%1$d). The app tries again in 15 minutes.</string>
-    <string name="fail_data">Recollect sent something this app can\'t read. Build and install the latest app.</string>
+    <string name="fail_server">Kaaga answered with an error (%1$d). The app tries again in 15 minutes.</string>
+    <string name="fail_data">Kaaga sent something this app can\'t read. Build and install the latest app.</string>
     <string name="fail_wallpaper">The phone didn\'t accept the wallpaper. Try Refresh now.</string>
 
     <string name="done_today">Done for today</string>
@@ -30,43 +30,43 @@
     <string name="disconnected">Disconnected.</string>
 
     <!-- The buddy (0.3.0): the web card's words -->
-    <string name="buddy_title">From your buddy</string>
+    <string name="buddy_title">From Kaaga</string>
     <string name="buddy_title_named">From %1$s</string>
     <string name="thumb_failed">That didn\'t save. Try again.</string>
     <string name="reminder_title">Reminder</string>
     <string name="reminder_plain">You have a reminder.</string>
     <string name="reminder_channel">Reminders</string>
-    <string name="reminder_channel_description">Your reminders from Recollect, at their time, with sound.</string>
+    <string name="reminder_channel_description">Your reminders from Kaaga, at their time, with sound.</string>
     <string name="alarm_title">Alarm</string>
     <string name="alarm_snooze">Snooze 10 min</string>
     <string name="alarm_dismiss">Dismiss</string>
     <string name="alarm_channel">Alarms</string>
     <string name="alarm_channel_description">Reminders that ring: a full-screen alarm with sound until you snooze or dismiss it.</string>
     <string name="notify_denied">Notifications are off for this app. Turn them on in App info.</string>
-    <string name="note_private">Your buddy left you a note. Open the app to read it.</string>
-    <string name="channel_name">Notes from your buddy</string>
-    <string name="channel_description">When your buddy leaves you a new note: at most two a day, never in quiet hours.</string>
+    <string name="note_private">Kaaga left you a note. Open the app to read it.</string>
+    <string name="channel_name">Notes from Kaaga</string>
+    <string name="channel_description">When Kaaga leaves you a new note: at most two a day, never in quiet hours.</string>
     <!-- 0.6.0: the buddy's questions, silent, with their quick answers and a reply box. -->
-    <string name="ask_channel_name">Questions from your buddy</string>
+    <string name="ask_channel_name">Questions from Kaaga</string>
     <string name="ask_channel_description">A question now and then, without a sound: answer with a tap or a few words, or let it go. It leaves by itself at its time and in quiet hours.</string>
-    <string name="ask_private">Your buddy has a question. Open the app to see it.</string>
+    <string name="ask_private">Kaaga has a question. Open the app to see it.</string>
     <string name="ask_reply">Reply</string>
     <string name="ask_reply_hint">Your answer</string>
 
     <!-- The widget before it is connected -->
-    <string name="widget_connect">Connect Recollect</string>
+    <string name="widget_connect">Connect Kaaga</string>
     <string name="widget_connect_line">Open the app to connect this phone.</string>
     <string name="widget_stale">Updated %1$s</string>
     <!-- 0.7.0 (stage 19): Later on the widget's card. -->
     <string name="later_button">Later</string>
     <string name="later_button_description">Later: bring this back at a time you can act on it</string>
     <string name="later_set_description">Later is set</string>
-    <string name="live_name">Your day (live)</string>
+    <string name="live_name">Kaaga (live)</string>
     <string name="live_description">The picture of your day, with small icons for your notifications on the lock screen.</string>
-    <string name="notif_icons_name">Your day: notification icons</string>
+    <string name="notif_icons_name">Kaaga: notification icons</string>
     <!-- The shell (0.7.0): the page could not load. -->
     <string name="shell_no_google">Google sign-in can\'t open inside the app. Sign in with your email and password (on the website, Forgot password sets one).</string>
-    <string name="shell_offline_title">Can\'t reach Recollect</string>
-    <string name="shell_offline_body">Recollect needs the internet. Check your connection, then try again.</string>
+    <string name="shell_offline_title">Can\'t reach Kaaga</string>
+    <string name="shell_offline_body">Kaaga needs the internet. Check your connection, then try again.</string>
     <string name="shell_retry">Try again</string>
 </resources>

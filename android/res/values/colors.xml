@@ -66,7 +66,7 @@
     <color name="wp_line_strong">@color/wp_light_line_strong</color>
     <color name="wp_set">@color/wp_light_set</color>
 
-    <!-- The launcher icon: the mark in white on ink, so it reads apart from the web app's (ink on white). -->
-    <color name="icon_ground">#2C2C2B</color>
-    <color name="icon_ink">#FFFFFF</color>
+    <!-- The launcher icon: the logo set's app icon, the bone mark on ink (KAAGA_REBRAND_PLAN). -->
+    <color name="icon_ground">#141416</color>
+    <color name="icon_ink">#ECE9E2</color>
 </resources>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Recollect's phone app (context/specs/ANDROID_APP_SPEC.md): the picture of the day as the home and
+  Kaaga's phone app (context/specs/ANDROID_APP_SPEC.md; named Kaaga since 0.8.0, its package id kept): the picture of the day as the home and
   lock screen wallpaper, a home-screen widget with the same lines, and one settings screen. It reads
   two things from the server with its own narrow token (the `ambient` scope) and nothing else.
 -->

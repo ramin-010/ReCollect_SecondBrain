@@ -219,7 +219,7 @@ final class Api {
             c.setUseCaches(false);
             c.setRequestProperty("Authorization", "Bearer " + token);
             c.setRequestProperty("Accept", accept);
-            c.setRequestProperty("User-Agent", "RecollectPhone/" + BuildConfig.VERSION);
+            c.setRequestProperty("User-Agent", "KaagaPhone/" + BuildConfig.VERSION);
             if (json != null) {
                 byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
                 c.setDoOutput(true);

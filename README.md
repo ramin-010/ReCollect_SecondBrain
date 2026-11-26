@@ -1,6 +1,6 @@
-# ReCollect: Second Brain
+# Kaaga: Second Brain
 
-ReCollect is a personal learning app that AI agents can work in. You keep notes as docs with real diagrams, revise them on a spaced schedule, and plan the week; Claude (in Claude Code, on claude.ai, or the app's own Ask AI) reads and writes the same docs, plans and records through one tool catalogue, and every change it makes can be undone.
+Kaaga (until November 2026 called ReCollect; the repositories keep their names) is a personal learning app that AI agents can work in. You keep notes as docs with real diagrams, revise them on a spaced schedule, and plan the week; Claude (in Claude Code, on claude.ai, or the app's own Ask Kaaga) reads and writes the same docs, plans and records through one tool catalogue, and every change it makes can be undone.
 
 This repository holds the pieces around the app. The app itself lives in two repos:
 
@@ -13,9 +13,9 @@ This repository holds the pieces around the app. The app itself lives in two rep
 ## What is here
 
 ```
-mcp/              The ReCollect MCP server (TypeScript, @modelcontextprotocol/sdk)
+mcp/              The Kaaga MCP server (TypeScript, @modelcontextprotocol/sdk)
   src/tools/      66 tools in groups (docs, plan, record, manage…), each with an action level
-  skills/         Agent skills: recollect-notes (notes with diagrams), recollect-study (a tutor that remembers)
+  skills/         Agent skills: kaaga-notes (notes with diagrams), kaaga-study (a tutor that remembers)
   src/hook.ts     Claude Code hooks that log work sessions to the app
 context/specs/    The design specs, each with an "As built" section
 android/          The Android companion (wallpaper, lock screen and widget from the day's plan)
@@ -26,12 +26,12 @@ prototype/        The first HTML prototype
 
 ```
  Claude Code ──stdio──► mcp/dist/index.js ──HTTPS + rcl_ token──┐
- claude.ai  ──HTTP /mcp + OAuth 2.1 sign-in──────────────────────┼──► ReCollect API ──► Postgres
- Ask AI (in the app) ──the same catalogue, embedded───────────────┘        │
-                                                                           └──► live docs (Yjs) in the open editor
+ claude.ai  ──HTTP /mcp + OAuth 2.1 sign-in──────────────────────┼──► Kaaga API ──► Postgres
+ Ask Kaaga (in the app) ──the same catalogue, embedded────────────┘    │
+                                                                       └──► live docs (Yjs) in the open editor
 ```
 
-- **One tool catalogue** serves every client: Claude Code over stdio, claude.ai and other remote clients over Streamable HTTP at `/mcp` (with the MCP authorization spec: protected-resource metadata, PKCE, Client ID Metadata Documents and dynamic registration, rotating refresh tokens), and the app's own Ask AI, which loads the same server in-process.
+- **One tool catalogue** serves every client: Claude Code over stdio, claude.ai and other remote clients over Streamable HTTP at `/mcp` (with the MCP authorization spec: protected-resource metadata, PKCE, Client ID Metadata Documents and dynamic registration, rotating refresh tokens), and the app's own Ask Kaaga, which loads the same server in-process.
 - **Three action levels**: a read; a change that is logged and can be undone from the app; and anything final or outward (publishing, sharing, emptying the trash), which the agent can only propose and the person taps to run.
 - **Docs are blocks, written as Markdown**: agents write a GitHub-style dialect (callouts, toggles, toggle headings, tables, code), ```` ```mermaid ```` diagrams that are checked before anything is stored, and ```` ```canvas ```` boards written as Mermaid flowchart text that the server lays out with ELK. Block tools insert, update, move and delete single blocks while the person is typing in the same doc.
 

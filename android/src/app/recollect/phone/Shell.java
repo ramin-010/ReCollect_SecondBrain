@@ -64,10 +64,10 @@ import java.util.concurrent.Executors;
  */
 public final class Shell extends Activity {
     /**
-     * The web app: re-collect.in in his app (11-21, the release); in the test app, the one on this computer over USB (adb
-     * reverse tcp:3005 tcp:3005; its API on 8002, live editing on 1234).
+     * The web app: kaaga.in in his app (0.8.0; build.mjs --home picks another); in the test app, the one on this computer
+     * over USB (adb reverse tcp:3005 tcp:3005; its API on 8002, live editing on 1234).
      */
-    static final String HOME = BuildConfig.QA ? "http://localhost:3005" : "https://re-collect.in";
+    static final String HOME = BuildConfig.QA ? "http://localhost:3005" : BuildConfig.HOME;
     private static final int ASK_VOICE = 21;
     private static final int ASK_NOTIFY = 22;
     /** Paper's ground in light (mockups/phone-app/tokens.css): the default look's, until the page says another. */

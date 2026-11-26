@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The status bar's icon for the buddy's notes: Recollect's mark (ic_launcher_fg) alone, white on clear, 24 dp. -->
+<!-- The status bar's icon (the buddy's notes, reminders): Kaaga's mark alone, white on clear, 24 dp, with the wider gaps
+     the logo set uses at small sizes. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp" android:height="24dp"
-    android:viewportWidth="48" android:viewportHeight="48">
-    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="3.5"
-        android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"
-        android:pathData="M8,24C8,17 12,13 16,13C20,13 22,15 24,18M24,18C26,15 28,13 32,13C36,13 40,17 40,24C40,31 36,35 32,35C28,35 26,33 24,30M24,30C22,33 20,35 16,35C12,35 8,31 8,24M24,18V30" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M13,13a3,3 0,1 0,6 0a3,3 0,1 0,-6 0Z" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M29,13a3,3 0,1 0,6 0a3,3 0,1 0,-6 0Z" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M20.5,24a3.5,3.5 0,1 0,7 0a3.5,3.5 0,1 0,-7 0Z" />
+    android:viewportWidth="24" android:viewportHeight="24">
+    <group android:translateX="-2.056" android:translateY="-1.037" android:scaleX="0.05093" android:scaleY="0.05093">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M256,80L256,80A176,176 0 0,1 395.35,148.5L116.65,148.5A176,176 0 0,1 256,80Z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M100.01,174.5L411.99,174.5A176,176 0 0,1 431.52,243L80.48,243A176,176 0 0,1 100.01,174.5Z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M120.48,269L471.52,269A176,176 0 0,1 451.99,337.5L140.01,337.5A176,176 0 0,1 120.48,269Z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M116.65,363.5L395.35,363.5A176,176 0 0,1 256,432L256,432A176,176 0 0,1 116.65,363.5Z" />
+    </group>
 </vector>
