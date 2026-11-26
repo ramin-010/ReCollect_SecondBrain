@@ -79,6 +79,13 @@ describe('a chat’s parts', () => {
             { from: at(0), to: at(7), minutes: 6, part: null },
             { from: at(7), to: at(16), minutes: 10, part: { at: at(7), kind: 'study', by: 'chat' } },
         ]);
+        // Past midnight (this computer's clock): the day's time is the day's, in a part of its own (11-26).
+        const loc = (m: number) => new Date(2026, 10, 23, 23, 50 + m).toISOString();
+        const night = splitSession([0, 2, 4, 6, 8, 10, 12, 14, 16, 18].map(loc), loc(0), loc(20), [{ at: loc(-5), kind: 'study', by: 'chat' }], 'work');
+        expect(night.map((p) => [p.from, p.to, p.minutes, p.part?.kind])).toEqual([
+            [loc(0), loc(10), 10, 'study'],
+            [loc(10), loc(20), 10, 'study'],
+        ]);
         // From the start: the whole chat is one part of that kind.
         expect(splitSession(stamps, at(0), at(16), [{ at: at(-5), kind: 'study', by: 'agent' }], 'work')).toHaveLength(1);
     });

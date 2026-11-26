@@ -1,6 +1,6 @@
 {
   "name": "recollect-setup",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Recollect for your AI coding tools: `npx recollect-setup` signs this computer in (you approve it in your browser) and adds Recollect's tools, hooks and skills to Claude Code, Antigravity and Cursor.",
   "keywords": [
     "recollect",

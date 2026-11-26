@@ -440,6 +440,12 @@ export interface SessionPart {
 
 const RANK: Record<ChatPart['by'], number> = { agent: 1, chat: 2 };
 
+/** The next midnight after a moment, on this computer's clock (the user's day). */
+const nextMidnight = (t: number): number => {
+    const d = new Date(t);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+};
+
 /**
  * A session's time split by what the chat was: each change starts a part (one from the chat's start, or before it,
  * says what it was from the beginning); two parts in a row that are the same thing are one (the stronger word kept).
@@ -461,6 +467,13 @@ export function splitSession(stamps: readonly string[], startedAt: string, end: 
             // The same thing again: one part, the stronger word (their own over the agent's) kept.
             if (!last.part || RANK[m.part.by] > RANK[last.part.by]) last.part = { ...m.part, at: new Date(last.t).toISOString() };
         } else bounds.push({ t: m.t, part: m.part });
+    }
+    // A chat that runs past midnight is cut there too (11-26: a day's time belongs to that day, not the day it began).
+    const endT = Date.parse(end);
+    for (let i = 0; i < bounds.length; i++) {
+        const stop = i + 1 < bounds.length ? bounds[i + 1]!.t : endT;
+        const midnight = nextMidnight(bounds[i]!.t);
+        if (midnight < stop) bounds.splice(i + 1, 0, { t: midnight, part: bounds[i]!.part });
     }
     const t = [...stamps, end].map((x) => Date.parse(x)).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
     const ms = bounds.map(() => 0);

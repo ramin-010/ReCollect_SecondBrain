@@ -20,7 +20,7 @@ npx recollect-setup
 
 ```sh
 npx recollect-setup status    # what is set up, who it is signed in as
-npx recollect-setup update    # the newest version, set up again
+npx recollect-setup@latest update    # the newest version, set up again (@latest: npx may keep an older copy)
 npx recollect-setup remove    # take it all out (the sign-in ends itself)
 ```
 

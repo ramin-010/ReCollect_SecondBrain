@@ -5,7 +5,7 @@
 //                                  Antigravity and Cursor; safe to run again (also `npx recollect-setup setup`)
 //   npx recollect-setup status     what is set up here
 //   npx recollect-setup remove     take it all out again
-//   npx recollect-setup update     the newest version, set up again
+//   npx recollect-setup@latest update   the newest version, set up again
 //   npx recollect-setup mcp        run the MCP server (the tools start dist/index.js, the hooks dist/hook.js, directly)
 //
 // Options: --url <server> (default https://api.re-collect.in), --login (sign in again), --tools claude,antigravity,cursor,
@@ -23,7 +23,8 @@ const HELP = `recollect-setup ${packageVersion()}: Recollect for your AI coding 
                                  Recollect to Claude Code, Antigravity and Cursor. Safe to run again.
   npx recollect-setup status     What is set up here.
   npx recollect-setup remove     Take it all out again.
-  npx recollect-setup update     Get the newest version and set up again.
+  npx recollect-setup@latest update   Get the newest version and set up again (@latest, or npx
+                                      may run the copy it kept from before).
   npx recollect-setup help       This.
 
 Options: --url <server>  --login  --tools claude,antigravity,cursor  --no-open  --keep-token

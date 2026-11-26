@@ -227,6 +227,10 @@ describe('the flow with numbers', () => {
         await runHook('start', input(), env, at(0));
         for (let m = 4; m <= 780; m += 4) await runHook('prompt', input({ prompt: '/compact' }), env, at(m));
         await runHook('end', input({ reason: 'prompt_input_exit' }), env, at(780));
-        expect(calls.find((c) => c.method === 'PUT')!.body).toMatchObject({ minutes: 780 });
+        // Whole: all 780 minutes are logged (in two parts when the 13 hours cross midnight on this computer's clock, 11-26).
+        const puts = calls.filter((c) => c.method === 'PUT' && /\/api\/sessions\/by-key\//.test(c.url));
+        expect(puts.reduce((n, c) => n + c.body.minutes, 0)).toBe(780);
+        const crosses = new Date(at(0)).getDate() !== new Date(at(780)).getDate();
+        expect(puts).toHaveLength(crosses ? 2 : 1);
     });
 });
