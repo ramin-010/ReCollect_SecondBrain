@@ -215,6 +215,9 @@ export function buddyViewText(v: BuddyView): string {
     return lines.join('\n');
 }
 
+/** The web brief's last line (TOOL_ACCESS_PLAN §5.4). */
+export const MORE_TOOLS_LINE = 'More than the listed tools: find_tools("<the job>").';
+
 export function registerRecordTools(server: McpServer, ctx: ToolContext): void {
     const { api } = ctx;
 
@@ -240,7 +243,9 @@ export function registerRecordTools(server: McpServer, ctx: ToolContext): void {
             // The web (claude.ai, ChatGPT): the small buddy brief (§4.6). An older server answers the full brief: printed as before.
             if (ctx.set === 'web') {
                 const v = await api.get<BuddyView | Brief>('/api/brief', { view: 'buddy' });
-                return 'inMotion' in v ? buddyViewText(v) : briefText(v);
+                // TOOL_ACCESS_PLAN §5.4: the map survives a host that drops the server's instructions.
+                return `${'inMotion' in v ? buddyViewText(v) : briefText(v)}
+${MORE_TOOLS_LINE}`;
             }
             return briefText(await api.get<Brief>('/api/brief', { project, key, ...(ctx.workMode ? { work: '1' } : {}) }));
         }
@@ -254,7 +259,7 @@ export function registerRecordTools(server: McpServer, ctx: ToolContext): void {
             title: 'Checkpoint the session',
             description:
                 'Write this chat’s session record (the key from get_brief), after each part of the work: the same key updates the same session. ' +
-                'Send what is new: a score, weak spots found or cleared, the topic’s status, the next step (a problem they stop before solving: no outcome, and where they got to in nextStep). Minutes are counted. What they say about their own life goes to remember or update_memory.',
+                'Send what is new: a score, weak spots found or cleared, the topic’s status, the next step (a problem they stop before solving: no outcome, and where they got to in nextStep). Minutes are counted.',
             input: {
                 key: z.string().trim().min(1).max(80).describe('The session key get_brief gave.'),
                 title: z.string().trim().min(1).max(200).optional().describe('What was done.'),

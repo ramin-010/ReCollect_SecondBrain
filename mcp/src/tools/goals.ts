@@ -43,7 +43,7 @@ export function registerGoalTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'List goals',
             description:
-                "The user's goals, active first: deadline, days left, milestone progress, the forecast (on track / behind …) and, for active goals, the why, subjects and every milestone with its id.",
+                "The user's goals, active first: deadline, days left, milestone progress, the forecast and, for active goals, the why, subjects and every milestone with its id.",
             input: {},
             annotations: READ_ONLY,
         },

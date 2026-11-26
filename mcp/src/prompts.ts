@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { PLAYBOOKS } from './playbooks.js';
 
 /** src/ in tests, dist/ when built: the skill sits beside both, in ../skills. */
 export const SKILL_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../skills/kaaga-notes/SKILL.md');
@@ -64,6 +65,14 @@ export function registerPrompts(server: McpServer, set?: string): void {
             },
             () => ({ messages: [{ role: 'user', content: { type: 'text', text: LOG_MY_WORK } }] })
         );
+    }
+    // TOOL_ACCESS_PLAN §5.3: the jobs with steps, as commands in a host's prompt menu ("A study session", "Plan the week").
+    if (set === 'web' || set === 'code' || set === undefined) {
+        for (const p of PLAYBOOKS) {
+            server.registerPrompt(p.id, { title: p.title, description: `The steps for: ${p.title.toLowerCase()}, with the Kaaga tools to use.` }, () => ({
+                messages: [{ role: 'user', content: { type: 'text', text: `${p.title}, with Kaaga. The steps:\n${p.steps}` } }],
+            }));
+        }
     }
     server.registerPrompt(
         'catch_up',

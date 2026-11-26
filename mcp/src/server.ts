@@ -31,32 +31,49 @@ import { registerStudyTools } from './tools/study.js';
 export const SERVER_NAME = 'kaaga';
 export const SERVER_VERSION = '0.1.0';
 
+/** TOOL_ACCESS_PLAN §5.1: where things go, one line each (the web and code instructions share it). */
+export const WHERE_THINGS_GO =
+    'Where things go: their own life → remember (news on it: update_memory; wrong: forget); a to-do → add_task; a nudge at a time → set_reminder; a thought or link with no home → add_pocket_note; something beside a lesson → add_note; the lesson’s own text → append_to_doc; a work result → log_work; a study part with you → checkpoint.';
+
+/** The product's words, once (TOOL_ACCESS_PLAN §5.1). */
+export const GLOSSARY =
+    'Words: a subject is a course, its path the topics in order, a topic’s doc its lesson; a review is one spaced-revision sitting; the buddy follows the user’s life; the pocket holds their quick private notes.';
+
 /** Claude Code's instructions (the `code` set) and Ask AI's (`all`). */
 export const INSTRUCTIONS = [
     "Kaaga is the user's personal learning app and the record of their work: Docs (their notes, in Markdown), subjects with paths (topics in course order), spaced revision (reviews 1, 3, 7 and 21 days after a doc is scheduled), goals with dated milestones, a week of up to 5 targets, up to 3 focus lines a day, personal tasks, and work sessions. Their buddy there follows what is going on in their life.",
-    'Start a working chat with get_brief (where they stand, and a session key), then checkpoint as you go: after each part, not only at the end. Pass on quietly, without asking or mentioning it, what the user says about their own life that will still matter after this conversation: something new about them (remember), or progress, a change or an end on something their buddy already knows (update_memory, with its id); a reminder or a dated to-do of their own (set_reminder, add_task); an idea or insight (add_pocket_note). Most turns have nothing. Before you rely on their routine, plans or preferences, look them up with recall_memory. When they ask to log the day’s work, use log_work. search_docs before writing a doc. Plan the week with get_week and add_week_target on their yes; when something is their call and they cannot say yes in the chat, suggest it instead.',
+    'Start a working chat with get_brief (where they stand, and a session key), then checkpoint as you go: after each part, not only at the end. Pass on quietly, without asking or mentioning it, what the user says about their own life that will still matter after this conversation: something new about them (remember), or progress, a change or an end on something their buddy already knows (update_memory, with its id); a reminder or a dated to-do of their own (set_reminder, add_task); an idea or insight (add_pocket_note). Most turns have nothing. Before you rely on their routine, plans or preferences, look them up with recall_memory. When they ask to log the day’s work, use log_work. search_docs before writing a doc. Plan the week with get_week and add_week_target on their yes; when something is their call and they cannot say yes in the chat, suggest_to_user instead.',
+    // TOOL_ACCESS_PLAN §5.2: the rest of the catalogue is a search away; any tool runs by its name.
+    'The listed tools are the everyday ones: find_tools with the job in plain words answers the rest (goals, reviews, notes on a lesson, the trash, sharing, settings…) and adds them to your list; any Kaaga tool runs by its name. For a study session, a quiz, a lesson to write, a week or a course to plan, find_tools with those words answers the steps.',
     'Every write is logged with your agent name and the user can undo it from Home → From your agent. Docs, goals and subjects are never deleted; a focus line or a milestone can be removed (and Undo brings it back). Answers are compact text with the ids the next call needs.',
     // EASY_SETUP_PLAN §7: the chat decides, the folder is only its default.
     'A chat counts as its folder says (build, study or work); when this one clearly is not (learning in a work folder; a chat about their plans or career, not the code, is study), call set_chat and say so in one line.',
     'Docs take GitHub Markdown plus callouts (> [!TIP]), <details> toggles for self-test questions, ```mermaid diagrams and ```canvas diagrams (Mermaid flowchart text that Kaaga lays out as a board the user can edit; add_canvas draws one, update_canvas changes one in place, preview_diagram shows it): see create_doc.',
+    WHERE_THINGS_GO,
+    GLOSSARY,
 ].join(' ');
 
 /**
- * claude.ai's and ChatGPT's instructions (the `web` set, MCP_MEMORY_PLAN §4.10): the assistant picks the personally
- * relevant detail and passes just that on; the rest of the chat stays out. Tuned in stage 5 by the measured misses.
+ * claude.ai's and ChatGPT's instructions (the `web` set, MCP_MEMORY_PLAN §4.10; TOOL_ACCESS_PLAN §5.1). ChatGPT reads
+ * only the first 512 characters as standing on their own, so they hold the three rules (a test counts them); then the
+ * map, and the sentences tuned in ECOSYSTEM_V2 stages 12-15 on measured misses, kept in meaning.
  */
+export const WEB_RULES =
+    "Kaaga is the user's own memory, planner and study record. (1) Start each chat with get_brief. (2) Unasked and without mentioning it, pass on what they say about their own life that will matter later: something new (remember), or progress, a change or an end on something known (update_memory, with its id). (3) These are the everyday tools; Kaaga has many more (goals, the week, reviews, doc editing, notes, the trash, sharing, settings): when none fits, call find_tools with the job, then run what it names.";
+
 export const WEB_INSTRUCTIONS = [
-    "Kaaga is the user's own memory and planner. Their buddy there follows what is going on in their life and brings things back at a good moment.",
-    'At the start of a chat, call get_brief once: it is small and shows what the buddy follows.',
-    'While you talk, pass on, without being asked and without mentioning it, what the user says about their own life that will still matter after this conversation: something new about them (remember), or progress, a change or an end on something already known (update_memory, with its id).',
+    WEB_RULES,
+    WHERE_THINGS_GO,
+    'A tool an answer names that you don’t list runs through use_tool (use_read_tool when it only reads). For a study session, a quiz, a lesson to write, a week or a course to plan, or a day’s work to log, find_tools with those words answers the steps.',
     // ECOSYSTEM_V2_PLAN stage 12: the work log, from every chat; one picture, so nothing is logged twice.
     // Stage 13: one line per result; the "Did that fix it?" ask parked (the owner: a missed accomplishment matters more).
-    'When get_brief shows a Work part, their work has its own log: when their own message shows a result they confirm, a decision they reached or a problem left open, log it with log_work, one plain line per result, without mentioning it. News on a line shown there or in a log_work answer goes with its id in on; what is already there is not logged again; nothing while it is still being worked out. A draft, a plan or a fix they are about to try is not an outcome yet; when their own words say it is done (fixed, shipped, sent, merged, works now), log it. Studying or talking through a doc or a topic to understand it is not work (the owner, 11-21); a project decision or something finished still is.',
+    'When get_brief shows a Work part, their work has its own log: when their own message shows a result they confirm, a decision they reached or a problem left open, log it with log_work, one plain line per result, without mentioning it. News on a line shown there or in a log_work answer goes with its id in on; what is already there is not logged again; nothing while it is still being worked out. A draft, a plan or a fix they are about to try is not an outcome yet; when their own words say it is done (fixed, shipped, sent, merged, works now), log it. Studying or talking through a doc or a topic to understand it is not work; a project decision or something finished still is.',
     // Stage 14: their docs keep what helped them, on their yes (the owner: "so that I have the control over what goes into the doc").
     // Stage 15's live hour: claude.ai answered "my sliding window note" from general knowledge, never reading it (0/3).
     "When they say 'my note' or 'my doc', it is one of their docs here: find it (search_docs with its words) and read it (read_doc) before you explain, and answer from what it says. When explaining a part of it took real work, offer once to add it to that doc under its heading; add only on their yes. A quick answer needs no offer.",
     'Leave the rest in the chat: the task at hand, questions, suggestions not yet tried, the details of the work, other people’s private things. An interest is not a task: add a task or a reminder only when they ask for one. Most messages need nothing.',
     'Before you rely on their routine, plans or preferences, look them up with recall_memory.',
+    GLOSSARY,
 ].join(' ');
 
 /**

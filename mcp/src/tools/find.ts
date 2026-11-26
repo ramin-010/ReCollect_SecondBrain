@@ -21,7 +21,7 @@ const RUNNER_NAMES = new Set(['find_tools', 'use_read_tool', 'use_tool']);
 const CATALOGUE_MAX = 6000;
 
 export const FIND_TOOLS_DESCRIPTION =
-    'Kaaga has many more tools than are listed: goals, the week, study paths, reviews, editing docs and diagrams, lesson notes, the trash, sharing, settings. Say the job in plain words ("delete a doc", "move a review to Friday", "run a study session"): it answers the tools that fit, with inputs and an example, and the steps of a job with steps. No query: the catalogue by area.';
+    'Kaaga has many more tools than are listed: goals, the week, reviews, doc editing and diagrams, lesson notes, the trash, sharing, settings. Say the job in plain words ("delete a doc", "move a review to Friday"): it answers the tools that fit, with inputs and an example, and the steps of a job with steps. No query: the catalogue by area.';
 
 const card = (name: string, set: ToolContext['set']) => (set === 'web' ? WEB_CARDS[name as ToolName] : undefined) ?? CARDS[name as ToolName];
 

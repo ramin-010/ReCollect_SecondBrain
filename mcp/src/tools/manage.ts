@@ -337,7 +337,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Show on their lock screen',
             description:
-                'Put their words on their phone\'s lock screen for a window, on their say-so ("put this on my lock screen until 6"). from/to "HH:mm" (their time; from: now, to: midnight); days "weekdays", "weekends" or 0-6 (Sunday 0) to repeat; until "YYYY-MM-DD". Without days or until: today only.',
+                'Put their words on their phone\'s lock screen for a window, on their say-so. from/to "HH:mm" (their time; default now to midnight); days "weekdays", "weekends" or 0-6 (Sunday 0) repeat it; until "YYYY-MM-DD". Without days or until: today only.',
             input: {
                 text: z.string().trim().min(1).max(120),
                 from: z.string().trim().max(5).optional(),

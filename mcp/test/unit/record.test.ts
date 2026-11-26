@@ -189,13 +189,16 @@ describe('get_brief on the web (MCP_MEMORY_PLAN §4.6)', () => {
                 'Their buddy\'s question (ask once at a natural pause; pass the answer with update_memory on t1): "Did you get your walk in?" (Yes / Not today)',
                 'Pass on what the user says.',
                 'Read this again on a later day.',
+                // TOOL_ACCESS_PLAN §5.4: the way to the rest of the catalogue, last.
+                'More than the listed tools: find_tools("<the job>").',
             ].join('\n')
         );
         expect(text.length).toBeLessThan(900);
     });
 
-    it('an older server answers the full brief: printed as before', async () => {
+    it('an older server answers the full brief: printed as before, then the way to the rest', async () => {
         h = await connect({ 'GET /api/brief': ok(fullBrief()) }, { set: 'web' });
-        expect(lastLine((await h.call('get_brief', {})).text)).toBe('Session key: s_0abcdefgh123 (pass it to checkpoint)');
+        const lines = (await h.call('get_brief', {})).text.split('\n');
+        expect(lines.slice(-2)).toEqual(['Session key: s_0abcdefgh123 (pass it to checkpoint)', 'More than the listed tools: find_tools("<the job>").']);
     });
 });

@@ -6,6 +6,7 @@ import type { CallToolResult, ToolAnnotations } from '@modelcontextprotocol/sdk/
 import type { z } from 'zod';
 import type { KaagaApi } from './api.js';
 import { describeError } from './errors.js';
+import { hintsFor } from './hints.js';
 
 export interface ToolContext {
     api: KaagaApi;
@@ -91,7 +92,8 @@ export function defineTool<S extends z.ZodRawShape>(
     // only without it): the copy in the annotations cost about 30 characters a tool of both tool budgets (stage 13).
     const handle = server.registerTool(
         name,
-        { title: spec.title, description: spec.description, inputSchema, annotations: { ...spec.annotations } },
+        // The annotation table (hints.ts) decides destructive and idempotent for every changing tool.
+        { title: spec.title, description: spec.description, inputSchema, annotations: hintsFor(name, spec.annotations) },
         async (args: unknown): Promise<CallToolResult> => {
             if (ctx.problem) return errorResult(ctx.problem);
             try {

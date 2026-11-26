@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
-import { DEFAULT_GROUPS, EXCLUDED_INSTRUCTIONS, INSTRUCTIONS, OFFICE_INSTRUCTIONS, OFFICE_TOOLS, RUNNERS, TOOL_GROUP_NAMES, TOOL_GROUPS, TOOL_LEVELS, TOOL_NAMES, WEB_INSTRUCTIONS, WEB_TOOLS } from '../../src/server.js';
+import { DEFAULT_GROUPS, EXCLUDED_INSTRUCTIONS, INSTRUCTIONS, OFFICE_INSTRUCTIONS, OFFICE_TOOLS, RUNNERS, TOOL_GROUP_NAMES, TOOL_GROUPS, TOOL_LEVELS, TOOL_NAMES, WEB_INSTRUCTIONS, WEB_RULES, WEB_TOOLS, doorPolicy } from '../../src/server.js';
 import { CATCH_UP } from '../../src/prompts.js';
+import { PLAYBOOKS } from '../../src/playbooks.js';
+import { DESTRUCTIVE, IDEMPOTENT } from '../../src/hints.js';
 import { connect, fail, type Harness } from './harness.js';
 
 let h: Harness | undefined;
@@ -37,6 +39,14 @@ describe('the server', () => {
             expect(tool.annotations?.readOnlyHint === true, tool.name).toBe(READS.includes(tool.name));
             expect(TOOL_LEVELS[tool.name as keyof typeof TOOL_LEVELS] === 1, tool.name).toBe(READS.includes(tool.name));
         }
+        // TOOL_ACCESS_PLAN §4.5: destructive only where existing content is removed or replaced (plus use_tool, which may run one).
+        const { createKaagaServer } = await import('../../src/server.js');
+        const { KaagaApi } = await import('../../src/api.js');
+        const raw = createKaagaServer({ api: new KaagaApi({ baseUrl: 'http://kaaga.test', token: `rcl_${'a'.repeat(43)}`, agentName: 't', log: () => {} }), agentName: 't' });
+        const registered = (raw as unknown as { _registeredTools: Record<string, { annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean } }> })._registeredTools;
+        const destructive = Object.entries(registered).filter(([, t]) => !t.annotations?.readOnlyHint && t.annotations?.destructiveHint === true).map(([n]) => n).sort();
+        expect(destructive).toEqual([...DESTRUCTIVE, 'use_tool'].sort());
+        for (const n of IDEMPOTENT) expect(registered[n]?.annotations?.idempotentHint, n).toBe(true);
         const tapped = tools.filter((t) => TOOL_LEVELS[t.name as keyof typeof TOOL_LEVELS] === 3);
         expect(tapped.map((t) => t.name)).toEqual(['empty_trash', 'publish_doc', 'share_doc']);
         for (const t of tapped) expect(t.description, t.name).toMatch(/tap/);
@@ -59,7 +69,8 @@ describe('the server', () => {
     it('offers the note recipe as a prompt: the skill’s text, plus the topic', async () => {
         h = await connect({});
         const { prompts } = await h.client.listPrompts();
-        expect(prompts.map((p) => p.name)).toEqual(['study', 'build', 'work', 'catch_up', 'note_recipe']);
+        // TOOL_ACCESS_PLAN §5.3: the jobs with steps are prompts too (a host's prompt menu shows them as commands).
+        expect(prompts.map((p) => p.name)).toEqual(['study', 'build', 'work', ...PLAYBOOKS.map((p) => p.id), 'catch_up', 'note_recipe']);
         // E4: the catch-up for a chat with no hooks names the tools it uses.
         const catchUp = await h.client.getPrompt({ name: 'catch_up', arguments: {} });
         const words = (catchUp.messages[0]!.content as { text: string }).text;
@@ -145,6 +156,28 @@ describe('a tool set per door (MCP_MEMORY_PLAN §4.1)', () => {
     it('all (Ask AI): every tool but set_folder and set_chat (it runs in no folder: EASY_SETUP_PLAN) and the runners', async () => {
         h = await connect({}, { set: 'all' });
         expect((await names()).sort()).toEqual(TOOL_NAMES.filter((n) => n !== 'set_folder' && n !== 'set_chat' && !(RUNNERS as readonly string[]).includes(n)).sort());
+    });
+});
+
+describe('what the model is told (TOOL_ACCESS_PLAN §5)', () => {
+    it('the web’s first 512 characters are its three rules, standing on their own (ChatGPT reads only those as such)', () => {
+        expect(WEB_INSTRUCTIONS.startsWith(WEB_RULES)).toBe(true);
+        expect(WEB_RULES.length).toBeLessThanOrEqual(512);
+        for (const part of ['(1) Start each chat with get_brief', 'remember', 'update_memory', '(3)', 'find_tools']) expect(WEB_RULES).toContain(part);
+        expect(WEB_INSTRUCTIONS.length).toBeLessThanOrEqual(2700);
+    });
+
+    it('every tool a playbook or an instruction names exists, and the web reaches it', () => {
+        const web = doorPolicy('web');
+        const texts = [WEB_INSTRUCTIONS, INSTRUCTIONS, ...PLAYBOOKS.map((p) => p.steps)];
+        for (const text of texts) {
+            for (const name of text.match(/\b[a-z]+(?:_[a-z]+)+\b/g) ?? []) {
+                if (['said_on', 'session_key'].includes(name)) continue;
+                expect((TOOL_NAMES as readonly string[]).includes(name), name).toBe(true);
+                if (text !== INSTRUCTIONS) expect(web.reachable.has(name), name).toBe(true);
+            }
+        }
+        for (const p of PLAYBOOKS) expect(p.steps.length, p.id).toBeLessThanOrEqual(1400);
     });
 });
 
