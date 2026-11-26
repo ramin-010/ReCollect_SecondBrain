@@ -56,6 +56,8 @@ const KIND: Record<string, string> = {
     image: 'image',
     table: 'table',
     divider: 'divider',
+    // DOC_PAGES_PLAN §5: a page shown at a spot in its parent's text (its text is the page's title).
+    page: 'page',
 };
 
 /** One outline line: indent, id, kind (with its level / kind / tick), first words. */
