@@ -8,7 +8,11 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { handleMcpHttp } from '../../src/embedded.js';
-import { RUNNERS, WEB_INSTRUCTIONS, WEB_TOOLS } from '../../src/server.js';
+import { RUNNERS, WEB_INSTRUCTIONS, WEB_TOOLS, createKaagaServer } from '../../src/server.js';
+import { KaagaApi } from '../../src/api.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import type { CallStat } from '../../src/tool.js';
+import { connect } from './harness.js';
 
 const TOKEN = `rcl_${'b'.repeat(43)}`;
 const memory = { _id: 'm1', text: 'Walks after work', kind: 'pattern', sensitivity: 'open', status: 'active', pinned: false, byUser: false, seenCount: 1, lastSeenDay: '2026-11-19' };
@@ -161,5 +165,35 @@ describe('the remote door (POST /mcp, a fresh server per request)', () => {
             expect(text(result)).toMatch(new RegExp(`^No tool named "${name}" here\\..*find_tools\\("<the job>"\\) shows what exists\\.$`));
         }
         await client.close();
+    });
+
+    it('answers tools/list from memory, the same list the SDK answers; a notification is 202; calls are counted (TOOL_ACCESS_PLAN §6.1, §6.5)', async () => {
+        const raw = async (body: unknown) =>
+            fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify(body) });
+        const before = doorRequests;
+        const cached = (await (await raw({ jsonrpc: '2.0', id: 7, method: 'tools/list', params: {} })).json()) as { id: number; result: { tools: unknown[] } };
+        expect(doorRequests).toBe(before + 1);
+        expect(cached.id).toBe(7);
+        const sdk = await connect({}, { set: 'web' });
+        const { tools } = await sdk.client.listTools();
+        await sdk.close();
+        expect(cached.result.tools).toEqual(JSON.parse(JSON.stringify(tools)));
+        expect((await raw({ jsonrpc: '2.0', method: 'notifications/initialized' })).status).toBe(202);
+        // The counts: what each call came to, by its path (no user, no arguments).
+        const seen: CallStat[] = [];
+        const api = new KaagaApi({ baseUrl: 'http://127.0.0.1:9', token: TOKEN, agentName: 'ChatGPT', retryDelayMs: 0, log: () => {} });
+        const server = createKaagaServer({ api, agentName: 'ChatGPT', set: 'web', onCall: (c) => seen.push(c) });
+        const client = new Client({ name: 'count', version: '1' });
+        const [a, b] = InMemoryTransport.createLinkedPair();
+        await Promise.all([server.connect(b), client.connect(a)]);
+        await client.callTool({ name: 'find_tools', arguments: { query: 'zzqx' } });
+        await client.callTool({ name: 'use_tool', arguments: { name: 'move_revision', args: { revisionId: 'r1', day: 'Friday' } } });
+        await client.callTool({ name: 'use_tool', arguments: { name: 'trash', args: {} } });
+        await client.close();
+        expect(seen.map(({ tool, via, outcome }) => [tool, via, outcome])).toEqual([
+            ['find_tools', 'direct', 'no_match'],
+            ['move_revision', 'use_tool', 'bad_args'],
+            ['trash', 'use_tool', 'unknown_tool'],
+        ]);
     });
 });

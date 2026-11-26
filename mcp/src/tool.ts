@@ -49,6 +49,26 @@ export interface DoorPolicy {
 /** How a call arrived: by its own name, or through a runner. */
 export type Via = 'direct' | 'use_tool' | 'use_read_tool';
 
+/** TOOL_ACCESS_PLAN §6.5: what one call came to (counted per day; no user, no arguments, no text). */
+export type CallOutcome = 'ok' | 'tool_error' | 'bad_args' | 'unknown_tool' | 'not_reachable' | 'no_match' | 'limited';
+export interface CallStat {
+    tool: string;
+    via: Via;
+    outcome: CallOutcome;
+    ms: number;
+}
+
+/** TOOL_ACCESS_PLAN §6.4: no answer on the web longer than this (a tool with its own paging keeps it). */
+export const WEB_ANSWER_MAX = 60_000;
+
+/** A long text cut at a line end, closed with how much is left and how to ask for less. */
+export function capAnswer(text: string, max = WEB_ANSWER_MAX): string {
+    if (text.length <= max) return text;
+    const at = text.lastIndexOf('\n', max);
+    const cut = at > max * 0.5 ? at : max;
+    return `${text.slice(0, cut)}\n(cut: ${text.length - cut} more characters. Ask for less: a smaller limit, one doc, one subject.)`;
+}
+
 export interface CatalogueEntry {
     name: string;
     title: string;
@@ -98,7 +118,8 @@ export function defineTool<S extends z.ZodRawShape>(
             if (ctx.problem) return errorResult(ctx.problem);
             try {
                 const answer = await run(args as z.output<z.ZodObject<S>>);
-                return typeof answer === 'string' ? textResult(answer) : answer;
+                if (typeof answer !== 'string') return answer;
+                return textResult(ctx.set === 'web' ? capAnswer(answer) : answer);
             } catch (err) {
                 return errorResult(describeError(err, ctx.api.baseUrl));
             }

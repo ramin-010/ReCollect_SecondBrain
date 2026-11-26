@@ -8,6 +8,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { KaagaApi } from './api.js';
 import { createKaagaServer, TOOL_LEVELS, type ToolName } from './server.js';
+import type { CallStat } from './tool.js';
 
 export interface CatalogueTool {
     name: string;
@@ -34,6 +35,49 @@ export interface CatalogueOptions {
     timeoutMs?: number;
     /** Stage 5's connector simulation: each tool call on the remote door (off unless the backend passes it). */
     trace?: (call: { tool: string; args: unknown; answer?: string }) => void;
+    /** TOOL_ACCESS_PLAN §6.5: each call's tool, path, outcome and time, for the counts. */
+    onCall?: (call: CallStat) => void;
+}
+
+/**
+ * TOOL_ACCESS_PLAN §6.1: the web's tools/list never changes while the process runs, so it is answered from memory:
+ * built once, by the same handler a fresh server would run (byte for byte the SDK's answer; a test compares them).
+ */
+let webList: Promise<unknown> | null = null;
+function cachedWebList(): Promise<unknown> {
+    webList ??= (async () => {
+        const api = new KaagaApi({ baseUrl: 'http://localhost:1', token: `rcl_${'x'.repeat(43)}`, agentName: 'list', log: () => {} });
+        const server = createKaagaServer({ api, agentName: 'list', problem: null, set: 'web' });
+        const handlers = (server.server as unknown as { _requestHandlers: Map<string, (req: unknown, extra: unknown) => Promise<unknown>> })._requestHandlers;
+        const result = await handlers.get('tools/list')!({ jsonrpc: '2.0', id: 0, method: 'tools/list', params: {} }, {});
+        await server.close();
+        return result;
+    })().catch((err: unknown) => {
+        webList = null;
+        throw err;
+    });
+    return webList;
+}
+
+type RpcBody = { jsonrpc?: unknown; id?: unknown; method?: unknown };
+
+/** The answer for a body that needs no server: a single tools/list (from memory), or a notification (202). */
+export async function quickAnswer(req: IncomingMessage & { body?: unknown }, res: ServerResponse): Promise<boolean> {
+    const body = req.body as RpcBody | undefined;
+    if (!body || typeof body !== 'object' || Array.isArray(body) || body.jsonrpc !== '2.0' || typeof body.method !== 'string') return false;
+    // The SDK's transport asks for both types in Accept; a client that doesn't send them gets the SDK's own answer.
+    const accept = String(req.headers['accept'] ?? '');
+    if (!accept.includes('application/json') || !accept.includes('text/event-stream')) return false;
+    if (body.id === undefined && body.method.startsWith('notifications/')) {
+        res.writeHead(202).end();
+        return true;
+    }
+    if (body.method === 'tools/list' && (typeof body.id === 'string' || typeof body.id === 'number')) {
+        const result = await cachedWebList();
+        res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ result, jsonrpc: '2.0', id: body.id }));
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -47,8 +91,9 @@ export async function handleMcpHttp(
     res: ServerResponse,
     options: CatalogueOptions,
 ): Promise<void> {
+    if (await quickAnswer(req, res)) return;
     const api = new KaagaApi({ baseUrl: options.baseUrl, token: options.token, agentName: options.agentName, timeoutMs: options.timeoutMs ?? 30_000, log: () => {} });
-    const server = createKaagaServer({ api, agentName: options.agentName, problem: null, set: 'web', ...(options.trace ? { trace: options.trace } : {}) });
+    const server = createKaagaServer({ api, agentName: options.agentName, problem: null, set: 'web', ...(options.trace ? { trace: options.trace } : {}), ...(options.onCall ? { onCall: options.onCall } : {}) });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on('close', () => {
         void transport.close();

@@ -4,6 +4,7 @@ import { DEFAULT_GROUPS, EXCLUDED_INSTRUCTIONS, INSTRUCTIONS, OFFICE_INSTRUCTION
 import { CATCH_UP } from '../../src/prompts.js';
 import { PLAYBOOKS } from '../../src/playbooks.js';
 import { DESTRUCTIVE, IDEMPOTENT } from '../../src/hints.js';
+import { capAnswer } from '../../src/tool.js';
 import { connect, fail, type Harness } from './harness.js';
 
 let h: Harness | undefined;
@@ -157,6 +158,25 @@ describe('a tool set per door (MCP_MEMORY_PLAN §4.1)', () => {
     it('all (Ask AI): every tool but set_folder and set_chat (it runs in no folder: EASY_SETUP_PLAN) and the runners', async () => {
         h = await connect({}, { set: 'all' });
         expect((await names()).sort()).toEqual(TOOL_NAMES.filter((n) => n !== 'set_folder' && n !== 'set_chat' && !(RUNNERS as readonly string[]).includes(n)).sort());
+    });
+});
+
+describe('built for many at once (TOOL_ACCESS_PLAN §6)', () => {
+    it('a web answer over 60,000 characters is cut at a line end, saying how to ask for less', () => {
+        const long = Array.from({ length: 4000 }, (_, i) => `line ${i} ${'x'.repeat(20)}`).join('\n');
+        const cut = capAnswer(long);
+        expect(cut.length).toBeLessThan(60_200);
+        expect(cut).toMatch(/\n\(cut: \d+ more characters\. Ask for less: a smaller limit, one doc, one subject\.\)$/);
+        expect(capAnswer('short')).toBe('short');
+    });
+
+    it('serverInfo says the package version and which list the door holds', async () => {
+        h = await connect({}, { set: 'web' });
+        expect(h.client.getServerVersion()?.version).toMatch(/^\d+\.\d+\.\d+\+[0-9a-f]{8}$/);
+        const web = h.client.getServerVersion()!.version;
+        await h.close();
+        h = await connect({});
+        expect(h.client.getServerVersion()!.version).not.toBe(web);
     });
 });
 

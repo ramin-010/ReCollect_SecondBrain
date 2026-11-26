@@ -1,10 +1,12 @@
 // The MCP server: every tool, wired to one API client. No transport here (index.ts adds stdio;
 // tests connect an in-memory client).
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { McpServer, type RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type ListToolsResult, type ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import type { KaagaApi } from './api.js';
 import { registerPrompts } from './prompts.js';
-import { errorResult, type CatalogueEntry, type DoorPolicy, type ToolContext, type Via } from './tool.js';
+import { errorResult, type CallOutcome, type CallStat, type CatalogueEntry, type DoorPolicy, type ToolContext, type Via } from './tool.js';
 import { closestNames } from './find.js';
 import { signatureOf } from './card.js';
 import { CARDS, WEB_CARDS } from './cards.js';
@@ -31,7 +33,23 @@ import { registerPocketTools } from './tools/pocket.js';
 import { registerFileTools } from './tools/files.js';
 
 export const SERVER_NAME = 'kaaga';
-export const SERVER_VERSION = '0.1.0';
+
+/** The package's version (package.json beside src/ and dist/). */
+export const SERVER_VERSION: string = (() => {
+    try {
+        return (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version?: string }).version ?? '0.0.0';
+    } catch {
+        return '0.0.0';
+    }
+})();
+
+/**
+ * TOOL_ACCESS_PLAN §6.2: `<package version>+<8 hex of the door's listed tools>`, so "which list does your app hold"
+ * has an answer (a host keeps the list it saw when it connected).
+ */
+export function versionOf(listed: ReadonlySet<string>): string {
+    return `${SERVER_VERSION}+${createHash('sha256').update([...listed].sort().join(',')).digest('hex').slice(0, 8)}`;
+}
 
 /** TOOL_ACCESS_PLAN §5.1: where things go, one line each (the web and code instructions share it). */
 export const WHERE_THINGS_GO =
@@ -520,6 +538,8 @@ export interface ServerOptions {
     project?: string;
     /** Stage 5's connector simulation: each tool call with its answer, in order (never the token). */
     trace?: (call: { tool: string; args: unknown; answer?: string }) => void;
+    /** TOOL_ACCESS_PLAN §6.5: each call's tool, path, outcome and time (the backend counts them; no user data). */
+    onCall?: (call: CallStat) => void;
     /** EASY_SETUP_PLAN: the folder this chat runs in (isNew: the account asks what it is). */
     folder?: { key: string; name: string; isNew?: boolean };
 }
@@ -556,9 +576,9 @@ export function createKaagaServer(options: ServerOptions): McpServer {
     const set: ToolSet = options.set ?? (options.workMode ? 'office' : 'code');
     // A new folder's question comes before everything else (EASY_SETUP_PLAN §3.5).
     const instructions = options.folder?.isNew && set !== 'excluded' && set !== 'web' ? `${NEW_FOLDER_INSTRUCTIONS(options.folder.name)} ${INSTRUCTIONS_OF[set]}` : INSTRUCTIONS_OF[set];
-    const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions });
-    const registry = new Map<string, RegisteredTool>();
     const policy = doorPolicy(set, { ...(options.groups ? { groups: options.groups } : {}), ...(options.listed ? { listed: options.listed } : {}) });
+    const server = new McpServer({ name: SERVER_NAME, version: versionOf(policy.listed) }, { instructions });
+    const registry = new Map<string, RegisteredTool>();
     const ctx: ToolContext = {
         api: options.api,
         problem: options.problem ?? null,
@@ -613,7 +633,7 @@ export function createKaagaServer(options: ServerOptions): McpServer {
     registerPrompts(server, set);
     const everything = leanToolList(server, policy);
     ctx.catalogue = () => catalogueOf(set, everything, policy);
-    guardCalls(server, ctx, registry, () => ctx.set ?? set, options.trace);
+    guardCalls(server, ctx, registry, () => ctx.set ?? set, options.trace, options.onCall);
     return server;
 }
 
@@ -685,14 +705,17 @@ async function inputProblem(name: string, tool: RegisteredTool, args: Record<str
  * tool the door can't reach answers one clear line; inputs that don't fit say how to fix them; a call that still sends
  * a removed field (a host's cached list) runs, and its answer says to reconnect.
  */
-function guardCalls(server: McpServer, ctx: ToolContext, registry: Map<string, RegisteredTool>, setNow: () => ToolSet, trace?: ServerOptions['trace']): void {
+function guardCalls(server: McpServer, ctx: ToolContext, registry: Map<string, RegisteredTool>, setNow: () => ToolSet, trace?: ServerOptions['trace'], onCall?: ServerOptions['onCall']): void {
     const handlers = (server.server as unknown as { _requestHandlers: Map<string, (req: unknown, extra: unknown) => Promise<CallToolResult>> })._requestHandlers;
     const original = handlers.get('tools/call');
     if (!original) return;
-    const answer = async (name: string, args: Record<string, unknown>, extra: unknown): Promise<CallToolResult> => {
+    // TOOL_ACCESS_PLAN §6.5: what each call came to, for the counts (the runners' own envelopes are not counted: the
+    // tool they ran is, with how it was reached).
+    const answer = async (name: string, args: Record<string, unknown>, extra: unknown, box: { outcome: CallOutcome } = { outcome: 'ok' }): Promise<CallToolResult> => {
         const set = setNow();
         const tool = registry.get(name);
         if (!tool || !ctx.policy?.reachable.has(name)) {
+            box.outcome = tool ? 'not_reachable' : 'unknown_tool';
             if (set === 'excluded') return errorResult(EXCLUDED_INSTRUCTIONS);
             if (set === 'office') return errorResult(`${name} is not available in this app: use Kaaga itself, or Claude Code.`);
             const near = closestNames([...(ctx.policy?.reachable ?? [])], name);
@@ -700,17 +723,34 @@ function guardCalls(server: McpServer, ctx: ToolContext, registry: Map<string, R
             return errorResult(`No tool named "${name}" here.${near.length ? ` Closest: ${near.join(', ')}.` : ''}${find}`);
         }
         const bad = await inputProblem(name, tool, args, ctx);
-        if (bad) return errorResult(bad);
+        if (bad) {
+            box.outcome = 'bad_args';
+            return errorResult(bad);
+        }
         const removed = (REMOVED_FIELDS[name] ?? []).filter((f) => Object.prototype.hasOwnProperty.call(args, f));
         const result = await original({ method: 'tools/call', params: { name, arguments: args } }, extra);
         if (!removed.length) return result;
         return { ...result, content: [...(result.content ?? []), { type: 'text' as const, text: `${removed.join(' and ')} ${removed.length > 1 ? 'were' : 'was'} not passed on. ${RECONNECT}` }] };
     };
-    const traced = async (name: string, args: Record<string, unknown>, extra: unknown, _via: Via): Promise<CallToolResult> => {
-        if (!trace) return answer(name, args, extra);
+    const counted = async (name: string, args: Record<string, unknown>, extra: unknown, via: Via): Promise<CallToolResult> => {
+        if (!onCall || (via === 'direct' && (name === 'use_tool' || name === 'use_read_tool'))) return answer(name, args, extra);
+        const started = Date.now();
+        const box: { outcome: CallOutcome } = { outcome: 'ok' };
+        const result = await answer(name, args, extra, box);
+        if (box.outcome === 'ok' && result.isError) box.outcome = 'tool_error';
+        if (box.outcome === 'ok' && name === 'find_tools' && (result.content ?? []).some((c) => c.type === 'text' && c.text.startsWith('Nothing matches'))) box.outcome = 'no_match';
+        try {
+            onCall({ tool: name, via, outcome: box.outcome, ms: Date.now() - started });
+        } catch {
+            // Counting never fails a call.
+        }
+        return result;
+    };
+    const traced = async (name: string, args: Record<string, unknown>, extra: unknown, via: Via): Promise<CallToolResult> => {
+        if (!trace) return counted(name, args, extra, via);
         // The simulation's trace keeps each call with the record's answer, so a report can say what was filed and how.
         try {
-            const result = await answer(name, args, extra);
+            const result = await counted(name, args, extra, via);
             trace({ tool: name, args, answer: (result.content ?? []).map((c) => (c.type === 'text' ? c.text : `[${c.type}]`)).join('\n') });
             return result;
         } catch (err) {
