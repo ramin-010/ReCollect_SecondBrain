@@ -39,7 +39,7 @@ export function registerMirrorTools(server: McpServer, ctx: ToolContext): void {
     defineTool(
         server,
         ctx,
-        'get_mirror',
+        'get_standing',
         {
             title: 'Where the user stands',
             description: 'Where the user stands, worked out by the app: each goal path’s pace against its deadline and the smallest fix, hours per week, per-subject quiz scores, weak spots, practice. Quote these numbers.',

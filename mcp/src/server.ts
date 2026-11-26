@@ -1,11 +1,14 @@
 // The MCP server: every tool, wired to one API client. No transport here (index.ts adds stdio;
 // tests connect an in-memory client).
 import { McpServer, type RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
-import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type ListToolsResult } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type ListToolsResult, type ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import type { KaagaApi } from './api.js';
 import { registerPrompts } from './prompts.js';
-import { READ_ONLY, defineTool, errorResult, type ToolContext } from './tool.js';
+import { errorResult, type CatalogueEntry, type DoorPolicy, type ToolContext, type Via } from './tool.js';
+import { closestNames } from './find.js';
+import { signatureOf } from './card.js';
+import { CARDS, WEB_CARDS } from './cards.js';
+import { registerFindTools } from './tools/find.js';
 import { registerContextTools } from './tools/context.js';
 import { registerDayTools } from './tools/day.js';
 import { registerDocTools } from './tools/docs.js';
@@ -146,8 +149,8 @@ export const TOOL_NAMES = [
     'get_week',
     'add_week_target',
     'update_week_target',
-    'suggest',
-    'get_mirror',
+    'suggest_to_user',
+    'get_standing',
     'list_tasks',
     'add_task',
     'update_task',
@@ -183,8 +186,7 @@ export const TOOL_NAMES = [
     'remove_focus',
     'add_pocket_note',
     'recent_agent_edits',
-    'more_tools',
-    // The "manage" group (MANAGER_AND_DOCS_PLAN §3.3): not listed until more_tools (or
+    // The "manage" group (MANAGER_AND_DOCS_PLAN §3.3): not listed on the code door (find_tools turns them on, or
     // KAAGA_TOOLS=all); the in-app manager always has it.
     'trash_doc',
     'restore_doc',
@@ -200,7 +202,7 @@ export const TOOL_NAMES = [
     'show_on_lock_screen',
     'clear_lock_line',
     'cancel_reminder',
-    'get_recall',
+    'get_quiz_results',
     'get_sharing',
     'publish_doc',
     'share_doc',
@@ -230,6 +232,10 @@ export const TOOL_NAMES = [
     'list_notes',
     'update_note',
     'remove_note',
+    // TOOL_ACCESS_PLAN §3: find any tool by the job, and run one that isn't listed.
+    'find_tools',
+    'use_read_tool',
+    'use_tool',
 ] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -247,8 +253,8 @@ export const TOOL_LEVELS: Readonly<Record<ToolName, 1 | 2 | 3>> = {
     get_week: 1,
     add_week_target: 2,
     update_week_target: 2,
-    suggest: 2,
-    get_mirror: 1,
+    suggest_to_user: 2,
+    get_standing: 1,
     list_tasks: 1,
     add_task: 2,
     update_task: 2,
@@ -284,7 +290,6 @@ export const TOOL_LEVELS: Readonly<Record<ToolName, 1 | 2 | 3>> = {
     remove_focus: 2,
     add_pocket_note: 2,
     recent_agent_edits: 1,
-    more_tools: 1,
     trash_doc: 2,
     restore_doc: 2,
     empty_trash: 3,
@@ -299,7 +304,7 @@ export const TOOL_LEVELS: Readonly<Record<ToolName, 1 | 2 | 3>> = {
     cancel_reminder: 2,
     show_on_lock_screen: 2,
     clear_lock_line: 2,
-    get_recall: 1,
+    get_quiz_results: 1,
     get_sharing: 1,
     // Sharing leaves the app: both only ask (the publish_doc and share_doc actions).
     publish_doc: 3,
@@ -325,6 +330,10 @@ export const TOOL_LEVELS: Readonly<Record<ToolName, 1 | 2 | 3>> = {
     list_notes: 1,
     update_note: 2,
     remove_note: 2,
+    find_tools: 1,
+    use_read_tool: 1,
+    // Runs any tool: the level of what it runs is that tool's own.
+    use_tool: 2,
 };
 
 export const TOOL_GROUP_NAMES = ['core', 'docs', 'plan', 'record', 'manage'] as const;
@@ -338,12 +347,11 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     checkpoint: 'core',
     // MCP_MEMORY_PLAN §4.1: moved to manage to make room for finding and correcting memories.
     list_sessions: 'manage',
-    suggest: 'core',
+    suggest_to_user: 'core',
     get_today: 'core',
     get_learning_overview: 'manage',
     add_pocket_note: 'core',
     recent_agent_edits: 'manage',
-    more_tools: 'core',
     search_docs: 'docs',
     read_doc: 'docs',
     create_doc: 'docs',
@@ -377,7 +385,7 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     update_focus: 'manage',
     remove_focus: 'manage',
     // B10: moved to manage to make room for set_reminder and log_work (the manager has every group).
-    get_mirror: 'manage',
+    get_standing: 'manage',
     log_decision: 'record',
     list_decisions: 'manage',
     trash_doc: 'manage',
@@ -396,7 +404,7 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     // Stage 7 (V1): his words on the lock screen for a window.
     show_on_lock_screen: 'manage',
     clear_lock_line: 'manage',
-    get_recall: 'manage',
+    get_quiz_results: 'manage',
     get_sharing: 'manage',
     publish_doc: 'manage',
     share_doc: 'manage',
@@ -430,6 +438,9 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     list_notes: 'manage',
     update_note: 'manage',
     remove_note: 'manage',
+    find_tools: 'core',
+    use_read_tool: 'core',
+    use_tool: 'core',
 };
 
 /** KAAGA_TOOLS: "all", or groups separated by commas ("core,docs,manage"); else the default. */
@@ -449,6 +460,8 @@ export interface ServerOptions {
     newId?: () => string;
     /** The tool groups listed from the start in the `code` set (default DEFAULT_GROUPS). */
     groups?: readonly ToolGroup[];
+    /** The `web` door's everyday set instead of WEB_TOOLS (TOOL_ACCESS_PLAN §7.3: the picking test's candidates). */
+    listed?: readonly string[];
     /** The door's tool set (MCP_MEMORY_PLAN §4.1); default `office` with workMode, else `code`. */
     set?: ToolSet;
     /** A work folder: the brief and the buddy's memory stay personal (BUDDY_MEMORY_PLAN §4.3); the `office` set. */
@@ -467,12 +480,39 @@ export interface ServerOptions {
 
 const INSTRUCTIONS_OF: Readonly<Record<ToolSet, string>> = { web: WEB_INSTRUCTIONS, code: INSTRUCTIONS, office: OFFICE_INSTRUCTIONS, excluded: EXCLUDED_INSTRUCTIONS, all: INSTRUCTIONS };
 
+/** The three tools that find and run the rest (TOOL_ACCESS_PLAN §3). */
+export const RUNNERS = ['find_tools', 'use_read_tool', 'use_tool'] as const;
+
+/**
+ * TOOL_ACCESS_PLAN §2: what each door lists and what a call may run there. One catalogue: every door can run every tool
+ * its policy allows, listed or not (a host that sends an unlisted name loses nothing); it lists a short set.
+ *   web       its everyday set + the three runners; reaches every tool but set_folder (no folder on the web)
+ *   code      the default groups + find_tools and use_tool (find_tools adds what it finds); reaches every tool
+ *   office    its 9 (the work-folder privacy line: nothing else is reachable)
+ *   excluded  nothing
+ *   all       Ask Kaaga: every tool listed, without the runners and the folder tools
+ */
+export function doorPolicy(set: ToolSet, opts: { groups?: readonly ToolGroup[]; listed?: readonly string[] } = {}): DoorPolicy {
+    const all = TOOL_NAMES as readonly string[];
+    if (set === 'web') return { listed: new Set([...(opts.listed ?? WEB_TOOLS), ...RUNNERS]), reachable: new Set(all.filter((n) => n !== 'set_folder')) };
+    if (set === 'code') {
+        const groups = opts.groups ?? DEFAULT_GROUPS;
+        const reachable = all.filter((n) => n !== 'use_read_tool');
+        return { listed: new Set(reachable.filter((n) => groups.includes(TOOL_GROUPS[n as ToolName]))), reachable: new Set(reachable) };
+    }
+    if (set === 'office') return { listed: new Set(OFFICE_TOOLS), reachable: new Set(OFFICE_TOOLS) };
+    if (set === 'excluded') return { listed: new Set(), reachable: new Set() };
+    const names = all.filter((n) => n !== 'set_folder' && n !== 'set_chat' && !(RUNNERS as readonly string[]).includes(n));
+    return { listed: new Set(names), reachable: new Set(names) };
+}
+
 export function createKaagaServer(options: ServerOptions): McpServer {
     const set: ToolSet = options.set ?? (options.workMode ? 'office' : 'code');
     // A new folder's question comes before everything else (EASY_SETUP_PLAN §3.5).
     const instructions = options.folder?.isNew && set !== 'excluded' && set !== 'web' ? `${NEW_FOLDER_INSTRUCTIONS(options.folder.name)} ${INSTRUCTIONS_OF[set]}` : INSTRUCTIONS_OF[set];
     const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions });
     const registry = new Map<string, RegisteredTool>();
+    const policy = doorPolicy(set, { ...(options.groups ? { groups: options.groups } : {}), ...(options.listed ? { listed: options.listed } : {}) });
     const ctx: ToolContext = {
         api: options.api,
         problem: options.problem ?? null,
@@ -484,6 +524,8 @@ export function createKaagaServer(options: ServerOptions): McpServer {
         ...(options.project ? { project: options.project } : {}),
         ...(options.folder ? { folder: options.folder } : {}),
         chats: newChatMemory(),
+        policy,
+        listChanged: () => server.sendToolListChanged(),
     };
     // EASY_SETUP_PLAN §7: their own word on what this chat is moves it between a work folder's set and the full one
     // (the work brief turns into the full brief, and back); the tools list changes, the instructions stay.
@@ -492,14 +534,13 @@ export function createKaagaServer(options: ServerOptions): McpServer {
         // Only a work folder's chat goes back to the work set: elsewhere a chat called work keeps its tools (a tool
         // without hooks logs its time through checkpoint, which the work set doesn't list).
         if (to === 'office' && set !== 'office') return false;
-        const listed = new Set<string>(to === 'office' ? OFFICE_TOOLS : [...registry.keys()].filter((n) => (options.groups ?? DEFAULT_GROUPS).includes(TOOL_GROUPS[n as ToolName])));
-        for (const [name, tool] of registry) {
-            if (listed.has(name) && !tool.enabled) tool.enable();
-            else if (!listed.has(name) && tool.enabled) tool.disable();
-        }
+        const next = doorPolicy(to, options.groups ? { groups: options.groups } : {});
+        policy.listed = next.listed;
+        policy.reachable = next.reachable;
         ctx.set = to;
         if (to === 'office') ctx.workMode = true;
         else delete ctx.workMode;
+        server.sendToolListChanged();
         return true;
     };
     registerRecordTools(server, ctx);
@@ -515,101 +556,156 @@ export function createKaagaServer(options: ServerOptions): McpServer {
     registerGoalTools(server, ctx);
     registerDayTools(server, ctx, options.newId);
     registerEditTools(server, ctx, options.agentName);
-    registerMoreTools(server, ctx, registry);
     registerManageTools(server, ctx);
     registerBlockTools(server, ctx);
     registerBuddyTools(server, ctx);
     registerFolderTools(server, ctx);
     registerStudyTools(server, ctx);
+    if (set === 'web' || set === 'code' || set === 'office') registerFindTools(server, ctx);
     registerPrompts(server, set);
-    leanToolList(server);
-    guardCalls(server, registry, () => ctx.set ?? set, options.trace);
-    if (set === 'all') {
-        // Ask AI runs in no folder and is no coding chat: a folder's kind is update_project's there (EASY_SETUP_PLAN).
-        for (const name of ['set_folder', 'set_chat']) registry.get(name)?.disable();
-        return server;
-    }
-    if (set === 'code') {
-        const listed = new Set(options.groups ?? DEFAULT_GROUPS);
-        for (const [name, tool] of registry) if (!listed.has(TOOL_GROUPS[name as ToolName])) tool.disable();
-        return server;
-    }
-    // A work folder lists the saving tools and its own work log; the web its set; an excluded folder nothing (no more_tools).
-    const shown = new Set<string>(set === 'office' ? OFFICE_TOOLS : set === 'web' ? WEB_TOOLS : []);
-    for (const [name, tool] of registry) if (!shown.has(name)) tool.disable();
+    const everything = leanToolList(server, policy);
+    ctx.catalogue = () => catalogueOf(set, everything, policy);
+    guardCalls(server, ctx, registry, () => ctx.set ?? set, options.trace);
     return server;
 }
 
 /**
- * A call to a tool this door doesn't list answers one clear line, never the SDK's "disabled" (MCP_MEMORY_PLAN §4.1);
- * a call that still sends a removed field (a host's cached list) runs, and its answer says to reconnect.
+ * Every tool registered here, as tools/list shows it, with its level: find_tools' catalogue and the inputs a refused
+ * call is told about. Built once per process per door (the texts never change while it runs), reachable tools only.
  */
-function guardCalls(server: McpServer, registry: Map<string, RegisteredTool>, setNow: () => ToolSet, trace?: ServerOptions['trace']): void {
+const CATALOGUES = new Map<string, Promise<CatalogueEntry[]>>();
+function catalogueOf(set: ToolSet, everything: () => Promise<ListToolsResult['tools']>, policy: DoorPolicy): Promise<CatalogueEntry[]> {
+    let built = CATALOGUES.get(set);
+    if (!built) {
+        built = everything().then((tools) =>
+            tools.map((t) => ({
+                name: t.name,
+                title: t.title ?? t.name,
+                description: t.description ?? '',
+                inputSchema: t.inputSchema as Record<string, unknown>,
+                level: TOOL_LEVELS[t.name as ToolName] ?? 2,
+            }))
+        );
+        built.catch(() => CATALOGUES.delete(set));
+        CATALOGUES.set(set, built);
+    }
+    return built.then((list) => list.filter((t) => policy.reachable.has(t.name)));
+}
+
+/** A tool's card on this door (the web's log_work has its own inputs, so its own card). */
+export const cardOf = (name: string, set: ToolSet | undefined) => (set === 'web' ? WEB_CARDS[name as ToolName] : undefined) ?? CARDS[name as ToolName];
+
+/** A zod issue in words a model can act on: `day must be a date 'YYYY-MM-DD' (got "Friday")`. */
+function issueWords(issue: { path: PropertyKey[]; message: string; code?: string }, args: Record<string, unknown>): string {
+    const where = issue.path.map(String).join('.') || 'the input';
+    let value: unknown = args;
+    for (const k of issue.path) value = value && typeof value === 'object' ? (value as Record<PropertyKey, unknown>)[k] : undefined;
+    if (value === undefined && issue.code === 'invalid_type') return `${where} is missing`;
+    const message = issue.message.replace(/^Invalid input: /, '');
+    const got = value === undefined ? '' : ` (got ${JSON.stringify(value).slice(0, 60)})`;
+    return /^(must|should|is|needs) /.test(message) ? `${where} ${message}${got}` : `${where}: ${message}${got}`;
+}
+
+type Issue = { path: PropertyKey[]; message: string; code?: string };
+
+/** What is wrong with a call's inputs, with the tool's inputs and its example (TOOL_ACCESS_PLAN §3.4); null when they fit. */
+async function inputProblem(name: string, tool: RegisteredTool, args: Record<string, unknown>, ctx: ToolContext): Promise<string | null> {
+    const schema = tool.inputSchema as { safeParse?: (v: unknown) => { success: boolean; error?: { issues: Issue[] } } } | undefined;
+    if (!schema?.safeParse) return null;
+    const parsed = schema.safeParse(args);
+    if (parsed.success) return null;
+    // One line per input (a date that is no date fails two checks: the first says enough).
+    const seen = new Set<string>();
+    const issues = (parsed.error?.issues ?? [])
+        .filter((i) => {
+            const key = i.path.map(String).join('.');
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        })
+        .slice(0, 3)
+        .map((i) => issueWords(i, args));
+    const entry = (await ctx.catalogue?.().catch(() => []))?.find((t) => t.name === name);
+    const card = cardOf(name, ctx.set);
+    const inputs = entry ? ` Inputs: ${signatureOf(entry.inputSchema)}.` : '';
+    const example = card ? ` Example: ${JSON.stringify(card.example)}.` : '';
+    return `${name}: ${issues.join('; ') || 'the inputs don’t fit'}.${inputs}${example}`;
+}
+
+/**
+ * Every call, direct or through use_tool / use_read_tool, passes here (MCP_MEMORY_PLAN §4.1, TOOL_ACCESS_PLAN §3.4): a
+ * tool the door can't reach answers one clear line; inputs that don't fit say how to fix them; a call that still sends
+ * a removed field (a host's cached list) runs, and its answer says to reconnect.
+ */
+function guardCalls(server: McpServer, ctx: ToolContext, registry: Map<string, RegisteredTool>, setNow: () => ToolSet, trace?: ServerOptions['trace']): void {
     const handlers = (server.server as unknown as { _requestHandlers: Map<string, (req: unknown, extra: unknown) => Promise<CallToolResult>> })._requestHandlers;
     const original = handlers.get('tools/call');
     if (!original) return;
-    server.server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
-        const name = req.params.name;
-        const answer = async (): Promise<CallToolResult> => {
-            const tool = registry.get(name);
-            const set = setNow();
-            if (tool && !tool.enabled) {
-                if (set === 'excluded') return errorResult(EXCLUDED_INSTRUCTIONS);
-                if (set === 'code') return errorResult(`${name} is in the ${TOOL_GROUPS[name as ToolName]} group: call more_tools first, then call it again.`);
-                return errorResult(`${name} is not available in this app: use Kaaga itself, or Claude Code.`);
-            }
-            const removed = (REMOVED_FIELDS[name] ?? []).filter((f) => Object.prototype.hasOwnProperty.call(req.params.arguments ?? {}, f));
-            const result = await original(req, extra);
-            if (!removed.length) return result;
-            return { ...result, content: [...(result.content ?? []), { type: 'text' as const, text: `${removed.join(' and ')} ${removed.length > 1 ? 'were' : 'was'} not passed on. ${RECONNECT}` }] };
-        };
-        if (!trace) return answer();
+    const answer = async (name: string, args: Record<string, unknown>, extra: unknown): Promise<CallToolResult> => {
+        const set = setNow();
+        const tool = registry.get(name);
+        if (!tool || !ctx.policy?.reachable.has(name)) {
+            if (set === 'excluded') return errorResult(EXCLUDED_INSTRUCTIONS);
+            if (set === 'office') return errorResult(`${name} is not available in this app: use Kaaga itself, or Claude Code.`);
+            const near = closestNames([...(ctx.policy?.reachable ?? [])], name);
+            const find = set === 'web' || set === 'code' ? ' find_tools("<the job>") shows what exists.' : '';
+            return errorResult(`No tool named "${name}" here.${near.length ? ` Closest: ${near.join(', ')}.` : ''}${find}`);
+        }
+        const bad = await inputProblem(name, tool, args, ctx);
+        if (bad) return errorResult(bad);
+        const removed = (REMOVED_FIELDS[name] ?? []).filter((f) => Object.prototype.hasOwnProperty.call(args, f));
+        const result = await original({ method: 'tools/call', params: { name, arguments: args } }, extra);
+        if (!removed.length) return result;
+        return { ...result, content: [...(result.content ?? []), { type: 'text' as const, text: `${removed.join(' and ')} ${removed.length > 1 ? 'were' : 'was'} not passed on. ${RECONNECT}` }] };
+    };
+    const traced = async (name: string, args: Record<string, unknown>, extra: unknown, _via: Via): Promise<CallToolResult> => {
+        if (!trace) return answer(name, args, extra);
         // The simulation's trace keeps each call with the record's answer, so a report can say what was filed and how.
-        const args = req.params.arguments ?? {};
         try {
-            const result = await answer();
+            const result = await answer(name, args, extra);
             trace({ tool: name, args, answer: (result.content ?? []).map((c) => (c.type === 'text' ? c.text : `[${c.type}]`)).join('\n') });
             return result;
         } catch (err) {
             trace({ tool: name, args, answer: `error: ${err instanceof Error ? err.message : String(err)}` });
             throw err;
         }
-    });
-}
-
-/** more_tools: turns a group on for this chat (the client is told the list changed). */
-function registerMoreTools(server: McpServer, ctx: ToolContext, registry: Map<string, RegisteredTool>): void {
-    defineTool(
-        server,
-        ctx,
-        'more_tools',
-        {
-            title: 'More tools',
-            description: "Turn on the manage tools: notes on a lesson or subject, the revision card, the trash, reviews done or moved, settings, projects, goal edits, the mirror, decisions, sessions, reminders, agents' edits.",
-            input: { group: z.enum(['manage']).optional() },
-            annotations: READ_ONLY,
-        },
-        async ({ group }) => {
-            const wanted = group ?? 'manage';
-            const names = [...registry.keys()].filter((n) => TOOL_GROUPS[n as ToolName] === wanted);
-            for (const n of names) registry.get(n)!.enable();
-            return `Turned on: ${names.join(', ')}. They are in your tool list now.`;
-        }
-    );
+    };
+    ctx.callTool = (name, args, extra, via) => traced(name, args, extra, via);
+    server.server.setRequestHandler(CallToolRequestSchema, async (req, extra) => traced(req.params.name, (req.params.arguments ?? {}) as Record<string, unknown>, extra, 'direct'));
 }
 
 /**
- * Every chat loads the tool list, so it carries nothing the model doesn't use: the SDK's JSON Schema
- * says `"$schema": "http://json-schema.org/draft-07/schema#"` in every tool (about 2,000 characters
- * over the catalogue). The SDK's own handler builds the list; this wraps it and drops that line
- * (catalogue.test.ts holds the whole list to its budget).
+ * tools/list shows the door's listed set only (TOOL_ACCESS_PLAN §2: every reachable tool stays registered and
+ * enabled). Every chat loads the list, so it carries nothing the model doesn't use: the SDK's JSON Schema says
+ * `"$schema": "http://json-schema.org/draft-07/schema#"` in every tool (about 2,000 characters over the catalogue), so
+ * that line goes (catalogue.test.ts holds the list to its budget). Answers the whole list, unfiltered, for the catalogue.
  */
-function leanToolList(server: McpServer): void {
+/**
+ * TOOL_ACCESS_PLAN stage 1: a hint that says what MCP assumes anyway goes (readOnlyHint false, idempotentHint false,
+ * destructiveHint true on a tool that changes something, openWorldHint true): about 50 characters a changing tool.
+ */
+export function leanAnnotations(a: ToolAnnotations): ToolAnnotations {
+    const out: ToolAnnotations = { ...a };
+    if (out.readOnlyHint === false) delete out.readOnlyHint;
+    if (out.idempotentHint === false) delete out.idempotentHint;
+    if (out.openWorldHint === true) delete out.openWorldHint;
+    if (out.destructiveHint === true && !a.readOnlyHint) delete out.destructiveHint;
+    return out;
+}
+
+function leanToolList(server: McpServer, policy: DoorPolicy): () => Promise<ListToolsResult['tools']> {
     const handlers = (server.server as unknown as { _requestHandlers: Map<string, (req: unknown, extra: unknown) => Promise<ListToolsResult>> })._requestHandlers;
     const original = handlers.get('tools/list');
-    if (!original) return;
+    const lean = (tools: ListToolsResult['tools']) =>
+        tools.map((t) => ({
+            ...t,
+            inputSchema: Object.fromEntries(Object.entries(t.inputSchema).filter(([k]) => k !== '$schema')) as typeof t.inputSchema,
+            ...(t.annotations ? { annotations: leanAnnotations(t.annotations) } : {}),
+        }));
+    if (!original) return async () => [];
     server.server.setRequestHandler(ListToolsRequestSchema, async (req, extra) => {
         const result = await original(req, extra);
-        return { ...result, tools: result.tools.map((t) => ({ ...t, inputSchema: Object.fromEntries(Object.entries(t.inputSchema).filter(([k]) => k !== '$schema')) as typeof t.inputSchema })) };
+        return { ...result, tools: lean(result.tools.filter((t) => policy.listed.has(t.name))) };
     });
+    return async () => lean((await original({ method: 'tools/list', params: {} }, {})).tools);
 }

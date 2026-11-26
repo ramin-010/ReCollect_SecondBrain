@@ -8,7 +8,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { handleMcpHttp } from '../../src/embedded.js';
-import { WEB_INSTRUCTIONS, WEB_TOOLS } from '../../src/server.js';
+import { RUNNERS, WEB_INSTRUCTIONS, WEB_TOOLS } from '../../src/server.js';
 
 const TOKEN = `rcl_${'b'.repeat(43)}`;
 const memory = { _id: 'm1', text: 'Walks after work', kind: 'pattern', sensitivity: 'open', status: 'active', pinned: false, byUser: false, seenCount: 1, lastSeenDay: '2026-11-19' };
@@ -31,6 +31,9 @@ function reply(method: string, path: string): unknown {
     if (path === '/api/buddy/update') return { paused: false, outcome: 'seen', memory: { ...memory, seenCount: 2 }, related: { memories: [], threads: [] }, inMotion: [] };
     if (path === '/api/buddy/memories') return [memory];
     if (path.startsWith('/api/buddy/memories/') && path.endsWith('/close')) return { memory: { ...memory, status: 'closed' }, editId: 'e1' };
+    // Two tools the web reaches through its runners (TOOL_ACCESS_PLAN §2).
+    if (path === '/api/sessions') return { sessions: [], days: [] };
+    if (path === '/api/revisions/r1/reschedule') return { item: { title: 'Heaps', cycleNumber: 2 } };
     return method === 'GET' ? [] : {};
 }
 
@@ -106,13 +109,12 @@ const ARGS: Record<string, Record<string, unknown>> = {
 };
 
 describe('the remote door (POST /mcp, a fresh server per request)', () => {
-    it('lists the web set and its instructions, no more_tools', async () => {
+    it('lists the web set with the three runners, and its instructions', async () => {
         const client = await connected();
         const before = doorRequests;
         const { tools } = await client.listTools();
         expect(doorRequests).toBeGreaterThan(before);
-        expect(tools.map((t) => t.name).sort()).toEqual([...WEB_TOOLS].sort());
-        expect(tools.map((t) => t.name)).not.toContain('more_tools');
+        expect(tools.map((t) => t.name).sort()).toEqual([...WEB_TOOLS, ...RUNNERS].sort());
         expect(client.getInstructions()).toBe(WEB_INSTRUCTIONS);
         await client.close();
     });
@@ -138,12 +140,25 @@ describe('the remote door (POST /mcp, a fresh server per request)', () => {
         // About 35 requests over real HTTP: alone ~3 s, beside the other files ~6 s (stage 12 made the set 32 tools).
     }, 20_000);
 
-    it('a tool outside the set answers one clear line, request after request (more_tools cannot help here)', async () => {
+    it('every tool is reachable request after request (TOOL_ACCESS_PLAN §2): found in one request, run in the next', async () => {
         const client = await connected();
-        for (const name of ['more_tools', 'list_sessions', 'update_canvas']) {
+        const text = (r: Awaited<ReturnType<Client['callTool']>>) => (r.content as Array<{ text: string }>).map((c) => c.text).join('\n');
+        const found = await client.callTool({ name: 'find_tools', arguments: { query: 'how much time did I spend this week' } });
+        expect(text(found)).toMatch(/^list_sessions · .* · reads · run with use_read_tool$/m);
+        // The next request is a fresh server: nothing had to be turned on.
+        const ran = await client.callTool({ name: 'use_read_tool', arguments: { name: 'list_sessions', args: { days: 3 } } });
+        expect(ran.isError, text(ran)).toBeFalsy();
+        expect(apiCalls).toContain('GET /api/sessions');
+        // A changing tool is refused by the reading runner, and runs through use_tool; args may come as a JSON string.
+        const refused = await client.callTool({ name: 'use_read_tool', arguments: { name: 'move_revision', args: { revisionId: 'r1', day: '2026-12-01' } } });
+        expect(text(refused)).toBe('move_revision changes something: call use_tool with the same name and args.');
+        const moved = await client.callTool({ name: 'use_tool', arguments: { name: 'move_revision', args: '{"revisionId":"r1","day":"2026-12-01"}' } });
+        expect(moved.isError, text(moved)).toBeFalsy();
+        // No such tool, and one the web can't reach: one clear line each, with where to look.
+        for (const name of ['more_tools', 'set_folder']) {
             const result = await client.callTool({ name, arguments: {} });
             expect(result.isError, name).toBe(true);
-            expect((result.content as Array<{ text: string }>)[0]!.text).toBe(`${name} is not available in this app: use Kaaga itself, or Claude Code.`);
+            expect(text(result)).toMatch(new RegExp(`^No tool named "${name}" here\\..*find_tools\\("<the job>"\\) shows what exists\\.$`));
         }
         await client.close();
     });

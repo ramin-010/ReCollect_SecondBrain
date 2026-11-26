@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
-import { DEFAULT_GROUPS, EXCLUDED_INSTRUCTIONS, INSTRUCTIONS, OFFICE_INSTRUCTIONS, OFFICE_TOOLS, TOOL_GROUP_NAMES, TOOL_GROUPS, TOOL_LEVELS, TOOL_NAMES, WEB_INSTRUCTIONS, WEB_TOOLS } from '../../src/server.js';
+import { DEFAULT_GROUPS, EXCLUDED_INSTRUCTIONS, INSTRUCTIONS, OFFICE_INSTRUCTIONS, OFFICE_TOOLS, RUNNERS, TOOL_GROUP_NAMES, TOOL_GROUPS, TOOL_LEVELS, TOOL_NAMES, WEB_INSTRUCTIONS, WEB_TOOLS } from '../../src/server.js';
 import { CATCH_UP } from '../../src/prompts.js';
 import { connect, fail, type Harness } from './harness.js';
 
@@ -10,14 +10,15 @@ afterEach(async () => {
     h = undefined;
 });
 
-const READS = ['get_brief', 'list_sessions', 'get_week', 'get_mirror', 'list_tasks', 'list_decisions', 'get_today', 'get_learning_overview', 'search_docs', 'read_doc', 'preview_diagram', 'list_subjects', 'get_path', 'list_due', 'list_goals', 'recent_agent_edits', 'more_tools', 'get_settings', 'list_suggestions', 'list_reminders', 'get_recall', 'get_sharing', 'get_outline', 'recall_memory', 'get_work_log', 'list_notes'];
+const READS = ['get_brief', 'list_sessions', 'get_week', 'get_standing', 'list_tasks', 'list_decisions', 'get_today', 'get_learning_overview', 'search_docs', 'read_doc', 'preview_diagram', 'list_subjects', 'get_path', 'list_due', 'list_goals', 'recent_agent_edits', 'get_settings', 'list_suggestions', 'list_reminders', 'get_quiz_results', 'get_sharing', 'get_outline', 'recall_memory', 'get_work_log', 'list_notes', 'find_tools', 'use_read_tool'];
+/** What the code door can run (use_read_tool is the web's: a coding tool runs a read through use_tool). */
+const CODE_NAMES = TOOL_NAMES.filter((n) => n !== 'use_read_tool');
 
 describe('the server', () => {
     it('lists every tool in TOOL_NAMES (catalogue.test.ts pins the count to the README), each with a title, a description and an object input schema', async () => {
         h = await connect({}, { groups: TOOL_GROUP_NAMES });
         const { tools } = await h.client.listTools();
-        expect(tools.map((t) => t.name)).toEqual([...TOOL_NAMES]);
-        expect(tools).toHaveLength(TOOL_NAMES.length);
+        expect(tools.map((t) => t.name)).toEqual(CODE_NAMES);
         for (const tool of tools) {
             expect(tool.title, tool.name).toBeTruthy();
             expect(tool.description!.length, tool.name).toBeGreaterThan(40);
@@ -32,7 +33,8 @@ describe('the server', () => {
         h = await connect({}, { groups: TOOL_GROUP_NAMES });
         const { tools } = await h.client.listTools();
         for (const tool of tools) {
-            expect(tool.annotations?.readOnlyHint, tool.name).toBe(READS.includes(tool.name));
+            // A hint MCP assumes anyway is left out of the list (readOnlyHint false): read-only says true, a change says nothing.
+            expect(tool.annotations?.readOnlyHint === true, tool.name).toBe(READS.includes(tool.name));
             expect(TOOL_LEVELS[tool.name as keyof typeof TOOL_LEVELS] === 1, tool.name).toBe(READS.includes(tool.name));
         }
         const tapped = tools.filter((t) => TOOL_LEVELS[t.name as keyof typeof TOOL_LEVELS] === 3);
@@ -40,16 +42,18 @@ describe('the server', () => {
         for (const t of tapped) expect(t.description, t.name).toMatch(/tap/);
     });
 
-    it('lists the default groups; more_tools turns the manage group on for the chat', async () => {
-        h = await connect({});
+    it('lists the default groups; find_tools turns what it found on for the chat (TOOL_ACCESS_PLAN §3.1)', async () => {
+        h = await connect({ 'GET /api/suggestions': { status: 200, data: [] } });
         const listed = async () => (await h!.client.listTools()).tools.map((t) => t.name);
-        expect(await listed()).toEqual(TOOL_NAMES.filter((n) => DEFAULT_GROUPS.includes(TOOL_GROUPS[n])));
+        expect(await listed()).toEqual(CODE_NAMES.filter((n) => DEFAULT_GROUPS.includes(TOOL_GROUPS[n])));
+        expect(await listed()).toEqual(expect.arrayContaining(['find_tools', 'use_tool']));
         const changed = new Promise<void>((resolve) => h!.client.setNotificationHandler(ToolListChangedNotificationSchema, () => resolve()));
-        const res = await h.call('more_tools', {});
-        expect(res.text).toMatch(/^Turned on: list_sessions, .*get_mirror.*list_decisions.*get_learning_overview.*recent_agent_edits.*get_work_log, update_work_line, set_revision_card, add_note, list_notes, update_note, remove_note\. They are in your tool list now\.$/);
-        expect(res.text).not.toContain('set_reminder');
+        const res = await h.call('find_tools', { query: 'move a review to another day', limit: 3 });
+        expect(res.text).toMatch(/^move_revision · Move a review · changes \(Undo\) · in your list now$/m);
         await changed;
-        expect(await listed()).toEqual([...TOOL_NAMES]);
+        expect(await listed()).toContain('move_revision');
+        // Listed or not, every tool runs by its name on this door.
+        expect((await h.call('list_suggestions', {})).text).not.toMatch(/No tool named/);
     });
 
     it('offers the note recipe as a prompt: the skill’s text, plus the topic', async () => {
@@ -103,21 +107,24 @@ describe('the server', () => {
 describe('a tool set per door (MCP_MEMORY_PLAN §4.1)', () => {
     const names = async () => (await h!.client.listTools()).tools.map((t) => t.name);
 
-    it('web (claude.ai, ChatGPT): its 32 tools, no more_tools, its own instructions; another tool answers one clear line', async () => {
-        h = await connect({}, { set: 'web' });
-        expect((await names()).sort()).toEqual([...WEB_TOOLS].sort());
+    it('web (claude.ai, ChatGPT): its 32 tools and the three runners, its own instructions; every other tool but set_folder runs', async () => {
+        h = await connect({ 'GET /api/suggestions': { status: 200, data: [] } }, { set: 'web' });
+        expect((await names()).sort()).toEqual([...WEB_TOOLS, ...RUNNERS].sort());
         expect(WEB_TOOLS).toHaveLength(32);
-        expect(await names()).not.toContain('more_tools');
         expect(h.client.getInstructions()).toBe(WEB_INSTRUCTIONS);
-        const other = await h.call('update_canvas', { docId: 'd1', canvasId: 'c1', diagram: 'flowchart LR\n a --> b' });
-        expect(other).toEqual({ text: 'update_canvas is not available in this app: use Kaaga itself, or Claude Code.', isError: true });
-        expect(other.text).not.toMatch(/disabled/);
+        // Not listed, still reachable: by its own name, or through a runner.
+        expect((await h.call('list_suggestions', {})).isError).toBe(false);
+        expect((await h.call('use_read_tool', { name: 'list_suggestions', args: {} })).isError).toBe(false);
+        const folder = await h.call('set_folder', { kind: 'build' });
+        expect(folder).toEqual({ text: 'No tool named "set_folder" here. Closest: set_chat, set_reminder, set_revision_card. find_tools("<the job>") shows what exists.', isError: true });
+        expect(folder.text).not.toMatch(/disabled/);
     });
 
-    it('code (Claude Code): the default groups with saving, finding and correcting; manage on more_tools', async () => {
+    it('code (Claude Code): the default groups with saving, finding and correcting; the rest through find_tools', async () => {
         h = await connect({});
         const listed = await names();
-        expect(listed).toEqual(expect.arrayContaining(['remember', 'update_memory', 'recall_memory', 'forget', 'more_tools']));
+        expect(listed).toEqual(expect.arrayContaining(['remember', 'update_memory', 'recall_memory', 'forget', 'find_tools', 'use_tool']));
+        expect(listed).not.toContain('use_read_tool');
         expect(listed).not.toContain('list_sessions');
         expect(listed).not.toContain('get_learning_overview');
         expect(h.client.getInstructions()).toBe(INSTRUCTIONS);
@@ -135,9 +142,9 @@ describe('a tool set per door (MCP_MEMORY_PLAN §4.1)', () => {
         expect(h.requests).toHaveLength(0);
     });
 
-    it('all (Ask AI): every tool but set_folder and set_chat (it runs in no folder: EASY_SETUP_PLAN)', async () => {
+    it('all (Ask AI): every tool but set_folder and set_chat (it runs in no folder: EASY_SETUP_PLAN) and the runners', async () => {
         h = await connect({}, { set: 'all' });
-        expect((await names()).sort()).toEqual(TOOL_NAMES.filter((n) => n !== 'set_folder' && n !== 'set_chat').sort());
+        expect((await names()).sort()).toEqual(TOOL_NAMES.filter((n) => n !== 'set_folder' && n !== 'set_chat' && !(RUNNERS as readonly string[]).includes(n)).sort());
     });
 });
 

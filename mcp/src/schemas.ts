@@ -15,7 +15,7 @@ export const zDocId = z
     .string()
     .trim()
     .refine((v) => /^[A-Za-z0-9]{1,128}$/.test(v), 'must be a doc id as search_docs shows it (letters and digits)')
-    .describe('Doc id (from search_docs, get_today or create_doc)');
+    .describe('Doc id (search_docs shows it)');
 
 export const zId = (what: string) =>
     z

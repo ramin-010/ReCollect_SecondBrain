@@ -172,8 +172,8 @@ export function registerContextTools(server: McpServer, ctx: ToolContext): void 
         {
             title: 'Learning overview',
             description:
-                'Per subject: topics (docs under revision) due now, waiting, mastered (all 4 reviews done) or not scheduled, and the daily revision budget. ' +
-                'With subject: its topics, each with its next review and doc id. For planning a week or finding gaps.',
+                'Per subject: topics (docs under revision) due now, waiting, mastered or not scheduled, and the daily revision budget. ' +
+                'With subject: its topics, each with its next review and doc id.',
             input: {
                 subject: zSubjectName.optional().describe('A subject name to list its topics (case-insensitive).'),
             },

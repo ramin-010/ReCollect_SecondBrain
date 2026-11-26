@@ -126,7 +126,7 @@ describe('manage tools', () => {
         expect(h.requests.at(-1)).toMatchObject({ body: { all: true } });
     });
 
-    it('get_recall lists the sessions, the missed questions and the weak spots; get_sharing says who can see a doc', async () => {
+    it('get_quiz_results lists the sessions, the missed questions and the weak spots; get_sharing says who can see a doc', async () => {
         h = await all({
             'GET /api/topics/top1/recall': ok({
                 topic: { _id: 'top1', title: 'Heaps', docId: DOC },
@@ -141,7 +141,7 @@ describe('manage tools', () => {
                 requests: [{ name: 'Ravi', requestedAt: '2026-11-15T10:00:00Z' }],
             }),
         });
-        expect((await h.call('get_recall', { topicId: 'top1' })).text).toBe(
+        expect((await h.call('get_quiz_results', { topicId: 'top1' })).text).toBe(
             'Recall on "Heaps":\n- 2026-11-13 · review 2 · partial (2 strong, 1 partial, 1 weak)\n  - weak: "Why is heapify O(n)?" · Most nodes sit near the bottom.\nOpen weak spots: "heapify cost"'
         );
         expect((await h.call('get_sharing', { docId: DOC })).text).toBe('"Heaps": published since 2026-11-15 (http://localhost:3005/p/heaps-k7m2x9q4hz3a) · Asha (can edit) · asking to edit: Ravi.');

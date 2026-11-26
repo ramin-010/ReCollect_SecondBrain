@@ -384,7 +384,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
     defineTool(
         server,
         ctx,
-        'get_recall',
+        'get_quiz_results',
         {
             title: 'Recall results',
             description: "A topic's last Recall sessions: grades, the questions they missed with the grader's words, open weak spots. To quiz them on what they get wrong. topicId, or docId.",

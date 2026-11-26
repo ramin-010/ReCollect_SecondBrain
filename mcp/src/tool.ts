@@ -29,8 +29,35 @@ export interface ToolContext {
     chats?: import('./tools/folders.js').ChatMemory;
     /** EASY_SETUP_PLAN §7: on their own word, this chat moves to the full set (theirs) or a work folder's (work). */
     switchSet?: (to: 'code' | 'office') => boolean;
+    /** TOOL_ACCESS_PLAN §2: what this door lists and what a call may run (find_tools adds to `listed` on code). */
+    policy?: DoorPolicy;
+    /** Every tool this door can reach, as tools/list shows it, with its level (find_tools' catalogue). */
+    catalogue?: () => Promise<CatalogueEntry[]>;
+    /** A call as a host makes it (the door's checks, the inputs, the trace): use_tool and use_read_tool run through it. */
+    callTool?: (name: string, args: Record<string, unknown>, extra: unknown, via: Via) => Promise<CallToolResult>;
+    /** The listed tools changed: the client is told (it lists again). */
+    listChanged?: () => void;
 }
 
+/** TOOL_ACCESS_PLAN §2: listed (tools/list) and reachable (what a call may run) are two things. */
+export interface DoorPolicy {
+    listed: Set<string>;
+    reachable: Set<string>;
+}
+
+/** How a call arrived: by its own name, or through a runner. */
+export type Via = 'direct' | 'use_tool' | 'use_read_tool';
+
+export interface CatalogueEntry {
+    name: string;
+    title: string;
+    description: string;
+    /** JSON Schema of the input, as tools/list gives it. */
+    inputSchema: Record<string, unknown>;
+    level: 1 | 2 | 3;
+}
+
+// Each tool's card (TOOL_ACCESS_PLAN §4.1) lives in cards.ts, one record by tool name: the type makes it required.
 export interface ToolSpec<S extends z.ZodRawShape> {
     title: string;
     description: string;

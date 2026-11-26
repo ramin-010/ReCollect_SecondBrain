@@ -36,7 +36,7 @@ describe('list_goals', () => {
 });
 
 describe('create_goal', () => {
-    it('resolves subjects by name and maps milestone dueDate → dueDay', async () => {
+    it('resolves subjects by name and sends each milestone’s dueDay', async () => {
         const created = goal({
             _id: 'goalN',
             title: 'Ship the MCP server',
@@ -52,7 +52,7 @@ describe('create_goal', () => {
             deadline: '2026-12-31',
             why: 'Agents write my docs',
             subjects: ['dsa', 'System design'],
-            milestones: [{ title: 'Tools', dueDate: '2026-11-20' }, { title: 'Tests' }],
+            milestones: [{ title: 'Tools', dueDay: '2026-11-20' }, { title: 'Tests' }],
         });
         const post = h.requests.find((r) => r.method === 'POST')!;
         expect(post.path).toBe('/api/goals');
@@ -140,7 +140,7 @@ describe('add_milestone', () => {
     it('POSTs title + dueDay and reports the goal progress', async () => {
         const added = milestone({ _id: 'msN', title: 'Graphs', dueDay: '2027-01-15' });
         h = await all({ 'POST /api/goals/goal1/milestones': ok({ milestone: added, goal: goal({ milestones: [milestone(), added] }) }, 201) });
-        const res = await h.call('add_milestone', { goalId: 'goal1', title: 'Graphs', dueDate: '2027-01-15' });
+        const res = await h.call('add_milestone', { goalId: 'goal1', title: 'Graphs', dueDay: '2027-01-15' });
         expect(h.requests[0]).toMatchObject({ method: 'POST', path: '/api/goals/goal1/milestones', body: { title: 'Graphs', dueDay: '2027-01-15' } });
         expect(h.requests[0]!.headers['idempotency-key']).toMatch(UUID_RE);
         expect(res.text).toBe(

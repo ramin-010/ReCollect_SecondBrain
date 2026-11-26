@@ -62,7 +62,7 @@ export function registerPathTools(server: McpServer, ctx: ToolContext): void {
             title: "A subject's path",
             description:
                 "The topics of a subject in their order, like a course: ✓ done, ▶ in progress, ○ planned, – skipped, with each one's next step and doc, and the topic to do next. " +
-                'Read it before studying with the user, to pick up where they are.',
+                'Read it before studying with them.',
             input: { subject: zSubjectName.describe('The subject name, e.g. "System Design".') },
             annotations: READ_ONLY,
         },
@@ -103,13 +103,13 @@ export function registerPathTools(server: McpServer, ctx: ToolContext): void {
             title: 'Move a topic along its path',
             description:
                 'Change one topic on its path: status (in_progress when the user starts it, done when learned, skipped, or back to planned), its next step (null clears it), ' +
-                'its place (after), or a planned topic’s title. The user can undo it.',
+                'its place (after), or a planned topic’s title.',
             input: {
                 topicId: zId('topic').describe('The topic id (get_path shows them).'),
                 status: z.enum(['planned', 'in_progress', 'done', 'skipped']).optional(),
-                nextStep: z.string().max(300).nullable().optional().describe('What to do next on it, e.g. "Do the consistent-hashing exercise".'),
+                nextStep: z.string().max(300).nullable().optional().describe('What to do next on it, one line.'),
                 after: zId('topic').nullable().optional().describe('Move it after this topic; null puts it first.'),
-                title: z.string().trim().min(1).max(200).optional().describe('A new title (planned topics only: a topic with a doc takes its doc’s title).'),
+                title: z.string().trim().min(1).max(200).optional().describe('A planned topic’s new title.'),
             },
             annotations: CHANGES,
         },

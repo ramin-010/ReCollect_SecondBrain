@@ -46,9 +46,8 @@ export function registerRevisionTools(server: McpServer, ctx: ToolContext): void
         {
             title: 'Schedule revision',
             description:
-                'Put a doc on the spaced-revision schedule: reviews 1, 3, 7 and 21 days from today, shown on Home when due. ' +
-                "A doc that isn't filed under a subject yet needs subject (a name); a doc already scheduled is left as it is. " +
-                'Only the user marks reviews as done.',
+                'Put a doc on spaced revision: reviews 1, 3, 7 and 21 days from today, on Home when due. ' +
+                'A doc in no subject yet needs subject (a name); a doc already scheduled stays as it is.',
             input: {
                 docId: zDocId,
                 subject: zSubjectName.optional().describe('Subject to file the doc under if it has none yet (case-insensitive name).'),
@@ -109,7 +108,7 @@ export function registerRevisionTools(server: McpServer, ctx: ToolContext): void
             title: 'Due revisions',
             description:
                 "Every revision due today or overdue: today's plan first (in order, fitted to their daily budget), then the ones waiting for room. " +
-                'Each line: subject, cycle (1–4), how late, the doc to open, the review id.',
+                'Each with the doc to open and its review id.',
             input: {},
             annotations: READ_ONLY,
         },

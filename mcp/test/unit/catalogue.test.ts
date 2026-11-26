@@ -8,7 +8,9 @@ import { DEFAULT_GROUPS, TOOL_GROUPS, TOOL_NAMES } from '../../src/server.js';
 import { connect, type Harness } from './harness.js';
 
 /** Characters of JSON for the default tool definitions, as tools/list returns them (the manage group is listed on request). */
-export const TOOL_JSON_BUDGET = 40_000;
+// TOOL_ACCESS_PLAN §2 (11-27): 40,000 → 42,000 for find_tools and use_tool. Claude Code now defers large MCP lists on its
+// own; the cap protects Cursor and Antigravity, which load every listed tool into every chat.
+export const TOOL_JSON_BUDGET = 42_000;
 
 const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
 
@@ -33,7 +35,7 @@ describe('the catalogue', () => {
     it('lists the default groups of TOOL_NAMES, and their definitions stay under the budget', async () => {
         h = await connect({});
         const { tools } = await h.client.listTools();
-        expect(tools.map((t) => t.name).sort()).toEqual(TOOL_NAMES.filter((n) => DEFAULT_GROUPS.includes(TOOL_GROUPS[n])).sort());
+        expect(tools.map((t) => t.name).sort()).toEqual(TOOL_NAMES.filter((n) => n !== 'use_read_tool' && DEFAULT_GROUPS.includes(TOOL_GROUPS[n])).sort());
         const size = JSON.stringify(tools).length;
         expect(size, `tool definitions are ${size} characters; the budget is ${TOOL_JSON_BUDGET}`).toBeLessThanOrEqual(TOOL_JSON_BUDGET);
     });

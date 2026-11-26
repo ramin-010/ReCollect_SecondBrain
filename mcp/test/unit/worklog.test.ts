@@ -215,7 +215,9 @@ describe('a work folder (B10)', () => {
         expect(office).toEqual([...OFFICE_TOOLS].sort());
         expect(h.client.getInstructions()).toBe(OFFICE_INSTRUCTIONS);
         expect(OFFICE_INSTRUCTIONS).toContain('Never save company code, data, clients or colleagues’ names.');
-        expect((await h.call('more_tools', {})).isError).toBe(true);
+        // Nothing beyond its own tools is reachable in a work folder, by any name.
+        expect(await h.call('find_tools', { query: 'delete a doc' })).toEqual({ text: 'find_tools is not available in this app: use Kaaga itself, or Claude Code.', isError: true });
+        expect((await h.call('trash_doc', { docId: 'd1' })).isError).toBe(true);
         await h.close();
 
         h = await connect({});

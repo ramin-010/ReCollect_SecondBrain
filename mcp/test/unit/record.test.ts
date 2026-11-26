@@ -158,9 +158,7 @@ describe('list_sessions', () => {
                 days: [{ day: '2026-11-14', minutes: { study: 45, practice: 0, build: 80, review: 0 }, count: 2 }],
             }),
         });
-        // MCP_MEMORY_PLAN §4.1: list_sessions is in the manage group now.
-        expect((await h.call('list_sessions', {})).text).toBe('list_sessions is in the manage group: call more_tools first, then call it again.');
-        await h.call('more_tools', {});
+        // MCP_MEMORY_PLAN §4.1: list_sessions is in the manage group (not listed), and still runs by its name (TOOL_ACCESS_PLAN §2).
         const res = await h.call('list_sessions', {});
         expect(h.requests[0]!.query).toEqual({ days: '7' });
         expect(res.text).toBe(['Sat 14 Nov · 2 h 5 min: study 45 min, build 1 h 20 min', '- "Graphs" · 45 min study · by hand', '- "Paths UI" · 1 h 20 min build · second_brain · hook'].join('\n'));

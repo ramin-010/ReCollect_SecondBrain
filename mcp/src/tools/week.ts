@@ -125,7 +125,7 @@ export function registerWeekTools(server: McpServer, ctx: ToolContext): void {
     defineTool(
         server,
         ctx,
-        'suggest',
+        'suggest_to_user',
         {
             title: 'Suggest something to the user',
             description:

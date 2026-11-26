@@ -72,7 +72,7 @@ export function registerGoalTools(server: McpServer, ctx: ToolContext): void {
                     .array(
                         z.object({
                             title: zMilestoneTitle,
-                            dueDate: zDay.optional().describe("'YYYY-MM-DD'"),
+                            dueDay: zDay.optional().describe("'YYYY-MM-DD'"),
                         })
                     )
                     .max(20)
@@ -88,7 +88,7 @@ export function registerGoalTools(server: McpServer, ctx: ToolContext): void {
                 deadline,
                 ...(why ? { why } : {}),
                 ...(linked.length > 0 ? { subjectIds: linked.map((s) => s.id) } : {}),
-                ...(milestones?.length ? { milestones: milestones.map((m) => ({ title: m.title, ...(m.dueDate ? { dueDay: m.dueDate } : {}) })) } : {}),
+                ...(milestones?.length ? { milestones: milestones.map((m) => ({ title: m.title, ...(m.dueDay ? { dueDay: m.dueDay } : {}) })) } : {}),
             });
             const lines = [`Created goal ${goalSummary(goal, false)}`];
             if (goal.subjects.length > 0) lines.push(`Subjects: ${goal.subjects.map((s) => s.name).join(', ')}`);
@@ -139,13 +139,13 @@ export function registerGoalTools(server: McpServer, ctx: ToolContext): void {
             input: {
                 goalId: zGoalId,
                 title: zMilestoneTitle.describe('A concrete, checkable step.'),
-                dueDate: zDay.optional().describe("'YYYY-MM-DD'"),
+                dueDay: zDay.optional().describe("'YYYY-MM-DD'"),
             },
             annotations: ADDS,
         },
-        async ({ goalId, title, dueDate }) => {
+        async ({ goalId, title, dueDay }) => {
             const { milestone, goal } = await orNotFound(
-                api.post<MilestoneResult>(`/api/goals/${goalId}/milestones`, { title, ...(dueDate ? { dueDay: dueDate } : {}) }),
+                api.post<MilestoneResult>(`/api/goals/${goalId}/milestones`, { title, ...(dueDay ? { dueDay } : {}) }),
                 `No goal with id ${goalId} (list_goals shows them).`
             );
             return withUndo(

@@ -58,15 +58,15 @@ describe('week tools', () => {
         expect(await text('update_week_target', { targetId: 'wt3' })).toMatch(/Send text or status/);
     });
 
-    it('suggest builds the payload by kind', async () => {
+    it('suggest_to_user builds the payload by kind', async () => {
         h = await connect({ 'POST /api/suggestions': ok({ _id: 'sg1' }) });
-        expect(await text('suggest', { kind: 'focus_line', text: 'Two sliding-window mediums' })).toContain('waits on Home');
+        expect(await text('suggest_to_user', { kind: 'focus_line', text: 'Two sliding-window mediums' })).toContain('waits on Home');
         expect(h.requests.at(-1)!.body).toEqual({ kind: 'focus_line', text: 'Two sliding-window mediums', payload: { text: 'Two sliding-window mediums' } });
-        expect(await text('suggest', { kind: 'profile_edit', text: 'Learns by building' })).toMatch(/needs profile/);
+        expect(await text('suggest_to_user', { kind: 'profile_edit', text: 'Learns by building' })).toMatch(/needs profile/);
     });
 });
 
-describe('get_mirror', () => {
+describe('get_standing', () => {
     it('prints each goal’s paths with pace and fix, then subjects; quotes the app’s numbers', async () => {
         h = await connect({
             'GET /api/mirror': ok({
@@ -87,7 +87,7 @@ describe('get_mirror', () => {
                 weeks: [{ weekStart: '2026-11-09', minutes: { study: 120, practice: 0, build: 0, review: 0 }, targets: { done: 1, total: 3 } }],
             }),
         }, { groups: TOOL_GROUP_NAMES });
-        const out = await text('get_mirror', {});
+        const out = await text('get_standing', {});
         expect(out).toContain('Goal "Offer" · due 2027-05-16 (183 days) · milestones 1/6 · behind');
         expect(out).toContain('System Design: 7/16 topics at 0.5/wk, needs 0.4/wk, lands 2027-06-01 · behind · fix: 1 more topic a week, or finish 2027-06-01');
         expect(out).toContain('DSA: quiz 3/4 · weak spots 2 open, 1 cleared in 30 days · practice: 3 alone, 1 with hints, 0 after the answer');

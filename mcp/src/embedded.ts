@@ -39,8 +39,8 @@ export interface CatalogueOptions {
 /**
  * Remote MCP (ALWAYS_ON_SPEC 6.5): one Streamable HTTP request, stateless. A fresh server per request
  * on the caller's own token, so the API's token rules, scopes and edit log apply exactly as for the
- * stdio server. It lists the `web` set (MCP_MEMORY_PLAN §4.1): no more_tools, since nothing turned on in one
- * request could last to the next.
+ * stdio server. It lists the `web` set (MCP_MEMORY_PLAN §4.1) and reaches the rest through find_tools, use_read_tool
+ * and use_tool (TOOL_ACCESS_PLAN §3): nothing turned on in one request could last to the next.
  */
 export async function handleMcpHttp(
     req: IncomingMessage & { body?: unknown },
@@ -66,9 +66,8 @@ export async function openCatalogue(options: CatalogueOptions): Promise<Catalogu
     await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
     const { tools } = await client.listTools();
     return {
-        // Every group is on already: more_tools has nothing to add for the manager.
+        // Every tool is listed for the manager (the `all` door): it needs no runner.
         tools: tools
-            .filter((t) => t.name !== 'more_tools')
             .map((t) => ({
                 name: t.name,
                 title: t.title ?? t.name,

@@ -501,7 +501,7 @@ export function registerBuddyTools(server: McpServer, ctx: ToolContext): void {
         {
             title: 'Forget a memory',
             description:
-                'Use this when a memory is no longer true and was a misunderstanding, or the user asks you to forget it: it is closed (Undo on Home). A change of routine goes to update_memory instead, so the old version stays as history. Memories the user wrote or changed themselves are theirs: you can’t close those.',
+                'Use this when a memory is no longer true and was a misunderstanding, or the user asks you to forget it: it is closed (Undo on Home). A change of routine goes to update_memory instead, so the old version stays as history.',
             input: { id: zId('memory'), reason: z.string().trim().max(200).optional().describe('Why, in a few words.') },
             annotations: CHANGES,
         },

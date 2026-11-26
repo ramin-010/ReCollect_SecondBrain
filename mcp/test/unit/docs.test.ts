@@ -381,7 +381,8 @@ describe('add_canvas', () => {
         for (const part of ['system-design', "create_doc's Markdown guide", '```mermaid', 'read_doc', '```canvas', 'update_canvas', 'preview_diagram', 'Undo', 'problems to fix']) {
             expect(tool.description).toContain(part);
         }
-        expect(tool.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+        // The list leaves out hints MCP assumes anyway (readOnlyHint false): adding is not destructive.
+        expect(tool.annotations).toEqual({ destructiveHint: false, openWorldHint: false });
     });
 });
 

@@ -182,10 +182,10 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
                 guide: z.boolean().optional().describe('true: answer the writing guide and create nothing (send nothing else).'),
                 title: z.string().trim().min(1, 'A doc needs a title').max(200).optional().describe('The doc title (shown above the body). Needed unless guide.'),
                 markdown: zMarkdown.optional().describe("The body in Markdown. Don't repeat the title as a heading at the top. Needed unless guide."),
-                subject: zSubjectName.optional().describe('Subject name to file it under, e.g. "DSA" (case-insensitive; see list_subjects).'),
+                subject: zSubjectName.optional().describe('Subject name to file it under, e.g. "DSA" (any case).'),
                 topicId: zId('topic')
                     .optional()
-                    .describe("A planned topic on a path (get_path, get_today show ids): the doc becomes that topic's note, in its subject. With revise the topic is done, else in progress."),
+                    .describe("A planned topic's id (get_path): the doc becomes its lesson (with revise the topic is done, else in progress)."),
                 revise: z.boolean().optional().describe('Schedule spaced revision (1, 3, 7, 21 days). Needs subject or topicId.'),
                 create_subject_if_missing: z.boolean().optional().describe('Create the subject if no subject has that name.'),
             },
