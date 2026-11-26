@@ -73,6 +73,10 @@ flowchart
 
 Headings `##`, short paragraphs, lists; a small GFM table where a comparison reads best. One blank line between paragraphs.
 
+## Pages inside a doc
+
+A doc can hold docs (pages), to any depth. When a note would pass about eight sections, or mixes a lesson with long practice, write an overview doc and a page per part: `create_doc` with `parentId` (the overview's id). Point to each page from the overview's text with its link line, `[Title](/docs/<id>)`, under the heading it belongs to. Never split a lesson that reads well as one doc. `get_doc_tree` shows a doc's pages (with `content: true`, all their text in one call); `move_doc` moves a page or reorders it.
+
 ## Worked example 1: a distributed cache
 
 ````markdown

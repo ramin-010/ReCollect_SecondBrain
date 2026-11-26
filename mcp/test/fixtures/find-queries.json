@@ -215,7 +215,13 @@
     { "q": "this repo is a study folder", "tools": ["set_folder", "update_project"], "held": false },
     { "q": "ignore this folder, don't log anything here", "tools": ["set_folder"], "held": true },
     { "q": "this chat is learning, not work", "tools": ["set_chat"], "held": false },
-    { "q": "count this conversation as study even though it's in my work repo", "tools": ["set_chat"], "held": false }
+    { "q": "count this conversation as study even though it's in my work repo", "tools": ["set_chat"], "held": false },
+    { "q": "show me the pages inside a doc", "tools": ["get_doc_tree"], "held": true },
+    { "q": "the whole course in one call, every sub-page with its text", "tools": ["get_doc_tree"], "held": false },
+    { "q": "list the nested pages under my system design doc as a tree", "tools": ["get_doc_tree"], "held": false },
+    { "q": "move this doc under the kafka doc", "tools": ["move_doc"], "held": true },
+    { "q": "put this page inside another doc", "tools": ["move_doc"], "held": false },
+    { "q": "reorder the pages so this one comes first", "tools": ["move_doc"], "held": false }
   ],
   "playbooks": [
     { "q": "tutor me on consistent hashing", "playbook": "study_session", "held": false },

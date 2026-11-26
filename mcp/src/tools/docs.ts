@@ -125,7 +125,9 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
             if (docs.length === 0) return query ? `No docs match ${quote(query)}.` : 'No docs yet.';
             const header = query ? `${plural(docs.length, 'doc')} matching ${quote(query)}, best first:` : `${plural(docs.length, 'doc')}, most recently updated first:`;
             const lines = docs.map((d) => {
-                const line = `- ${quote(d.title, 100)} · ${d.subject ?? 'no subject'} · updated ${dayOf(d.updatedAt, zone)} · id ${d.id}`;
+                // DOC_PAGES_PLAN §6.2: where a page sits, so two "Practice" pages read apart.
+                const inside = d.path?.length ? ` (in ${d.path.map((t) => t.trim() || 'Untitled').join(' › ')})` : '';
+                const line = `- ${quote(d.title, 100)}${inside} · ${d.subject ?? 'no subject'} · updated ${dayOf(d.updatedAt, zone)} · id ${d.id}`;
                 return d.snippet ? `${line}\n  ${d.snippet}` : line;
             });
             return [header, ...lines].join('\n');
@@ -157,11 +159,15 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
                 // STUDY_FLOW_PLAN: a lesson's card and its notes (list_notes reads them).
                 ...(doc.card ? ['has its revision card'] : []),
                 ...(doc.topicId && doc.notes ? [`${plural(doc.notes, 'note')} on this lesson`] : []),
+                // DOC_PAGES_PLAN D5: a page inside a lesson is revised with it (its notes are the lesson's).
+                ...(doc.lesson ? [`part of the lesson ${quote(doc.lesson.title, 80)} (doc ${doc.lesson.docId})${doc.notes ? `, ${plural(doc.notes, 'note')} on it` : ''}`] : []),
             ].join(' · ');
             const body = doc.markdown.trim() ? doc.markdown : '(empty doc)';
             // DOC_PAGES_PLAN §6: where it sits, and the pages inside it (read_doc each by its id).
             const path = doc.path?.length ? `\nInside: ${doc.path.map((p) => `${quote(p.title, 60)} (${p.id})`).join(' › ')}` : '';
-            const pages = doc.pages?.length ? `\n\nPages inside (${doc.pages.length}): ${doc.pages.map((p) => `${quote(p.title, 60)} · id ${p.id}${p.pages ? ` · ${plural(p.pages, 'page')} inside` : ''}`).join('; ')}` : '';
+            const pages = doc.pages?.length
+                ? `\n\nPages inside (${doc.pages.length}; get_doc_tree shows the whole tree, move_doc moves one):\n${doc.pages.map((p) => `- ${quote(p.title, 60)} · id ${p.id}${p.pages ? ` · ${plural(p.pages, 'page')} inside` : ''}`).join('\n')}`
+                : '';
             return `${header}${path}\n\n${body}${pages}${doc.canEdit && doc.markdown.trim() ? `\n\n---\n${STUDY_NOTE_LINE}` : ''}`;
         }
     );
@@ -217,7 +223,9 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
             if (resolved?.created) lines.push(`Created subject ${quote(resolved.name, 60)} (id ${resolved.id}).`);
             const where = doc.subject ? ` in ${doc.subject.name}` : '';
             const onPath = topicId && doc.topicStatus ? `, the note of topic ${topicId} (now ${doc.topicStatus.replace('_', ' ')})` : '';
-            lines.push(`Created doc ${quote(doc.title, 100)}${parentId ? `, a page inside doc ${parentId}` : ''}${where}${onPath} · id ${doc.id}.`);
+            // DOC_PAGES_PLAN §6.2: a page is listed under its parent's pages; a link line points to it from the parent's text.
+            const parentName = doc.parent?.title ? quote(doc.parent.title, 80) : `doc ${parentId}`;
+            lines.push(parentId ? `Created page ${quote(doc.title, 100)} inside ${parentName}${where}${onPath} · id ${doc.id}. It is listed under that doc's pages; to point to it from that doc's text, write the line [${doc.title}](/docs/${doc.id}) where it belongs.` : `Created doc ${quote(doc.title, 100)}${where}${onPath} · id ${doc.id}.`);
             if (doc.nextRevision) lines.push(`Revision scheduled: first review ${doc.nextRevision} (cycles at 1, 3, 7 and 21 days).`);
             else if (doc.subject) lines.push('Not scheduled for revision (schedule_revision starts it).');
             lines.push(...canvasLines(doc.canvases));

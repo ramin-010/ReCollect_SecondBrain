@@ -13,7 +13,7 @@ afterEach(async () => {
     h = undefined;
 });
 
-const READS = ['get_brief', 'list_sessions', 'get_week', 'get_standing', 'list_tasks', 'list_decisions', 'get_today', 'get_learning_overview', 'search_docs', 'read_doc', 'preview_diagram', 'list_subjects', 'get_path', 'list_due', 'list_goals', 'recent_agent_edits', 'get_settings', 'list_suggestions', 'list_reminders', 'get_quiz_results', 'get_sharing', 'get_outline', 'recall_memory', 'get_work_log', 'list_notes', 'list_pocket_notes', 'read_note_file', 'find_tools', 'use_read_tool'];
+const READS = ['get_brief', 'list_sessions', 'get_week', 'get_standing', 'list_tasks', 'list_decisions', 'get_today', 'get_learning_overview', 'search_docs', 'read_doc', 'preview_diagram', 'list_subjects', 'get_path', 'list_due', 'list_goals', 'recent_agent_edits', 'get_settings', 'list_suggestions', 'list_reminders', 'get_quiz_results', 'get_sharing', 'get_outline', 'get_doc_tree', 'recall_memory', 'get_work_log', 'list_notes', 'list_pocket_notes', 'read_note_file', 'find_tools', 'use_read_tool'];
 /** What the code door can run (use_read_tool is the web's: a coding tool runs a read through use_tool). */
 const CODE_NAMES = TOOL_NAMES.filter((n) => n !== 'use_read_tool');
 

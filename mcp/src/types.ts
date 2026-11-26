@@ -11,6 +11,8 @@ export interface DocListItem {
     subject: string | null;
     updatedAt: string;
     snippet: string;
+    /** DOC_PAGES_PLAN: the titles of the docs above it, root first (an older server sends none). */
+    path?: string[];
 }
 
 export interface DocRead {
@@ -27,6 +29,27 @@ export interface DocRead {
     /** DOC_PAGES_PLAN: the docs above it (root first) and the pages inside it (older servers send neither). */
     path?: Array<{ id: string; title: string }>;
     pages?: Array<{ id: string; title: string; pages: number }>;
+    /** DOC_PAGES_PLAN D5: the lesson a page inside one is revised with (null: none, or it is a lesson itself). */
+    lesson?: { docId: string; title: string } | null;
+}
+
+/** GET /api/agent/docs/tree (DOC_PAGES_PLAN §3.4). */
+export interface DocTreeNode {
+    id: string;
+    parentId: string | null;
+    depth: number;
+    title: string;
+    pages: number;
+    chars: number;
+    updatedAt: string;
+    lesson: boolean;
+    markdown?: string;
+}
+
+export interface DocTree {
+    root: { id: string; title: string; path: Array<{ id: string; title: string }> } | null;
+    nodes: DocTreeNode[];
+    left: Array<{ id: string; title: string; chars: number }>;
 }
 
 /** What the API says about a canvas a write made (backend/src/services/docs/diagram/resolve.ts). */
@@ -56,6 +79,8 @@ export interface DocCreated {
     editId: string;
     /** One per canvas in the Markdown (absent when it had none). */
     canvases?: CanvasReport[];
+    /** DOC_PAGES_PLAN: the doc it was made inside (an older server sends none). */
+    parent?: { id: string; title: string | null };
 }
 
 /** PATCH /api/agent/docs/:id */
@@ -67,6 +92,8 @@ export interface DocUpdated {
     /** What changed, in words ("renamed it …", "filed it under …"); empty when nothing did. */
     changes: string[];
     editId: string | null;
+    /** DOC_PAGES_PLAN: after a move, the doc it is inside now (null: the top level). */
+    parent?: { id: string; title: string | null } | null;
 }
 
 export interface DocAppended {

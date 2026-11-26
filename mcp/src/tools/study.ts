@@ -43,6 +43,8 @@ interface NoteItem {
     files?: NoteFile[];
     lesson: Lesson | null;
     subject: string | null;
+    /** DOC_PAGES_PLAN D4: the page inside its lesson it was written on (an older server sends none). */
+    page?: { docId: string; title: string } | null;
 }
 
 interface NoteAdded {
@@ -51,12 +53,13 @@ interface NoteAdded {
     title: string;
     lesson: Lesson | null;
     subject: string;
+    page?: { docId: string; title: string } | null;
     already?: true;
     editId: string | null;
 }
 
 interface NotesList {
-    place: { lesson: Lesson | null; subject: string | null } | null;
+    place: { lesson: Lesson | null; page?: { docId: string; title: string } | null; subject: string | null } | null;
     notes: NoteItem[];
     more: number | null;
     message?: string;
@@ -77,8 +80,10 @@ const zNoteId = zId('note').describe('The note id (list_notes shows it).');
 const zTitle = z.string().trim().min(1, 'A note needs a title').max(NOTE_TITLE_MAX);
 const zUrl = z.string().trim().url('url must be a web address').max(2048);
 
-const where = (lesson: Lesson | null, subject: string | null | undefined): string =>
-    lesson?.docId ? `the lesson ${quote(lesson.title ?? 'its doc', 80)} (doc ${lesson.docId})` : `the subject ${subject ?? '?'}`;
+const where = (lesson: Lesson | null, subject: string | null | undefined, page?: { docId: string; title: string } | null): string =>
+    lesson?.docId
+        ? `the lesson ${quote(lesson.title ?? 'its doc', 80)} (doc ${lesson.docId})${page ? `, on its page ${quote(page.title, 60)} (doc ${page.docId})` : ''}`
+        : `the subject ${subject ?? '?'}`;
 
 export function registerStudyTools(server: McpServer, ctx: ToolContext): void {
     const { api } = ctx;
@@ -127,8 +132,8 @@ export function registerStudyTools(server: McpServer, ctx: ToolContext): void {
             if (!!docId === !!subject) throw new ToolError('Give docId (a lesson) or subject (its name), one of them.');
             if (!markdown?.trim() && !url) throw new ToolError('Send the note (markdown) or a link (url).');
             const note = await api.post<NoteAdded>('/api/agent/notes', { ...(docId ? { docId } : { subject }), title, ...(markdown ? { markdown } : {}), ...(url ? { url } : {}) });
-            if (note.already) return `Already saved on ${where(note.lesson, note.subject)}: ${quote(note.title, 80)} · id ${note.id}. Nothing added.`;
-            return withUndo(`Saved ${note.kind === 'link' ? 'the link' : 'the note'} ${quote(note.title, 80)} on ${where(note.lesson, note.subject)} · id ${note.id}. attach_file adds a file to it.`);
+            if (note.already) return `Already saved on ${where(note.lesson, note.subject, note.page)}: ${quote(note.title, 80)} · id ${note.id}. Nothing added.`;
+            return withUndo(`Saved ${note.kind === 'link' ? 'the link' : 'the note'} ${quote(note.title, 80)} on ${where(note.lesson, note.subject, note.page)} · id ${note.id}. attach_file adds a file to it.`);
         }
     );
 
@@ -158,11 +163,12 @@ export function registerStudyTools(server: McpServer, ctx: ToolContext): void {
             if (cursor) params.set('cursor', String(cursor));
             const [list, zone] = await Promise.all([api.get<NotesList>(`/api/agent/notes?${params.toString()}`), userTimeZone(api)]);
             if (!list.place && !ids?.length) return "That doc isn't on a subject's path yet, so it has no notes.";
-            const head = ids?.length ? `${plural(list.notes.length, 'note')} of the ${ids.length} asked for` : `${plural(list.notes.length, 'note')} on ${where(list.place?.lesson ?? null, list.place?.subject)}`;
+            const head = ids?.length ? `${plural(list.notes.length, 'note')} of the ${ids.length} asked for` : `${plural(list.notes.length, 'note')} on ${where(list.place?.lesson ?? null, list.place?.subject)}${list.place?.page ? `, the page ${quote(list.place.page.title, 60)}'s first` : ''}`;
             if (!list.notes.length) return `${head}.`;
             const blocks = list.notes.map((n) => {
                 const meta = [`id ${n.id}`, n.kind, dayOf(n.day, zone), n.by === 'the user' ? 'theirs' : `by ${n.by}`];
                 if (n.lesson && !docId) meta.push(`lesson ${quote(n.lesson.title ?? '', 60)}`);
+                if (n.page) meta.push(`on the page ${quote(n.page.title, 60)}`);
                 if (n.files?.length) meta.push(filesLine(n.files));
                 const body = [n.url ? `<${n.url}>` : '', n.text.trim()].filter(Boolean).join('\n');
                 return `### ${n.title}\n(${meta.join(' · ')})${body ? `\n${body}` : ''}`;

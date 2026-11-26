@@ -6,7 +6,9 @@ import { z } from 'zod';
 import { ApiError } from '../api.js';
 import { ToolError } from '../errors.js';
 import { KIND_WORDS, kindOfWord } from '../folders.js';
-import { plural, quietly, quote, withUndo } from '../format.js';
+import { dayOf, plural, quietly, quote, withUndo } from '../format.js';
+import { userTimeZone } from '../timezone.js';
+import type { DocTree, DocTreeNode, DocUpdated } from '../types.js';
 import { zDay, zDocId, zId } from '../schemas.js';
 import { ADDS, CHANGES, READ_ONLY, defineTool, type ToolContext } from '../tool.js';
 import { zKindWord } from './folders.js';
@@ -16,7 +18,13 @@ interface TrashState {
     title: string;
     trashedAt: string | null;
     editId: string | null;
+    /** DOC_PAGES_PLAN D8: how many pages went (or came back) with it; restored at the top level (its parent still in the trash). */
+    pages?: number;
+    detached?: boolean;
 }
+
+/** "1.2k characters" */
+const sizeOf = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k characters` : `${n} characters`);
 
 interface Suggestion {
     _id: string;
@@ -135,7 +143,8 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         },
         async ({ docId }) => {
             const s = await api.post<TrashState>(`/api/agent/docs/${docId}/trash`, {});
-            return s.editId ? withUndo(`Moved ${quote(s.title)} to the trash (30 days).`) : `${quote(s.title)} was already in the trash.`;
+            const pages = s.pages ? ` and the ${plural(s.pages, 'page')} inside it` : '';
+            return s.editId ? withUndo(`Moved ${quote(s.title)}${pages} to the trash (30 days).`) : `${quote(s.title)} was already in the trash.`;
         }
     );
 
@@ -151,7 +160,78 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         },
         async ({ docId }) => {
             const s = await api.post<TrashState>(`/api/agent/docs/${docId}/restore`, {});
-            return s.editId ? withUndo(`Restored ${quote(s.title)}.`) : `${quote(s.title)} was not in the trash.`;
+            const pages = s.pages ? ` and ${plural(s.pages, 'page')}` : '';
+            const top = s.detached ? ' It came back at the top level: the doc it was in is still in the trash.' : '';
+            return s.editId ? withUndo(`Restored ${quote(s.title)}${pages}.${top}`) : `${quote(s.title)} was not in the trash.`;
+        }
+    );
+
+    // DOC_PAGES_PLAN §6.2: docs inside docs, as a tree, and moving one (both take ids only: R1, R4).
+    defineTool(
+        server,
+        ctx,
+        'get_doc_tree',
+        {
+            title: "A doc's pages, as a tree",
+            description:
+                'The pages inside a doc (sub-pages, nested docs), as an indented tree: id · title · size · last update, lessons marked. Without docId: the top-level docs. ' +
+                "content: true adds every page's Markdown in tree order (up to 60,000 characters; the rest are named). Use it before reorganising, and to read a whole course in one call.",
+            input: {
+                docId: zDocId.optional().describe('The doc whose pages to show. Leave out for the top-level docs.'),
+                depth: z.number().int().min(1).max(64).optional().describe('How many levels down (default: all).'),
+                content: z.boolean().optional().describe("true: each page's Markdown too."),
+            },
+            annotations: READ_ONLY,
+        },
+        async ({ docId, depth, content }) => {
+            const [tree, zone] = await Promise.all([
+                api.get<DocTree>('/api/agent/docs/tree', { ...(docId ? { docId } : {}), ...(depth ? { depth } : {}), ...(content ? { content: 1 } : {}) }),
+                userTimeZone(api),
+            ]);
+            const row = (n: DocTreeNode) =>
+                `${'  '.repeat(n.depth)}- ${quote(n.title, 80)} · id ${n.id} · ${sizeOf(n.chars)} · updated ${dayOf(n.updatedAt, zone)}${n.pages ? ` · ${plural(n.pages, 'page')} inside` : ''}${n.lesson ? ' · lesson' : ''}`;
+            if (!tree.root) {
+                if (!tree.nodes.length) return 'No docs yet.';
+                return [`${plural(tree.nodes.length, 'top-level doc')}, most recently updated first (with a docId, the pages inside one):`, ...tree.nodes.map(row)].join('\n');
+            }
+            const where = tree.root.path.length ? `, inside ${tree.root.path.map((p) => `${quote(p.title, 60)} (${p.id})`).join(' › ')}` : '';
+            const lines = [`${quote(tree.root.title, 80)}${where}: ${plural(tree.nodes.length - 1, 'page')} inside${depth ? ` (${depth} level${depth === 1 ? '' : 's'} down)` : ''}.`, ...tree.nodes.map(row)];
+            if (content) {
+                for (const n of tree.nodes) if (n.markdown !== undefined) lines.push('', '---', `# ${n.title} (id ${n.id})`, '', n.markdown.trim() || '(empty)');
+                if (tree.left.length) {
+                    lines.push('', '---', `Not shown (one answer holds 60,000 characters): ${tree.left.map((l) => `${quote(l.title, 60)} (id ${l.id}, ${sizeOf(l.chars)})`).join(', ')}. read_doc each, or get_doc_tree on one of them.`);
+                }
+            }
+            return lines.join('\n');
+        }
+    );
+
+    defineTool(
+        server,
+        ctx,
+        'move_doc',
+        {
+            title: 'Move a doc inside another, or reorder it',
+            description:
+                'Put a doc inside another doc as its page (parentId), take it out to the top level (parentId: "top"), or change its place among its sibling pages (after: a sibling\'s id, or "start"). ' +
+                "Everything inside it moves with it. A lesson can't go inside another lesson. The user can undo it.",
+            input: {
+                docId: zDocId,
+                parentId: z.string().trim().min(1).max(64).optional().describe('The doc to put it inside, or "top" for the top level.'),
+                after: z.string().trim().min(1).max(64).optional().describe('A page of the same parent to go after, or "start" to go first.'),
+            },
+            annotations: CHANGES,
+        },
+        async ({ docId, parentId, after }) => {
+            if (parentId === undefined && after === undefined) throw new ToolError('Say where it goes: parentId (a doc id, or "top") and/or after (a sibling page\'s id, or "start").');
+            const moved = await api.patch<DocUpdated>(`/api/agent/docs/${docId}`, {
+                ...(parentId !== undefined ? { parentId: parentId === 'top' ? null : parentId } : {}),
+                ...(after !== undefined ? { after } : {}),
+            });
+            const change = moved.changes.find((c) => c.startsWith('moved it'));
+            if (!moved.editId || !change) return `${quote(moved.title)} is already there.`;
+            const into = moved.parent ? ' Everything inside it moved with it.' : '';
+            return withUndo(`Moved ${quote(moved.title)}${change.slice('moved it'.length)} · id ${moved.id}.${into}`);
         }
     );
 

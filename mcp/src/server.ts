@@ -230,6 +230,9 @@ export const TOOL_NAMES = [
     // KAAGA_TOOLS=all); the in-app manager always has it.
     'trash_doc',
     'restore_doc',
+    // DOC_PAGES_PLAN §6.2: a doc's pages as a tree, and moving a doc inside another.
+    'get_doc_tree',
+    'move_doc',
     'empty_trash',
     'complete_revision',
     'move_revision',
@@ -342,6 +345,8 @@ export const TOOL_LEVELS: Readonly<Record<ToolName, 1 | 2 | 3>> = {
     recent_agent_edits: 1,
     trash_doc: 2,
     restore_doc: 2,
+    get_doc_tree: 1,
+    move_doc: 2,
     empty_trash: 3,
     complete_revision: 2,
     move_revision: 2,
@@ -449,6 +454,8 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     list_decisions: 'manage',
     trash_doc: 'manage',
     restore_doc: 'manage',
+    get_doc_tree: 'manage',
+    move_doc: 'manage',
     empty_trash: 'manage',
     complete_revision: 'manage',
     move_revision: 'manage',

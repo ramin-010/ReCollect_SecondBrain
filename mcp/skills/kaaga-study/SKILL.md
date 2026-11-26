@@ -41,6 +41,8 @@ checkpoint { key, topicId, title: "Cache invalidation and stampedes",
 
 Ask once per part. Never ask them to restate something already saved. When their profile asks for help with their writing, point out at most three fixes on their answer, here in the chat, each with a one-line reason.
 
+A lesson may have pages inside it (`read_doc` lists them; `get_doc_tree` with `content: true` reads them all at once). The pages are revised with their lesson: no schedule or subject of their own. A note goes on the page being studied (`add_note` with that page's `docId`): it stays with the lesson and remembers its page.
+
 ## 3. Keeping what made it click
 
 Doubts are the best material. When an explanation clears one up, they may say:
