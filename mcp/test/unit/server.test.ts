@@ -185,7 +185,8 @@ describe('what the model is told (TOOL_ACCESS_PLAN §5)', () => {
         expect(WEB_INSTRUCTIONS.startsWith(WEB_RULES)).toBe(true);
         expect(WEB_RULES.length).toBeLessThanOrEqual(512);
         for (const part of ['(1) Start each chat with get_brief', 'remember', 'update_memory', '(3)', 'find_tools']) expect(WEB_RULES).toContain(part);
-        expect(WEB_INSTRUCTIONS.length).toBeLessThanOrEqual(2700);
+        // The aim was 2,600; stage 5's two measured misses (notes beside a lesson, editing a doc) added a line.
+        expect(WEB_INSTRUCTIONS.length).toBeLessThanOrEqual(2850);
     });
 
     it('every tool a playbook or an instruction names exists, and the web reaches it', () => {

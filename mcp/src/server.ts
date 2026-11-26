@@ -91,6 +91,9 @@ export const WEB_INSTRUCTIONS = [
     // Stage 14: their docs keep what helped them, on their yes (the owner: "so that I have the control over what goes into the doc").
     // Stage 15's live hour: claude.ai answered "my sliding window note" from general knowledge, never reading it (0/3).
     "When they say 'my note' or 'my doc', it is one of their docs here: find it (search_docs with its words) and read it (read_doc) before you explain, and answer from what it says. When explaining a part of it took real work, offer once to add it to that doc under its heading; add only on their yes. A quick answer needs no offer.",
+    // TOOL_ACCESS_PLAN stage 5's misses: notes kept beside a lesson were looked for in its text, and a doc to change
+    // beyond adding was read and left as it was.
+    'Notes, links and files kept beside a lesson are not its text: list_notes, add_note, attach_file. To change a doc beyond adding to it, find_tools("edit a doc") first.',
     'Leave the rest in the chat: the task at hand, questions, suggestions not yet tried, the details of the work, other people’s private things. An interest is not a task: add a task or a reminder only when they ask for one. Most messages need nothing.',
     'Before you rely on their routine, plans or preferences, look them up with recall_memory.',
     GLOSSARY,
