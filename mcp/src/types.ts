@@ -24,6 +24,9 @@ export interface DocRead {
     /** STUDY_FLOW_PLAN: it has a revision card; its lesson's notes and links (older servers send neither). */
     card?: boolean;
     notes?: number;
+    /** DOC_PAGES_PLAN: the docs above it (root first) and the pages inside it (older servers send neither). */
+    path?: Array<{ id: string; title: string }>;
+    pages?: Array<{ id: string; title: string; pages: number }>;
 }
 
 /** What the API says about a canvas a write made (backend/src/services/docs/diagram/resolve.ts). */

@@ -88,7 +88,7 @@ const WEB_DOC_WORDS = {
     search_docs: 'Find their docs by words (every word must match; best first), or the most recent without a query: id, subject, last update, a snippet. Search before creating a doc.',
     read_doc: 'Read one doc as Markdown, after a header with its id, title, subject and last update.',
     create_doc:
-        'Create a doc from Markdown (GitHub style, > [!TIP] callouts, <details> toggles, ```mermaid diagrams), optionally under a subject with spaced revision (revise: true). search_docs first: append_to_doc beats a duplicate. guide: true answers the full guide and creates nothing.',
+        'Create a doc from Markdown (callouts, <details> toggles, ```mermaid), optionally under a subject with spaced revision (revise: true). search_docs first: append_to_doc beats a duplicate. guide: true answers the full guide and creates nothing.',
     append_to_doc: 'Add Markdown to a doc: at its end, or with heading inside that section (after: a few words of the paragraph it follows). Their own text is never touched.',
 } as const;
 
@@ -159,7 +159,10 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
                 ...(doc.topicId && doc.notes ? [`${plural(doc.notes, 'note')} on this lesson`] : []),
             ].join(' · ');
             const body = doc.markdown.trim() ? doc.markdown : '(empty doc)';
-            return `${header}\n\n${body}${doc.canEdit && doc.markdown.trim() ? `\n\n---\n${STUDY_NOTE_LINE}` : ''}`;
+            // DOC_PAGES_PLAN §6: where it sits, and the pages inside it (read_doc each by its id).
+            const path = doc.path?.length ? `\nInside: ${doc.path.map((p) => `${quote(p.title, 60)} (${p.id})`).join(' › ')}` : '';
+            const pages = doc.pages?.length ? `\n\nPages inside (${doc.pages.length}): ${doc.pages.map((p) => `${quote(p.title, 60)} · id ${p.id}${p.pages ? ` · ${plural(p.pages, 'page')} inside` : ''}`).join('; ')}` : '';
+            return `${header}${path}\n\n${body}${pages}${doc.canEdit && doc.markdown.trim() ? `\n\n---\n${STUDY_NOTE_LINE}` : ''}`;
         }
     );
 
@@ -181,17 +184,18 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
             input: {
                 guide: z.boolean().optional().describe('true: answer the writing guide and create nothing (send nothing else).'),
                 title: z.string().trim().min(1, 'A doc needs a title').max(200).optional().describe('The doc title (shown above the body). Needed unless guide.'),
-                markdown: zMarkdown.optional().describe("The body in Markdown. Don't repeat the title as a heading at the top. Needed unless guide."),
+                markdown: zMarkdown.optional().describe('The body in Markdown, without the title. Needed unless guide.'),
                 subject: zSubjectName.optional().describe('Subject name to file it under, e.g. "DSA" (any case).'),
                 topicId: zId('topic')
                     .optional()
                     .describe("A planned topic's id (get_path): the doc becomes its lesson (with revise the topic is done, else in progress)."),
                 revise: z.boolean().optional().describe('Schedule spaced revision (1, 3, 7, 21 days). Needs subject or topicId.'),
-                create_subject_if_missing: z.boolean().optional().describe('Create the subject if no subject has that name.'),
+                create_subject_if_missing: z.boolean().optional().describe('Create the subject if it is missing.'),
+                parentId: zDocId.optional().describe('Put it inside this doc, as a page.'),
             },
             annotations: ADDS,
         },
-        async ({ guide, title, markdown, subject, topicId, revise, create_subject_if_missing }) => {
+        async ({ guide, title, markdown, subject, topicId, revise, create_subject_if_missing, parentId }) => {
             // The full guide on request (MCP_MEMORY_PLAN §4.10): a host with tools only (no prompts) can still read it.
             if (guide) return `${MARKDOWN_GUIDE}\n\nThe whole note recipe, with worked examples, is the note_recipe prompt where the app shows prompts.`;
             if (!title || !markdown) throw new ToolError('Send title and markdown (or only guide: true for the writing guide).');
@@ -206,13 +210,14 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
                     ...(resolved ? { subjectId: resolved.id } : {}),
                     ...(topicId ? { topicId } : {}),
                     ...(revise ? { revise: true } : {}),
+                    ...(parentId ? { parentId } : {}),
                 })
             );
             const lines: string[] = [];
             if (resolved?.created) lines.push(`Created subject ${quote(resolved.name, 60)} (id ${resolved.id}).`);
             const where = doc.subject ? ` in ${doc.subject.name}` : '';
             const onPath = topicId && doc.topicStatus ? `, the note of topic ${topicId} (now ${doc.topicStatus.replace('_', ' ')})` : '';
-            lines.push(`Created doc ${quote(doc.title, 100)}${where}${onPath} · id ${doc.id}.`);
+            lines.push(`Created doc ${quote(doc.title, 100)}${parentId ? `, a page inside doc ${parentId}` : ''}${where}${onPath} · id ${doc.id}.`);
             if (doc.nextRevision) lines.push(`Revision scheduled: first review ${doc.nextRevision} (cycles at 1, 3, 7 and 21 days).`);
             else if (doc.subject) lines.push('Not scheduled for revision (schedule_revision starts it).');
             lines.push(...canvasLines(doc.canvases));

@@ -320,7 +320,7 @@ export const CARDS: Readonly<Record<ToolName, ToolCard>> = {
     create_doc: {
         use: '"write a doc on caching", "make notes from this".',
         not: 'adding to a doc they have (append_to_doc).',
-        params: { guide: 'true alone answers the full Markdown and diagram guide and creates nothing', revise: 'schedules reviews; needs subject or topicId' },
+        params: { guide: 'true alone answers the full Markdown and diagram guide and creates nothing', revise: 'schedules reviews; needs subject or topicId', parentId: 'a doc of theirs to put it inside, as a page (to any depth)' },
         returns: 'the new doc’s id.',
         example: { title: 'Kafka basics', markdown: '## Summary\n\nKafka is a distributed, append-only log.', subject: 'System Design' },
         keywords: ['new doc', 'write', 'new note', 'notes', 'lesson', 'create note', 'document', 'write up'],
