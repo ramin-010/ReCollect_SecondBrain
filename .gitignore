@@ -28,6 +28,9 @@
 /context/specs/EASY_SETUP_PLAN.md
 /context/specs/STUDY_FLOW_PLAN.md
 /context/specs/KAAGA_REBRAND_PLAN.md
+/context/specs/DOC_PAGES_PLAN.md
+/context/specs/TOOL_ACCESS_PLAN.md
+/context/specs/OVERNIGHT_RUN.md
 
 # The Android app's build tools, outputs and signing key
 /android/.toolchain/
