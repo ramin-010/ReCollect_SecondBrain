@@ -569,7 +569,7 @@ export const RUNNERS = ['find_tools', 'use_read_tool', 'use_tool'] as const;
 /**
  * TOOL_ACCESS_PLAN §2: what each door lists and what a call may run there. One catalogue: every door can run every tool
  * its policy allows, listed or not (a host that sends an unlisted name loses nothing); it lists a short set.
- *   web       its everyday set + the three runners; reaches every tool but set_folder (no folder on the web)
+ *   web       its everyday set + the three runners; reaches every tool but set_folder and set_chat (no folder on the web)
  *   code      the default groups + find_tools and use_tool (find_tools adds what it finds); reaches every tool
  *   office    its 9 (the work-folder privacy line: nothing else is reachable)
  *   excluded  nothing
@@ -577,7 +577,10 @@ export const RUNNERS = ['find_tools', 'use_read_tool', 'use_tool'] as const;
  */
 export function doorPolicy(set: ToolSet, opts: { groups?: readonly ToolGroup[]; listed?: readonly string[] } = {}): DoorPolicy {
     const all = TOOL_NAMES as readonly string[];
-    if (set === 'web') return { listed: new Set([...(opts.listed ?? WEB_TOOLS), ...RUNNERS]), reachable: new Set(all.filter((n) => n !== 'set_folder')) };
+    // TOOL_ACCESS_PLAN §12.2 (B2): the folder tools need a folder and a process of the chat's own; the web door has
+    // neither (set_chat would read the backend machine's hook sessions, and a stateless door keeps nothing for the next
+    // checkpoint). A web chat says what it is with checkpoint's kind.
+    if (set === 'web') return { listed: new Set([...(opts.listed ?? WEB_TOOLS), ...RUNNERS]), reachable: new Set(all.filter((n) => n !== 'set_folder' && n !== 'set_chat')) };
     if (set === 'code') {
         const groups = opts.groups ?? DEFAULT_GROUPS;
         const reachable = all.filter((n) => n !== 'use_read_tool');

@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { PATH_ON_WEB } from '../../src/tools/files.js';
+import { PATH_NOT_HERE } from '../../src/tools/files.js';
 import { UNDO, connect, ok, type Harness } from './harness.js';
 
 let h: Harness | undefined;
@@ -37,8 +37,21 @@ describe('attach_file', () => {
         expect((await h.call('attach_file', { noteId: 'n1', name: 'a.md' })).text).toBe('Send exactly one of path, text or base64.');
         await h.close();
         h = await connect({}, { set: 'web' });
-        expect((await h.call('attach_file', { noteId: 'n1', path: clip })).text).toBe(PATH_ON_WEB);
+        expect((await h.call('attach_file', { noteId: 'n1', path: clip })).text).toBe(PATH_NOT_HERE);
         expect(h.requests).toHaveLength(0);
+    });
+
+    it('Ask Kaaga (inside the backend) never reads a path: the server’s own files stay out (§12.2 B1)', async () => {
+        const dir = mkdtempSync(path.join(tmpdir(), 'kaaga-files-'));
+        const secret = path.join(dir, '.env');
+        writeFileSync(secret, 'SECRET=1');
+        for (const set of ['all', 'web'] as const) {
+            h = await connect({ 'POST /api/agent/notes/n1/files': answer([['.env', 8]]) }, { set });
+            expect((await h.call('attach_file', { noteId: 'n1', path: secret })).text).toBe(PATH_NOT_HERE);
+            expect(h.requests).toHaveLength(0);
+            await h.close();
+            h = undefined;
+        }
     });
 
     it('text and base64 go as JSON with the name', async () => {

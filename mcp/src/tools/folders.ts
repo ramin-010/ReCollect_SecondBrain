@@ -145,7 +145,8 @@ export function registerFolderTools(server: McpServer, ctx: ToolContext): void {
             const moved = by === 'user' ? ctx.switchSet?.(kind === 'work' ? 'office' : 'code') === true : false;
             const after = moved ? (kind === 'work' ? ' This chat now has a work folder’s tools only.' : ' Their full Kaaga tools are on now: call get_brief for where they stand.') : '';
             // Claude Code with Kaaga's hooks: the hook splits the chat's time where it changed.
-            const open = openSessionFor(key, ctx.folder?.key);
+            // Only a process on the user's own computer reads the hooks' sessions (never the backend's machine).
+            const open = ctx.set === 'code' || ctx.set === 'office' ? openSessionFor(key, ctx.folder?.key) : null;
             if (open) {
                 const at = fromStart ? open.startedAt : new Date().toISOString();
                 const { added } = addPart(path.join(hooksHome(), 'open'), open.sessionId, { at, kind, by: who });

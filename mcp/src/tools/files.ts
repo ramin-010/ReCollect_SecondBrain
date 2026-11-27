@@ -16,7 +16,13 @@ export const FILE_MAX_BYTES = 10 * 1024 * 1024;
 export const FILE_TEXT_MAX = 1_000_000;
 export const FILE_BASE64_MAX = Math.ceil((1024 * 1024 * 4) / 3) + 64;
 const VIDEO = /\.(mp4|mov|mkv|webm|avi|wmv|m4v|flv|mpg|mpeg|3gp)$/i;
-export const PATH_ON_WEB = 'A path only works in a coding tool on their computer. Send the file’s text, or ask them to add the file in Kaaga.';
+export const PATH_NOT_HERE = 'A path only works in a coding tool on their computer. Send the file’s text, or ask them to add the file in Kaaga.';
+
+/**
+ * TOOL_ACCESS_PLAN §12.2 (B1): a path is read only where this process runs on the user's own computer (a coding tool).
+ * The web door and Ask Kaaga run inside the backend: a path there would read the server's own disk.
+ */
+export const readsLocalFiles = (set: string | undefined): boolean => set === 'code' || set === 'office';
 
 export interface NoteFile {
     n: number;
@@ -64,7 +70,7 @@ export function registerFileTools(server: McpServer, ctx: ToolContext): void {
             type Answer = { file: NoteFile; files: NoteFile[] };
             let r: Answer;
             if (file !== undefined) {
-                if (ctx.set === 'web') throw new ToolError(PATH_ON_WEB);
+                if (!readsLocalFiles(ctx.set)) throw new ToolError(PATH_NOT_HERE);
                 const full = path.resolve(file);
                 let size: number;
                 try {

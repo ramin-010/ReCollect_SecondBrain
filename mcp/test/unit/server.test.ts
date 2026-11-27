@@ -129,8 +129,13 @@ describe('a tool set per door (MCP_MEMORY_PLAN §4.1)', () => {
         expect((await h.call('list_suggestions', {})).isError).toBe(false);
         expect((await h.call('use_read_tool', { name: 'list_suggestions', args: {} })).isError).toBe(false);
         const folder = await h.call('set_folder', { kind: 'build' });
-        expect(folder).toEqual({ text: 'No tool named "set_folder" here. Closest: set_chat, set_reminder, set_revision_card. find_tools("<the job>") shows what exists.', isError: true });
+        expect(folder).toEqual({ text: 'No tool named "set_folder" here. Closest: set_reminder, set_revision_card. find_tools("<the job>") shows what exists.', isError: true });
         expect(folder.text).not.toMatch(/disabled/);
+        // §12.2 (B2): set_chat reads the hooks of the machine it runs on; on the web that is the backend's.
+        const chat = await h.call('use_tool', { name: 'set_chat', args: { kind: 'study', by: 'user' } });
+        expect(chat.isError).toBe(true);
+        expect(chat.text).toMatch(/^No tool named "set_chat" here\./);
+        expect((await h.call('find_tools', { query: 'this chat is study' })).text).not.toMatch(/set_chat ·/);
     });
 
     it('code (Claude Code): the default groups with saving, finding and correcting; the rest through find_tools', async () => {
