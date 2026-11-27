@@ -53,7 +53,7 @@ export function versionOf(listed: ReadonlySet<string>): string {
 
 /** TOOL_ACCESS_PLAN §5.1: where things go, one line each (the web and code instructions share it). */
 export const WHERE_THINGS_GO =
-    'Where things go: their own life → remember (news on it: update_memory; wrong: forget); a to-do → add_task; a nudge at a time → set_reminder; a thought or link with no home → add_pocket_note; something beside a lesson → add_note; the lesson’s own text → append_to_doc; a work result → log_work; a study part with you → checkpoint. One thing goes to one place: after the right tool, don’t also remember it.';
+    'Where things go: their own life → remember (news on it: update_memory; wrong: forget); a to-do → add_task; a nudge at a time → set_reminder; a thought or link with no home → add_pocket_note; something beside a lesson → add_note; the lesson’s own text → append_to_doc; a work result → log_work; a decision to look at again → log_decision; a study part with you → checkpoint. One thing goes to one place: after the right tool, don’t also remember it.';
 
 /**
  * TOOL_ACCESS_PLAN §12.3: a chat can change and take back what is in Kaaga (his 11-27 chats: a model sent him to Home

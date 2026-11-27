@@ -254,8 +254,8 @@ export const CARDS: Readonly<Record<ToolName, ToolCard>> = {
     checkpoint: {
         use: 'after each part of a study, practice or build session with you, not only at the end.',
         not: 'their own life (remember); a work result (log_work).',
-        params: { key: 'the session key get_brief gave', topicId: 'the path topic (get_brief, get_path)', weakSpots: 'what they got wrong or found shaky', cleared: 'old weak spots they now get right', nextStep: 'what to do next, one line' },
-        returns: 'the session saved with its minutes; the same key updates it. A chat that runs past midnight counts each day on its own (the answer says so); list_sessions shows every day.',
+        params: { key: 'the session key get_brief gave', topicId: 'the path topic (get_brief, get_path)', weakSpots: 'what they got wrong or found shaky', cleared: 'old weak spots they now get right', nextStep: 'where they pick up next time, one line (their home screen shows it); send it again when it changes, "" when nothing is left' },
+        returns: 'the session saved with its minutes; the same key updates it; when an earlier session’s next step still stands, it says so. A chat that runs past midnight counts each day on its own (the answer says so); list_sessions shows every day.',
         example: { key: 's_0abc123de45', title: 'Cache invalidation', topicId: 'top_cache', score: { done: 3, total: 4 }, weakSpots: ['write-behind vs write-through'], topicStatus: 'in_progress', nextStep: 'Do the consistent-hashing exercise' },
         keywords: ['session', 'save session', 'save progress', 'record session', 'log session', 'score', 'quiz score', 'weak spots', 'studied', 'practice', 'practice problem', 'study session'],
     },

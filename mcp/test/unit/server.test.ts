@@ -191,10 +191,9 @@ describe('what the model is told (TOOL_ACCESS_PLAN §5)', () => {
         expect(WEB_INSTRUCTIONS.startsWith(WEB_RULES)).toBe(true);
         expect(WEB_RULES.length).toBeLessThanOrEqual(512);
         for (const part of ['(1) Start each chat with get_brief', 'remember', 'update_memory', '(3)', 'find_tools']) expect(WEB_RULES).toContain(part);
-        // The aim was 2,600; stage 5's two measured misses (notes beside a lesson, editing a doc) added a line.
-        // 11-27: TOOL_ACCESS_PLAN §12's two lines make it 3,091. Trimming, or a new limit, is Fable's to decide (his word):
-        // this stays red until then.
-        expect(WEB_INSTRUCTIONS.length).toBeLessThanOrEqual(2850);
+        // A guard against creep, not a host limit (only the first 512 are): 2,600 was the aim, 2,850 after stage 5,
+        // 3,200 after §12 (TOOL_ACCESS_PLAN §12.10). The next sentence replaces one.
+        expect(WEB_INSTRUCTIONS.length).toBeLessThanOrEqual(3200);
     });
 
     it('every tool a playbook or an instruction names exists, and the web reaches it', () => {

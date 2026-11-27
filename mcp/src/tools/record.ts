@@ -94,6 +94,8 @@ interface SessionWrite {
     learned?: { saved: number; seen: number; skipped: number; paused: boolean } | null;
     /** TOOL_ACCESS_PLAN §12.5: the chat went on into a new day; that day's part is its own row (older servers: absent). */
     dayPart?: { day: string; began: string; beganMinutes: number | null } | null;
+    /** TOOL_ACCESS_PLAN §13.1: the topic's next step an earlier session set, when this write sent none (older servers: absent). */
+    staleStep?: string | null;
 }
 
 interface SessionList {
@@ -277,7 +279,7 @@ ${MORE_TOOLS_LINE}`;
                 weakSpots: z.array(z.string().trim().min(1).max(160)).max(10).optional().describe('What they got wrong or found shaky.'),
                 cleared: z.array(z.string().trim().min(1).max(160)).max(20).optional().describe('Weak spots they now get right.'),
                 topicStatus: z.enum(['planned', 'in_progress', 'done', 'skipped']).optional(),
-                nextStep: z.string().trim().max(300).optional().describe('What to do next on the topic (or the project).'),
+                nextStep: z.string().trim().max(300).optional().describe('Where to pick up next time; "" when done.'),
             },
             annotations: CHANGES,
         },
@@ -304,6 +306,8 @@ ${MORE_TOOLS_LINE}`;
             ];
             if (w.topic) lines.push(`Topic: ${w.topic.position}. ${w.topic.title} · ${w.topic.status.replace('_', ' ')}${w.topic.nextStep ? ` · next step: ${w.topic.nextStep}` : ''}`);
             if (w.weakSpots.length) lines.push(`Open weak spots: ${w.weakSpots.map((x) => x.text).join('; ')}`);
+            // §13.1: an earlier session's step outlives this one unless it is replaced or cleared (their home screen shows it).
+            if (w.staleStep) lines.push(`Its next step still says ${quote(w.staleStep, 120)}: send the new nextStep, or "" when that is done.`);
             // §12.5: a chat that runs into a new day says so, so "was yesterday logged?" has an answer.
             if (w.dayPart) lines.push(`Today (${shortDay(w.dayPart.day)}) counts on its own; this chat began ${shortDay(w.dayPart.began)}, which keeps its ${w.dayPart.beganMinutes ? mins(w.dayPart.beganMinutes) : 'time'}. list_sessions shows each day.`);
             const text = lines.join('\n');
