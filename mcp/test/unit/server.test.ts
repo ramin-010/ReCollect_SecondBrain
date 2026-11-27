@@ -27,10 +27,11 @@ describe('the server', () => {
             expect(tool.description!.length, tool.name).toBeGreaterThan(40);
             expect(tool.inputSchema.type).toBe('object');
         }
-        // Nothing deletes docs or goals; a focus line or a milestone can be removed (undoable), a doc's blocks
+        // Nothing deletes docs or goals for good; a focus line or a milestone can be removed (undoable), a doc's blocks
         // (delete_blocks), a note on a lesson or a subject (remove_note), a pocket note while they allow it, and a subject
-        // (empty at once with Undo, else only on their tap): TOOL_ACCESS_PLAN §4.7.
-        expect(tools.filter((t) => /delete|remove/i.test(t.name)).map((t) => t.name)).toEqual(['remove_milestone', 'remove_focus', 'delete_blocks', 'remove_note', 'delete_pocket_note', 'delete_subject', 'remove_file']);
+        // (empty at once with Undo, else only on their tap): TOOL_ACCESS_PLAN §4.7. §12: a task, and a topic (planned and
+        // empty at once with Undo, else only on their tap).
+        expect(tools.filter((t) => /delete|remove/i.test(t.name)).map((t) => t.name)).toEqual(['delete_task', 'remove_topic', 'remove_milestone', 'remove_focus', 'delete_blocks', 'remove_note', 'delete_pocket_note', 'delete_subject', 'remove_file']);
     });
 
     it('marks reads read-only and writes not; every tool has a level (1 = reads), level 3 only asks', async () => {
@@ -191,6 +192,8 @@ describe('what the model is told (TOOL_ACCESS_PLAN §5)', () => {
         expect(WEB_RULES.length).toBeLessThanOrEqual(512);
         for (const part of ['(1) Start each chat with get_brief', 'remember', 'update_memory', '(3)', 'find_tools']) expect(WEB_RULES).toContain(part);
         // The aim was 2,600; stage 5's two measured misses (notes beside a lesson, editing a doc) added a line.
+        // 11-27: TOOL_ACCESS_PLAN §12's two lines make it 3,091. Trimming, or a new limit, is Fable's to decide (his word):
+        // this stays red until then.
         expect(WEB_INSTRUCTIONS.length).toBeLessThanOrEqual(2850);
     });
 

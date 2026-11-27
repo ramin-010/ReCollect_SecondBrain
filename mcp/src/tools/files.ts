@@ -90,7 +90,7 @@ export function registerFileTools(server: McpServer, ctx: ToolContext): void {
                 if (!name) throw new ToolError('Give the file a name with its extension (e.g. "plan.md").');
                 r = await api.post<Answer>(`/api/agent/notes/${encodeURIComponent(noteId)}/files`, text !== undefined ? { name, text } : { name, base64 });
             }
-            return withUndo(`Attached ${quote(r.file.name)} (${sizeWords(r.file.size)}) to note ${noteId}. Its ${filesLine(r.files)}.`);
+            return withUndo(`Attached ${quote(r.file.name)} (${sizeWords(r.file.size)}) to note ${noteId}. Its ${filesLine(r.files)}.`, r);
         }
     );
 
@@ -107,7 +107,7 @@ export function registerFileTools(server: McpServer, ctx: ToolContext): void {
         async ({ noteId, name, n }) => {
             if ((name === undefined) === (n === undefined)) throw new ToolError('Name the file: name or n, one of them.');
             const r = await api.post<{ removed: string; files: NoteFile[] }>(`/api/agent/notes/${encodeURIComponent(noteId)}/files/remove`, name !== undefined ? { name } : { n });
-            return withUndo(`Took ${quote(r.removed)} off note ${noteId}. ${r.files.length ? `Its ${filesLine(r.files)}.` : 'It has no files now.'}`);
+            return withUndo(`Took ${quote(r.removed)} off note ${noteId}. ${r.files.length ? `Its ${filesLine(r.files)}.` : 'It has no files now.'}`, r);
         }
     );
 

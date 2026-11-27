@@ -91,7 +91,7 @@ export function registerPathTools(server: McpServer, ctx: ToolContext): void {
         async ({ subject, titles, after }) => {
             const s = await resolveSubject(api, subject);
             const result = await api.post<{ created: string[]; path: Path }>(`/api/subjects/${s.id}/path`, { titles, ...(after !== undefined ? { after } : {}) });
-            return withUndo(`Planned ${plural(result.created.length, 'topic')} in ${quote(s.name, 60)}.\n${pathText(result.path)}`);
+            return withUndo(`Planned ${plural(result.created.length, 'topic')} in ${quote(s.name, 60)}.\n${pathText(result.path)}`, result);
         }
     );
 
@@ -121,11 +121,31 @@ export function registerPathTools(server: McpServer, ctx: ToolContext): void {
                 ...(after !== undefined ? { after } : {}),
                 ...(title !== undefined ? { title } : {}),
             };
-            const { topic, path } = await orNotFound(
+            const { topic, path, ...answer } = await orNotFound(
                 api.patch<{ topic: PathTopic; path: Path }>(`/api/topics/${topicId}/path`, body),
                 `No topic with id ${topicId} (get_path shows them).`
             );
-            return withUndo(`${topicLine(topic)}\n${pathText(path)}`);
+            return withUndo(`${topicLine(topic)}\n${pathText(path)}`, answer);
+        }
+    );
+
+    // TOOL_ACCESS_PLAN §12.4: a topic off its path. A planned one holding nothing goes at once (Undo); one with a doc,
+    // reviews, notes or sessions only asks: their tap on Home.
+    defineTool(
+        server,
+        ctx,
+        'remove_topic',
+        {
+            title: 'Take a topic off its path',
+            description:
+                'Take a topic off its subject’s path (get_path shows ids). A planned topic holding nothing goes at once (Undo on Home); one with a lesson doc, reviews, notes or sessions only asks: they tap "Do it" on Home (its doc stays). To keep its place but not study it: update_topic status skipped.',
+            input: { topicId: zId('topic'), reason: z.string().trim().max(200).optional().describe('Shown on their card when it asks.') },
+            annotations: CHANGES,
+        },
+        async ({ topicId, reason }) => {
+            const r = await api.post<{ id: string; title: string; removed: boolean; asked: boolean; text?: string; editId?: string }>(`/api/agent/topics/${encodeURIComponent(topicId)}/remove`, reason ? { reason } : {});
+            if (r.asked) return `Asked: ${r.text}. Nothing changes until they tap "Do it" on Home (Suggested).`;
+            return withUndo(`Took ${quote(r.title, 80)} off its path · id ${r.id}.`, r);
         }
     );
 }

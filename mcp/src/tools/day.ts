@@ -29,7 +29,7 @@ export function registerDayTools(server: McpServer, ctx: ToolContext, newId: () 
         },
         async ({ text }) => {
             const item = await api.post<FocusItem>('/api/focus', { text });
-            return withUndo(`Added focus ${quote(item.text, FOCUS_TEXT_MAX)} for ${item.day} · id ${item._id}.`);
+            return withUndo(`Added focus ${quote(item.text, FOCUS_TEXT_MAX)} for ${item.day} · id ${item._id}.`, item);
         }
     );
 
@@ -54,7 +54,7 @@ export function registerDayTools(server: McpServer, ctx: ToolContext, newId: () 
                 api.patch<FocusItem>(`/api/focus/${focusId}`, { ...(text !== undefined ? { text } : {}), ...(done !== undefined ? { done } : {}) }),
                 `No focus line with id ${focusId} (get_today shows them).`
             );
-            return withUndo(`Focus ${quote(item.text, FOCUS_TEXT_MAX)} is now ${item.done ? 'done' : 'open'} · id ${item._id}.`);
+            return withUndo(`Focus ${quote(item.text, FOCUS_TEXT_MAX)} is now ${item.done ? 'done' : 'open'} · id ${item._id}.`, item);
         }
     );
 
@@ -70,8 +70,8 @@ export function registerDayTools(server: McpServer, ctx: ToolContext, newId: () 
             annotations: CHANGES,
         },
         async ({ focusId }) => {
-            await orNotFound(api.delete(`/api/focus/${focusId}`), `No focus line with id ${focusId} (get_today shows them).`);
-            return withUndo(`Removed focus line ${focusId}.`);
+            const gone = await orNotFound(api.delete(`/api/focus/${focusId}`), `No focus line with id ${focusId} (get_today shows them).`);
+            return withUndo(`Removed focus line ${focusId}.`, gone);
         }
     );
 
@@ -93,7 +93,7 @@ export function registerDayTools(server: McpServer, ctx: ToolContext, newId: () 
             // A new id per note: the API creates a note under the id we pick (PUT), and our own
             // retry reuses this URL and its Idempotency-Key, so it can never add the note twice.
             const note = await api.put<QuickNote>(`/api/quick-notes/${newId()}`, { content: text, category: 'PRIMARY', ...(pinned ? { isPinned: true } : {}) });
-            return quietly(ctx.workMode, withUndo(`Added a pocket note${note.isPinned || pinned ? ' (pinned)' : ''}.`));
+            return quietly(ctx.workMode, withUndo(`Added a pocket note${note.isPinned || pinned ? ' (pinned)' : ''}.`, note));
         }
     );
 }

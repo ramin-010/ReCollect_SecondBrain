@@ -107,7 +107,7 @@ export function registerBlockTools(server: McpServer, ctx: ToolContext): void {
         async ({ docId, markdown, where }) => {
             const r = await api.post<Inserted>(`/api/agent/docs/${docId}/blocks`, { markdown, where });
             const problems = (r.canvases ?? []).flatMap((c) => c.problems ?? []);
-            return withUndo([`Inserted ${plural(r.inserted, 'block')} in doc ${r.id}: ${r.ids.join(', ')}.`, ...problems.map((p) => `Canvas: ${p}`)].join('\n'));
+            return withUndo([`Inserted ${plural(r.inserted, 'block')} in doc ${r.id}: ${r.ids.join(', ')}.`, ...problems.map((p) => `Canvas: ${p}`)].join('\n'), r);
         }
     );
 
@@ -130,7 +130,7 @@ export function registerBlockTools(server: McpServer, ctx: ToolContext): void {
         },
         async ({ docId, blockId, markdown, props }) => {
             const r = await api.patch<{ id: string; block: { id: string; type: string; markdown: string } | null }>(`/api/agent/docs/${docId}/blocks/${encodeURIComponent(blockId)}`, { markdown, props });
-            return withUndo(`Changed block ${blockId} in doc ${r.id}${r.block ? `: ${r.block.markdown.split('\n')[0]?.slice(0, 120)}` : ''}.`);
+            return withUndo(`Changed block ${blockId} in doc ${r.id}${r.block ? `: ${r.block.markdown.split('\n')[0]?.slice(0, 120)}` : ''}.`, r);
         }
     );
 
@@ -146,7 +146,7 @@ export function registerBlockTools(server: McpServer, ctx: ToolContext): void {
         },
         async ({ docId, ids, where }) => {
             const r = await api.post<{ id: string; moved: number }>(`/api/agent/docs/${docId}/blocks/move`, { ids, where });
-            return withUndo(`Moved ${plural(r.moved, 'block')} in doc ${r.id}.`);
+            return withUndo(`Moved ${plural(r.moved, 'block')} in doc ${r.id}.`, r);
         }
     );
 
@@ -162,7 +162,7 @@ export function registerBlockTools(server: McpServer, ctx: ToolContext): void {
         },
         async ({ docId, ids }) => {
             const r = await api.post<{ id: string; deleted: number }>(`/api/agent/docs/${docId}/blocks/delete`, { ids });
-            return withUndo(`Deleted ${plural(r.deleted, 'block')} from doc ${r.id}.`);
+            return withUndo(`Deleted ${plural(r.deleted, 'block')} from doc ${r.id}.`, r);
         }
     );
 
@@ -189,7 +189,7 @@ export function registerBlockTools(server: McpServer, ctx: ToolContext): void {
         async ({ docId, part, action, markdown }) => {
             if ((action === 'replace' || action === 'insert_before' || action === 'insert_after') && !markdown?.trim()) throw new ToolError(`${action} needs markdown: the new blocks.`);
             const r = await api.post<{ id: string; title: string; done: string; ids?: string[] }>(`/api/agent/docs/${docId}/part`, { part, action, ...(markdown ? { markdown } : {}) });
-            return withUndo(`${r.done} in ${quote(r.title)} (doc ${r.id})${r.ids?.length ? `; new blocks ${r.ids.join(', ')}` : ''}.`);
+            return withUndo(`${r.done} in ${quote(r.title)} (doc ${r.id})${r.ids?.length ? `; new blocks ${r.ids.join(', ')}` : ''}.`, r);
         }
     );
 }

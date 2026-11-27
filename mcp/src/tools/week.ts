@@ -97,7 +97,7 @@ export function registerWeekTools(server: McpServer, ctx: ToolContext): void {
                 if (!projectId) throw new ToolError(`No project ${quote(project)}: projects come from logged sessions (${list.map((p) => p.key).join(', ') || 'none yet'}).`);
             }
             const t = await api.post<WeekTarget & { weekStart: string }>('/api/week/targets', { text, weekStart: week, topicId, milestoneId, todoId: taskId, measure, amount, subjectId, projectId });
-            return withUndo(`Added to the week of ${shortDay(t.weekStart)}: ${targetLine(t)}`);
+            return withUndo(`Added to the week of ${shortDay(t.weekStart)}: ${targetLine(t)}`, t);
         }
     );
 
@@ -118,7 +118,7 @@ export function registerWeekTools(server: McpServer, ctx: ToolContext): void {
         async ({ targetId, text, status }) => {
             if (text === undefined && status === undefined) throw new ToolError('Send text or status.');
             const t = await api.patch<WeekTarget>(`/api/week/targets/${targetId}`, { text, status });
-            return withUndo(`${t.status === 'dropped' ? 'Dropped' : 'Changed'}: ${targetLine(t)}`);
+            return withUndo(`${t.status === 'dropped' ? 'Dropped' : 'Changed'}: ${targetLine(t)}`, t);
         }
     );
 

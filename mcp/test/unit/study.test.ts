@@ -2,7 +2,7 @@
 // manage group, send what the API takes, and answer in short text with the ids the next call needs.
 import { afterEach, describe, expect, it } from 'vitest';
 import { TOOL_GROUPS } from '../../src/server.js';
-import { UNDO, connect, fail, lastLine, ok, type Harness } from './harness.js';
+import { UNDO, UNDO_OF, connect, fail, lastLine, ok, type Harness } from './harness.js';
 
 let h: Harness | null = null;
 afterEach(async () => {
@@ -34,7 +34,7 @@ describe('the study tools', () => {
         expect(first.isError).toBe(false);
         expect(first.text).toContain('Wrote the revision card (4 blocks) under "Revision card" at the end of doc doc1. Each review opens it first.');
         expect(first.text).toContain('Canvas cv_1: 5 boxes, 4 arrows');
-        expect(lastLine(first.text)).toBe(UNDO);
+        expect(lastLine(first.text)).toBe(UNDO_OF('e1'));
         expect(h.requests[0]).toMatchObject({ method: 'PUT', path: '/api/agent/docs/doc1/card', body: { markdown: '- point\n\n```canvas\nflowchart\n  a --> b\n```' } });
         expect((await h.call('set_revision_card', { docId: 'doc1', markdown: '- one' })).text).toContain('Replaced the revision card (1 block) under "Review card"');
     });
@@ -51,10 +51,10 @@ describe('the study tools', () => {
             ALL
         );
         const note = await h.call('add_note', { docId: 'doc1', title: 'Why DNS uses UDP', markdown: 'No handshake for one small question.' });
-        expect(note.text).toBe(`Saved the note "Why DNS uses UDP" on the lesson "How DNS works" (doc doc1) · id n1. attach_file adds a file to it.\n${UNDO}`);
+        expect(note.text).toBe(`Saved the note "Why DNS uses UDP" on the lesson "How DNS works" (doc doc1) · id n1. attach_file adds a file to it.\n${UNDO_OF('e1')}`);
         expect(h.requests[0]!.body).toEqual({ docId: 'doc1', title: 'Why DNS uses UDP', markdown: 'No handshake for one small question.' });
         const link = await h.call('add_note', { subject: 'Networking', title: 'DNS in 10 minutes', url: 'https://www.youtube.com/watch?v=abc' });
-        expect(link.text).toBe(`Saved the link "DNS in 10 minutes" on the subject Networking · id n2. attach_file adds a file to it.\n${UNDO}`);
+        expect(link.text).toBe(`Saved the link "DNS in 10 minutes" on the subject Networking · id n2. attach_file adds a file to it.\n${UNDO_OF('e2')}`);
         expect(h.requests[1]!.body).toEqual({ subject: 'Networking', title: 'DNS in 10 minutes', url: 'https://www.youtube.com/watch?v=abc' });
         const again = await h.call('add_note', { docId: 'doc1', title: 'Why DNS uses UDP', markdown: 'x' });
         expect(again.text).toBe('Already saved on the lesson "How DNS works" (doc doc1): "Why DNS uses UDP" · id n1. Nothing added.');
@@ -105,11 +105,11 @@ describe('the study tools', () => {
             ALL
         );
         const changed = await h.call('update_note', { id: 'n1', markdown: 'Both texts.' });
-        expect(changed.text).toBe(`Changed the note "TTL" on the lesson "How DNS works" (doc doc1) · id n1.\n${UNDO}`);
+        expect(changed.text).toBe(`Changed the note "TTL" on the lesson "How DNS works" (doc doc1) · id n1.\n${UNDO_OF('e3')}`);
         expect(h.requests[0]!.body).toEqual({ markdown: 'Both texts.' });
-        expect((await h.call('remove_note', { id: 'n2', into: 'n1' })).text).toBe(`Merged note n2 into n1.\n${UNDO}`);
+        expect((await h.call('remove_note', { id: 'n2', into: 'n1' })).text).toBe(`Merged note n2 into n1.\n${UNDO_OF('e4')}`);
         expect(h.requests[1]!.body).toEqual({ into: 'n1' });
-        expect((await h.call('remove_note', { id: 'n3' })).text).toBe(`Removed note n3.\n${UNDO}`);
+        expect((await h.call('remove_note', { id: 'n3' })).text).toBe(`Removed note n3.\n${UNDO_OF('e5')}`);
         const missing = await h.call('update_note', { id: 'n9', title: 'x' });
         expect(missing.isError).toBe(true);
         expect(missing.text).toContain('No note with the id n9');

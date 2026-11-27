@@ -107,7 +107,7 @@ describe('find_tools answers', () => {
         expect(text.split('\n')).toEqual([
             'move_revision · Move a review · changes (Undo) · run with use_tool',
             'Use when: "push my caching review to Friday", "I can’t revise this today".',
-            'Not for: marking it done (complete_revision); a pile of overdue ones (spread_backlog).',
+            'Not for: marking it done (complete_revision); a pile of overdue ones (spread_backlog); being busy for some days ("busy until Wednesday", "pause my reviews"): update_settings busyUntil holds their reviews by itself, so move nothing.',
             'Args: { revisionId: string, day: "YYYY-MM-DD" }   revisionId: from list_due; day: "YYYY-MM-DD", today or later',
             'Example: use_tool {"name":"move_revision","args":{"revisionId":"rev_cache","day":"2026-12-04"}}',
             'Answers: the review’s new day.',

@@ -1,6 +1,6 @@
 // MCP_MEMORY_PLAN stage 4 (§4.9, R13): a folder the user excluded is excluded everywhere. The real server process
 // (src/index.ts, run by tsx-free node on the built dist-next when present, else skipped) starts in a folder whose
-// hooks rule is "off": it lists no tools and says the folder is excluded; a work folder lists its seven tools.
+// hooks rule is "off": it lists no tools and says the folder is excluded; a work folder lists its ten tools (§12: undo_edit too).
 // Also the wording test over every text (§4.10): no "he", "him" or "his" anywhere a model reads.
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -51,7 +51,7 @@ describe.skipIf(!built)('an excluded folder (the real server process on dist-nex
         expect(client.getInstructions()).toBe(EXCLUDED_INSTRUCTIONS);
     });
 
-    it('a work folder (brief: false) lists its seven tools; any other folder the default set', async () => {
+    it('a work folder (brief: false) lists its ten tools (§12: undo_edit too); any other folder the default set', async () => {
         ({ client } = await serverIn([{ path: '<home>/work/', mode: 'light', brief: false }]));
         expect((await client.listTools()).tools.map((t) => t.name).sort()).toEqual([...OFFICE_TOOLS].sort());
         expect(client.getInstructions()).toBe(OFFICE_INSTRUCTIONS);

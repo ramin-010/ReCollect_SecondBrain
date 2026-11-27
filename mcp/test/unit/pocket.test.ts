@@ -1,6 +1,6 @@
 // TOOL_ACCESS_PLAN §4.7: the pocket (only while they allow it) and subjects, through the tools.
 import { afterEach, describe, expect, it } from 'vitest';
-import { UNDO, connect, fail, ok, type Harness } from './harness.js';
+import { UNDO, UNDO_OF, connect, fail, ok, type Harness } from './harness.js';
 
 let h: Harness | undefined;
 afterEach(async () => {
@@ -30,8 +30,8 @@ describe('the pocket', () => {
             ['Their pocket: 2 notes.', '- "link: a talk" · pinned · 2026-11-21 · 1 file · id pn2', '- "a long idea…" · 2026-11-20 · id pn1', 'A note cut at 300 characters reads in full with its id.'].join('\n')
         );
         expect((await h.call('list_pocket_notes', { id: 'pn1' })).text).toBe('Pocket note pn1 · 2026-11-20\na long idea in full');
-        expect((await h.call('update_pocket_note', { id: 'pn1', text: 'shorter', pinned: true })).text).toBe(`Changed. Pocket note pn1: "shorter" (pinned)\n${UNDO}`);
-        expect((await h.call('delete_pocket_note', { id: 'pn1' })).text).toBe(`Deleted the pocket note pn1.\n${UNDO}`);
+        expect((await h.call('update_pocket_note', { id: 'pn1', text: 'shorter', pinned: true })).text).toBe(`Changed. Pocket note pn1: "shorter" (pinned)\n${UNDO_OF('e1')}`);
+        expect((await h.call('delete_pocket_note', { id: 'pn1' })).text).toBe(`Deleted the pocket note pn1.\n${UNDO_OF('e2')}`);
     });
 });
 
@@ -42,9 +42,9 @@ describe('subjects', () => {
             'POST /api/agent/subjects/Scratch/delete': ok({ id: 's2', name: 'Scratch', deleted: true, asked: false, editId: 'e2' }),
             'POST /api/agent/subjects/DSA/delete': ok({ id: 's1', name: 'DSA', deleted: false, asked: true, text: 'Delete the subject "DSA" with 2 topics, 1 doc and 0 notes (undo for 7 days)' }),
         });
-        expect((await h.call('update_subject', { subject: 'DSA', name: 'Algorithms' })).text).toBe(`Subject "Algorithms" · id s1.\n${UNDO}`);
+        expect((await h.call('update_subject', { subject: 'DSA', name: 'Algorithms' })).text).toBe(`Subject "Algorithms" · id s1.\n${UNDO_OF('e1')}`);
         expect((await h.call('update_subject', { subject: 'DSA' })).text).toBe('Nothing to change: send name, description, or both.');
-        expect((await h.call('delete_subject', { subject: 'Scratch' })).text).toBe(`Deleted the empty subject "Scratch".\n${UNDO}`);
+        expect((await h.call('delete_subject', { subject: 'Scratch' })).text).toBe(`Deleted the empty subject "Scratch".\n${UNDO_OF('e2')}`);
         expect((await h.call('delete_subject', { subject: 'DSA', reason: 'done with it' })).text).toBe(
             '"DSA" holds topics, notes or docs, so it waits for their tap: a card on Home says "Delete the subject "DSA" with 2 topics, 1 doc and 0 notes (undo for 7 days)". Nothing is deleted until they tap "Do it".'
         );

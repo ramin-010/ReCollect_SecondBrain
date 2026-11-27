@@ -74,7 +74,7 @@ export function registerRevisionTools(server: McpServer, ctx: ToolContext): void
                 );
                 const lines = resolved.created ? [`Created subject ${quote(resolved.name, 60)} (id ${resolved.id}).`] : [];
                 lines.push(`Scheduled ${quote(created.topic.title, 100)} under ${resolved.name}: reviews on ${reviewDays(created.chain)}.`);
-                return withUndo(lines.join('\n'));
+                return withUndo(lines.join('\n'), created);
             }
 
             const { topic, nextAction } = status;
@@ -88,7 +88,7 @@ export function registerRevisionTools(server: McpServer, ctx: ToolContext): void
             switch (nextAction.kind) {
                 case 'start': {
                     const started = await api.post<{ chain: ChainRevision[] }>('/api/revisions/start', { topicId: topic._id });
-                    return withUndo(`Scheduled ${title} for revision: reviews on ${reviewDays(started.chain)}.${note}`);
+                    return withUndo(`Scheduled ${title} for revision: reviews on ${reviewDays(started.chain)}.${note}`, started);
                 }
                 case 'completed':
                     return `${title} has finished all its reviews (mastered). Nothing changed.${note}`;

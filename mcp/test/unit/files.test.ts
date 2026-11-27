@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { PATH_NOT_HERE } from '../../src/tools/files.js';
-import { UNDO, connect, ok, type Harness } from './harness.js';
+import { UNDO, UNDO_OF, connect, ok, type Harness } from './harness.js';
 
 let h: Harness | undefined;
 afterEach(async () => {
@@ -22,7 +22,7 @@ describe('attach_file', () => {
         const file = path.join(dir, 'budget.xlsx');
         writeFileSync(file, Buffer.alloc(2048, 1));
         h = await connect({ 'POST /api/agent/notes/n1/files': answer([['budget.xlsx', 2048]]) });
-        expect((await h.call('attach_file', { noteId: 'n1', path: file })).text).toBe(`Attached "budget.xlsx" (2 KB) to note n1. Its 1 file: 1. budget.xlsx (2 KB).\n${UNDO}`);
+        expect((await h.call('attach_file', { noteId: 'n1', path: file })).text).toBe(`Attached "budget.xlsx" (2 KB) to note n1. Its 1 file: 1. budget.xlsx (2 KB).\n${UNDO_OF('e1')}`);
         expect(h.requests[0]!.body).toEqual({ file: { file: 'budget.xlsx', size: 2048 } });
         expect(h.requests[0]!.headers['content-type']).toBeUndefined();
     });
@@ -72,7 +72,7 @@ describe('remove_file, read_note_file, list_notes', () => {
             'GET /api/agent/notes': ok({ place: { lesson: { docId: 'd1', title: 'Caching' }, subject: 'System Design' }, notes: [{ id: 'n1', kind: 'note', title: 'Cheat sheet', url: null, text: 'notes', day: '2026-11-20T10:00:00.000Z', by: 'the user', lesson: null, subject: 'System Design', files: [{ n: 1, name: 'budget.xlsx', type: 'x', size: 49152 }, { n: 2, name: 'plan.md', type: 'x', size: 3072 }] }], more: null }),
             'GET /api/learning/settings': ok({ timezone: 'Asia/Kolkata' }),
         });
-        expect((await h.call('remove_file', { noteId: 'n1', name: 'plan.md' })).text).toBe(`Took "plan.md" off note n1. Its 1 file: 1. budget.xlsx (48 KB).\n${UNDO}`);
+        expect((await h.call('remove_file', { noteId: 'n1', name: 'plan.md' })).text).toBe(`Took "plan.md" off note n1. Its 1 file: 1. budget.xlsx (48 KB).\n${UNDO_OF('e2')}`);
         expect((await h.call('read_note_file', { noteId: 'n1', file: 1 })).text).toBe('1. plan.md · text/markdown · 13 B\n\n# Plan');
         expect((await h.call('read_note_file', { noteId: 'n1', file: 'budget.xlsx' })).text).toBe('2. budget.xlsx · application/vnd.ms-excel · 48 KB\nNot a text file: its link is https://cdn.test/budget.xlsx');
         expect((await h.call('list_notes', { docId: 'd1' })).text).toContain('2 files: 1. budget.xlsx (48 KB), 2. plan.md (3 KB)');

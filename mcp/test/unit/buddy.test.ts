@@ -2,7 +2,7 @@
 // word it is, update_memory, recall_memory with provenance, forget; the answers' "Related" and "In motion"; the
 // older-server fallbacks; the brief's buddy lines.
 import { afterEach, describe, expect, it } from 'vitest';
-import { UNDO, connect, fail, ok, type Harness } from './harness.js';
+import { UNDO, UNDO_OF, connect, fail, ok, type Harness } from './harness.js';
 import { briefText, type Brief } from '../../src/tools/record.js';
 
 let h: Harness | undefined;
@@ -112,7 +112,7 @@ describe('update_memory', () => {
         });
         const res = await h.call('update_memory', { on: 'mem1', update: 'changed', text: 'Walks in the mornings now' });
         expect(h.requests[0]!.body).toEqual({ on: 'mem1', update: 'changed', text: 'Walks in the mornings now', inferred: false });
-        expect(res.text).toBe(`Changed: now "Walks in the mornings now" (id mem3). "Walks after work" is closed and kept as history.\n${UNDO}`);
+        expect(res.text).toBe(`Changed: now "Walks in the mornings now" (id mem3). "Walks after work" is closed and kept as history.\n${UNDO_OF('e1')}`);
     });
 
     it('progress, history, check, a stale id, an inference, a closed one', async () => {
@@ -255,7 +255,7 @@ describe('recall_memory and forget', () => {
         h = await connect({ 'POST /api/buddy/memories/mem1/close': [ok({ memory: memory({ status: 'closed' }), editId: 'e1' }), fail(403, 'The user wrote or changed this memory: only they can change it (on /you)')] });
         const res = await h.call('forget', { id: 'mem1', reason: 'They stopped' });
         expect(h.requests[0]!.body).toEqual({ reason: 'They stopped' });
-        expect(res.text).toBe(`Forgot: "Studies best after 9 pm".\n${UNDO}`);
+        expect(res.text).toBe(`Forgot: "Studies best after 9 pm".\n${UNDO_OF('e1')}`);
         const refused = await h.call('forget', { id: 'mem1' });
         expect(refused.isError).toBe(true);
         expect(refused.text).toMatch(/only they can change it/);

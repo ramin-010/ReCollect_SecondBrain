@@ -318,7 +318,7 @@ export function updateText(r: UpdateAnswer, said: string): string {
     const text = lines.join('\n');
     const lists = listsText(r.related, r.inMotion);
     const body = lists ? `${text}\n${lists}` : text;
-    return r.editId ? withUndo(body) : body;
+    return r.editId ? withUndo(body, r) : body;
 }
 
 export function registerBuddyTools(server: McpServer, ctx: ToolContext): void {
@@ -507,7 +507,7 @@ export function registerBuddyTools(server: McpServer, ctx: ToolContext): void {
         },
         async ({ id, reason }) => {
             const r = await api.post<{ memory: Memory; editId: string }>(`/api/buddy/memories/${encodeURIComponent(id)}/close`, reason ? { reason } : {});
-            return withUndo(`Forgot: ${quote(r.memory.text, 120)}.`);
+            return withUndo(`Forgot: ${quote(r.memory.text, 120)}.`, r);
         }
     );
 }

@@ -147,6 +147,8 @@ export interface AgentEdit {
     createdAt: string;
     seenAt: string | null;
     undoneAt: string | null;
+    /** TOOL_ACCESS_PLAN §12.3: the app that took its own change back (older servers: absent). */
+    undoneBy?: string | null;
     canUndo: boolean;
 }
 

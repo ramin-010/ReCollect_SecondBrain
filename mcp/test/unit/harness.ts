@@ -3,6 +3,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { KaagaApi } from '../../src/api.js';
+import { UNDO_LINE, undoLine } from '../../src/format.js';
 import { createKaagaServer, type ToolGroup, type ToolSet } from '../../src/server.js';
 
 export const BASE = 'http://kaaga.test';
@@ -119,7 +120,9 @@ export async function connect(
     };
 }
 
-export const UNDO = 'Undo: the user can undo this from Home → From your agent.';
+/** A write's last line without an edit id; UNDO_OF(id) with one (TOOL_ACCESS_PLAN §12.3). */
+export const UNDO = UNDO_LINE;
+export const UNDO_OF = (editId: string): string => undoLine(editId);
 
 /** The last line of a tool answer. */
 export const lastLine = (text: string): string => text.trimEnd().split('\n').at(-1) ?? '';

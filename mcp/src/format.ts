@@ -2,14 +2,31 @@
 // them, dates as YYYY-MM-DD.
 import type { GoalForecast, Milestone, RevisionItem } from './types.js';
 
-export const UNDO_LINE = 'Undo: the user can undo this from Home → From your agent.';
+/**
+ * TOOL_ACCESS_PLAN §12.3: a write's last line names the way back, so a chat asked to take its change back does it
+ * itself (undo_edit) instead of sending the user to Home. Without the edit's id, recent_agent_edits finds it.
+ */
+export const UNDO_HOME = 'they can also undo it on Home → From your agent';
+export const undoLine = (editId?: string | null): string =>
+    editId
+        ? `Undo: undo_edit {"editId":"${editId}"} takes this back if they ask; ${UNDO_HOME}.`
+        : `Undo: if they ask to take this back, recent_agent_edits shows its id for undo_edit; ${UNDO_HOME}.`;
+/** The line without an edit id (kept for the tests that compare whole answers). */
+export const UNDO_LINE = undoLine();
 
 /** Revision cycles of a topic (1, 3, 7 and 21 days). */
 export const REVISION_CYCLES = 4;
 
-/** Every write result ends with the Undo line. */
-export function withUndo(text: string): string {
-    return `${text}\n${UNDO_LINE}`;
+/** The edit id an API answer carries (`editId`), if any. */
+export function editIdOf(from: unknown): string | null {
+    if (typeof from === 'string') return from || null;
+    if (from && typeof from === 'object' && typeof (from as { editId?: unknown }).editId === 'string') return (from as { editId: string }).editId || null;
+    return null;
+}
+
+/** Every write result ends with the Undo line; `from` is the API's answer (or the edit id) when it names the edit. */
+export function withUndo(text: string, from?: unknown): string {
+    return `${text}\n${undoLine(editIdOf(from))}`;
 }
 
 /**

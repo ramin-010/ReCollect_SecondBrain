@@ -1,4 +1,5 @@
-// Personal tasks (LOOP_COMPLETE_SPEC 4.1): list, add, change, tick. Never workspace tasks, never a delete.
+// Personal tasks (LOOP_COMPLETE_SPEC 4.1): list, add, change, tick, and (TOOL_ACCESS_PLAN §12.4) delete with an Undo.
+// Never workspace tasks.
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { ToolError } from '../errors.js';
@@ -50,7 +51,10 @@ export function registerTaskTools(server: McpServer, ctx: ToolContext): void {
             input: { title: z.string().trim().min(1).max(200), due: zDue.optional(), priority: z.enum(['low', 'normal', 'high', 'urgent']).optional() },
             annotations: ADDS,
         },
-        async ({ title, due, priority }) => quietly(ctx.workMode, withUndo(`Added: ${taskLine(await api.post<Task>('/api/tasks', { title, due, priority }))}`))
+        async ({ title, due, priority }) => {
+            const t = await api.post<Task>('/api/tasks', { title, due, priority });
+            return quietly(ctx.workMode, withUndo(`Added: ${taskLine(t)}`, t));
+        }
     );
 
     defineTool(
@@ -71,7 +75,24 @@ export function registerTaskTools(server: McpServer, ctx: ToolContext): void {
         },
         async ({ taskId, ...patch }) => {
             if (Object.values(patch).every((v) => v === undefined)) throw new ToolError('Send title, due, priority or status.');
-            return withUndo(`Changed: ${taskLine(await api.patch<Task>(`/api/tasks/${taskId}`, patch))}`);
+            const t = await api.patch<Task>(`/api/tasks/${taskId}`, patch);
+            return withUndo(`Changed: ${taskLine(t)}`, t);
+        }
+    );
+
+    defineTool(
+        server,
+        ctx,
+        'delete_task',
+        {
+            title: 'Delete a task',
+            description: 'Delete one of their personal tasks (list_tasks shows ids), with its reminders: one added by mistake, or one they no longer need. Undo on Home brings it back. Done instead: update_task with status complete.',
+            input: { taskId: zId('task') },
+            annotations: CHANGES,
+        },
+        async ({ taskId }) => {
+            const r = await api.post<{ id: string; title: string; reminders: number; editId: string }>(`/api/agent/tasks/${encodeURIComponent(taskId)}/delete`, {});
+            return withUndo(`Deleted the task ${quote(r.title, 90)}${r.reminders ? ` and its ${r.reminders === 1 ? 'reminder' : `${r.reminders} reminders`}` : ''} · id ${r.id}.`, r);
         }
     );
 }

@@ -229,7 +229,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
             if (doc.nextRevision) lines.push(`Revision scheduled: first review ${doc.nextRevision} (cycles at 1, 3, 7 and 21 days).`);
             else if (doc.subject) lines.push('Not scheduled for revision (schedule_revision starts it).');
             lines.push(...canvasLines(doc.canvases));
-            return withUndo(lines.join('\n'));
+            return withUndo(lines.join('\n'), doc);
         }
     );
 
@@ -260,7 +260,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
             });
             const filing = [result.subject ? `in ${result.subject.name}` : 'no subject', ...(result.topicId ? [`topic ${result.topicId}`] : [])].join(' · ');
             if (!result.editId) return `Nothing to change: doc ${result.id} is ${quote(result.title, 100)} · ${filing}.`;
-            return withUndo(`Updated doc ${result.id}: ${result.changes.join(', ')}.\nNow ${quote(result.title, 100)} · ${filing}.`);
+            return withUndo(`Updated doc ${result.id}: ${result.changes.join(', ')}.\nNow ${quote(result.title, 100)} · ${filing}.`, result);
         }
     );
 
@@ -287,7 +287,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
             if (!heading) {
                 if (after) throw new ToolError('after needs heading: the section the note goes in.');
                 const result = await api.post<DocAppended>(`/api/agent/docs/${docId}/append`, { markdown });
-                return withUndo([`Appended ${plural(result.appended, 'block')} to the end of doc ${result.id}.`, ...canvasLines(result.canvases)].join('\n'));
+                return withUndo([`Appended ${plural(result.appended, 'block')} to the end of doc ${result.id}.`, ...canvasLines(result.canvases)].join('\n'), result);
             }
             let note: NoteAdded | DocAppended;
             try {
@@ -299,10 +299,10 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
                 throw err;
             }
             // An older Kaaga server (before the deploy) ignores the two fields and appends at the doc's end.
-            if (!('heading' in note)) return withUndo(`Appended ${plural(note.appended, 'block')} to the end of doc ${note.id} (this Kaaga server is older: notes go inside a section from its next release).`);
+            if (!('heading' in note)) return withUndo(`Appended ${plural(note.appended, 'block')} to the end of doc ${note.id} (this Kaaga server is older: notes go inside a section from its next release).`, note);
             if ('already' in note) return `Already in that section (${quote(note.heading, 80)}): not added again.`;
             const where = note.placed === 'after' ? 'right after the paragraph you quoted' : 'at the end of that section';
-            return withUndo([`Added a note under ${quote(note.heading, 80)} in doc ${note.id}, ${where}, with the day and your app under it.`, ...canvasLines(note.canvases)].join('\n'));
+            return withUndo([`Added a note under ${quote(note.heading, 80)} in doc ${note.id}, ${where}, with the day and your app under it.`, ...canvasLines(note.canvases)].join('\n'), note);
         }
     );
 
@@ -331,7 +331,8 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
                 [
                     `Replaced section ${quote(result.heading, 100)} in doc ${result.id}: removed ${plural(result.removed, 'block')}, inserted ${plural(result.inserted, 'block')}.`,
                     ...canvasLines(result.canvases),
-                ].join('\n')
+                ].join('\n'),
+                result
             );
         }
     );
@@ -363,7 +364,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
         },
         async ({ docId, diagram, height }) => {
             const result = await api.post<DocAppended>(`/api/agent/docs/${docId}/append`, { markdown: canvasFence(diagram, height) });
-            return withUndo([`Added a canvas to doc ${result.id}.`, ...canvasLines(result.canvases)].join('\n'));
+            return withUndo([`Added a canvas to doc ${result.id}.`, ...canvasLines(result.canvases)].join('\n'), result);
         }
     );
 
@@ -410,7 +411,7 @@ export function registerDocTools(server: McpServer, ctx: ToolContext): void {
             const result = await api.post<CanvasUpdated>(`/api/agent/docs/${docId}/canvas/${canvasId}`, body);
             const lines = canvasLines(result.canvases);
             if (!result.editId) return [`Canvas ${result.canvasId} in doc ${result.id} is unchanged: the change gives the board it already has.`, ...lines].join('\n');
-            return withUndo([`Updated canvas ${result.canvasId} in doc ${result.id}.`, ...lines].join('\n'));
+            return withUndo([`Updated canvas ${result.canvasId} in doc ${result.id}.`, ...lines].join('\n'), result);
         }
     );
 

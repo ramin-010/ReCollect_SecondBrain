@@ -96,10 +96,10 @@ describe('recent_agent_edits', () => {
         expect(h.requests.find((r) => r.path === '/api/agent/edits')).toMatchObject({ method: 'GET', query: { limit: '10' } });
         expect(res.text).toBe(
             [
-                '3 edits by agents, newest first (times in Asia/Kolkata):',
-                '- 2026-11-14 15:00 · Created "Postgres locks" · doc docA · not reviewed yet',
-                '- 2026-11-13 23:30 · Added focus "Graphs" · by Cursor · kept',
-                '- 2026-11-13 16:30 · Appended 2 blocks to "MVCC" · doc docB · undone by the user',
+                "3 edits by agents, newest first (times in Asia/Kolkata); undo_edit takes back one of this app's own by its id:",
+                '- e1 · 2026-11-14 15:00 · Created "Postgres locks" · doc docA · not reviewed yet',
+                '- e2 · 2026-11-13 23:30 · Added focus "Graphs" · by Cursor · kept',
+                '- e3 · 2026-11-13 16:30 · Appended 2 blocks to "MVCC" · doc docB · undone by the user',
             ].join('\n')
         );
     });

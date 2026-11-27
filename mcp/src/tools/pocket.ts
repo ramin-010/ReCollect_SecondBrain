@@ -60,7 +60,7 @@ export function registerPocketTools(server: McpServer, ctx: ToolContext): void {
         async ({ id, text, pinned }) => {
             const n = await api.patch<PocketNote & { editId: string | null }>(`/api/agent/pocket/${encodeURIComponent(id)}`, { text, pinned });
             const line = `Pocket note ${n.id}: ${quote(n.text, 120)}${n.pinned ? ' (pinned)' : ''}`;
-            return n.editId ? withUndo(`Changed. ${line}`) : `Nothing changed. ${line}`;
+            return n.editId ? withUndo(`Changed. ${line}`, n) : `Nothing changed. ${line}`;
         }
     );
 
@@ -75,8 +75,8 @@ export function registerPocketTools(server: McpServer, ctx: ToolContext): void {
             annotations: CHANGES,
         },
         async ({ id }) => {
-            await api.post(`/api/agent/pocket/${encodeURIComponent(id)}/delete`, {});
-            return withUndo(`Deleted the pocket note ${id}.`);
+            const gone = await api.post(`/api/agent/pocket/${encodeURIComponent(id)}/delete`, {});
+            return withUndo(`Deleted the pocket note ${id}.`, gone);
         }
     );
 
@@ -94,7 +94,7 @@ export function registerPocketTools(server: McpServer, ctx: ToolContext): void {
             if (name === undefined && description === undefined) return 'Nothing to change: send name, description, or both.';
             const r = await api.patch<{ id: string; name: string; description: string | null; editId: string | null }>(`/api/agent/subjects/${encodeURIComponent(subject)}`, { name, description });
             const line = `${quote(r.name)}${r.description ? ` · ${quote(r.description, 120)}` : ''} · id ${r.id}`;
-            return r.editId ? withUndo(`Subject ${line}.`) : `Nothing changed: subject ${line}.`;
+            return r.editId ? withUndo(`Subject ${line}.`, r) : `Nothing changed: subject ${line}.`;
         }
     );
 
@@ -110,7 +110,7 @@ export function registerPocketTools(server: McpServer, ctx: ToolContext): void {
         },
         async ({ subject, reason }) => {
             const r = await api.post<{ id: string; name: string; deleted: boolean; asked: boolean; text?: string; editId?: string }>(`/api/agent/subjects/${encodeURIComponent(subject)}/delete`, { reason });
-            if (r.deleted) return withUndo(`Deleted the empty subject ${quote(r.name)}.`);
+            if (r.deleted) return withUndo(`Deleted the empty subject ${quote(r.name)}.`, r);
             return `${quote(r.name)} holds topics, notes or docs, so it waits for their tap: a card on Home says "${r.text ?? 'Delete the subject'}". Nothing is deleted until they tap "Do it".`;
         }
     );

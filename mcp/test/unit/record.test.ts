@@ -1,6 +1,6 @@
 // The brief and the record (SYNC_SPINE_SPEC 1.3): get_brief, checkpoint, list_sessions.
 import { afterEach, describe, expect, it } from 'vitest';
-import { UNDO, connect, fail, lastLine, ok, type Harness } from './harness.js';
+import { UNDO, UNDO_OF, connect, fail, lastLine, ok, type Harness } from './harness.js';
 import { SYS, subjects } from './fixtures.js';
 import { briefText, type Brief } from '../../src/tools/record.js';
 
@@ -121,7 +121,7 @@ describe('checkpoint', () => {
         expect(h.requests.filter((r) => r.method === 'PUT').at(-1)!.body).toEqual({ title: 'Heaps' });
         expect(lastLine(old.text)).toMatch(/^said and learned were not passed on\. .*reconnect the Kaaga connector/);
         const done = await h.call('checkpoint', { key: 's_k', topicStatus: 'done' });
-        expect(lastLine(done.text)).toBe(UNDO);
+        expect(lastLine(done.text)).toBe(UNDO_OF('e1'));
         expect((await h.call('checkpoint', { key: 's_k' })).text).toMatch(/^Send at least a title/);
     });
 
@@ -161,7 +161,7 @@ describe('list_sessions', () => {
         // MCP_MEMORY_PLAN §4.1: list_sessions is in the manage group (not listed), and still runs by its name (TOOL_ACCESS_PLAN §2).
         const res = await h.call('list_sessions', {});
         expect(h.requests[0]!.query).toEqual({ days: '7' });
-        expect(res.text).toBe(['Sat 14 Nov · 2 h 5 min: study 45 min, build 1 h 20 min', '- "Graphs" · 45 min study · by hand', '- "Paths UI" · 1 h 20 min build · second_brain · hook'].join('\n'));
+        expect(res.text).toBe(['Sat 14 Nov · 2 h 5 min: study 45 min, build 1 h 20 min', '- "Graphs" · 45 min study · by hand · id a', '- "Paths UI" · 1 h 20 min build · second_brain · hook · id b'].join('\n'));
     });
 });
 

@@ -5,7 +5,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { ToolError } from '../errors.js';
 import { plural, quote, withUndo } from '../format.js';
-import { zId, zSubjectName } from '../schemas.js';
+import { zDay, zId, zSubjectName } from '../schemas.js';
 import { resolveSubject } from '../subjects.js';
 import { CHANGES, READ_ONLY, defineTool, type ToolContext } from '../tool.js';
 import { nextUpLine } from './paths.js';
@@ -92,6 +92,8 @@ interface SessionWrite {
     weakSpots: Array<{ _id: string; text: string }>;
     topicEditId: string | null;
     learned?: { saved: number; seen: number; skipped: number; paused: boolean } | null;
+    /** TOOL_ACCESS_PLAN §12.5: the chat went on into a new day; that day's part is its own row (older servers: absent). */
+    dayPart?: { day: string; began: string; beganMinutes: number | null } | null;
 }
 
 interface SessionList {
@@ -302,8 +304,10 @@ ${MORE_TOOLS_LINE}`;
             ];
             if (w.topic) lines.push(`Topic: ${w.topic.position}. ${w.topic.title} · ${w.topic.status.replace('_', ' ')}${w.topic.nextStep ? ` · next step: ${w.topic.nextStep}` : ''}`);
             if (w.weakSpots.length) lines.push(`Open weak spots: ${w.weakSpots.map((x) => x.text).join('; ')}`);
+            // §12.5: a chat that runs into a new day says so, so "was yesterday logged?" has an answer.
+            if (w.dayPart) lines.push(`Today (${shortDay(w.dayPart.day)}) counts on its own; this chat began ${shortDay(w.dayPart.began)}, which keeps its ${w.dayPart.beganMinutes ? mins(w.dayPart.beganMinutes) : 'time'}. list_sessions shows each day.`);
             const text = lines.join('\n');
-            return w.topicEditId ? withUndo(text) : text;
+            return w.topicEditId ? withUndo(text, w.topicEditId) : text;
         }
     );
 
@@ -333,10 +337,42 @@ ${MORE_TOOLS_LINE}`;
                 lines.push(`${shortDay(d.day)} · ${total ? mins(total) : plural(d.count, 'session')}${kinds ? `: ${kinds}` : ''}`);
                 for (const s of list.sessions.filter((x) => x.day === d.day)) {
                     const by = s.source === 'user' ? 'by hand' : s.source === 'hook' ? 'hook' : s.agentName ?? 'agent';
-                    lines.push(`- ${quote(s.title, 80)} · ${s.minutes ? `${mins(s.minutes)} ` : ''}${s.kind}${s.topic ? ` · ${s.topic.title}` : s.subject ? ` · ${s.subject.name}` : ''}${s.project ? ` · ${s.project.name}` : ''}${s.score ? ` · quiz ${s.score.done}/${s.score.total}` : ''} · ${by}`);
+                    lines.push(`- ${quote(s.title, 80)} · ${s.minutes ? `${mins(s.minutes)} ` : ''}${s.kind}${s.topic ? ` · ${s.topic.title}` : s.subject ? ` · ${s.subject.name}` : ''}${s.project ? ` · ${s.project.name}` : ''}${s.score ? ` · quiz ${s.score.done}/${s.score.total}` : ''} · ${by} · id ${s._id}`);
                 }
             }
             return lines.join('\n');
+        }
+    );
+
+    // TOOL_ACCESS_PLAN §12.4: a time entry corrected or removed on their word (each with an Undo).
+    defineTool(
+        server,
+        ctx,
+        'update_session',
+        {
+            title: 'Correct or remove a session',
+            description:
+                'Correct one time entry on their word (list_sessions shows ids): its minutes, its day, title or kind; or remove it (remove: true). Not for logging new work: that is checkpoint.',
+            input: {
+                sessionId: zId('session'),
+                minutes: z.number().int().min(0).max(1440).optional(),
+                day: zDay.optional().describe('Moves the entry to that day.'),
+                title: z.string().trim().min(1).max(200).optional(),
+                kind: z.enum(['study', 'practice', 'build', 'review']).optional(),
+                remove: z.boolean().optional().describe('true removes the entry (Undo brings it back).'),
+            },
+            annotations: CHANGES,
+        },
+        async ({ sessionId, remove, ...patch }) => {
+            if (remove) {
+                if (Object.values(patch).some((v) => v !== undefined)) throw new ToolError('Either remove the session, or change it: not both.');
+                const r = await api.post<{ id: string; title: string; editId: string }>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/delete`, {});
+                return withUndo(`Removed the session ${quote(r.title, 80)} · id ${r.id}.`, r);
+            }
+            if (Object.values(patch).every((v) => v === undefined)) throw new ToolError('Send minutes, day, title or kind (or remove: true).');
+            const r = await api.patch<{ session: SessionJson; changed: string[]; editId: string | null }>(`/api/agent/sessions/${encodeURIComponent(sessionId)}`, patch);
+            const line = `${quote(r.session.title, 80)} · ${r.session.minutes ? `${mins(r.session.minutes)} ` : ''}${r.session.kind} · ${shortDay(r.session.day)} · id ${r.session._id}`;
+            return r.changed.length ? withUndo(`Corrected: ${r.changed.join(', ')}.\nNow ${line}.`, r) : `Nothing changed: ${line}.`;
         }
     );
 }

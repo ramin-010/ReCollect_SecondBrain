@@ -22,6 +22,14 @@ export const DESTRUCTIVE: ReadonlySet<string> = new Set([
     'delete_pocket_note',
     'delete_subject',
     'remove_file',
+    // TOOL_ACCESS_PLAN §12: each removes or replaces what is there (Undo brings it back).
+    'undo_edit',
+    'delete_task',
+    'update_decision',
+    'remove_topic',
+    'stop_revision',
+    'uncomplete_revision',
+    'update_session',
 ]);
 
 /** Sets a value: the same call again changes nothing more. */

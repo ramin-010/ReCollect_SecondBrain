@@ -93,7 +93,7 @@ export function registerGoalTools(server: McpServer, ctx: ToolContext): void {
             const lines = [`Created goal ${goalSummary(goal, false)}`];
             if (goal.subjects.length > 0) lines.push(`Subjects: ${goal.subjects.map((s) => s.name).join(', ')}`);
             for (const m of goal.milestones) lines.push(`  ${milestoneLine(m)}`);
-            return withUndo(lines.join('\n'));
+            return withUndo(lines.join('\n'), goal);
         }
     );
 
@@ -125,7 +125,7 @@ export function registerGoalTools(server: McpServer, ctx: ToolContext): void {
             const changed = Object.keys(body).map((k) => (k === 'subjectIds' ? 'subjects' : k));
             if (changed.length === 0) throw new ToolError('Nothing to change: pass title, why, deadline, status or subjects.');
             const goal = await orNotFound(api.patch<Goal>(`/api/goals/${goalId}`, body), `No goal with id ${goalId} (list_goals shows them).`);
-            return withUndo(`Updated goal (${changed.join(', ')}): ${goalSummary(goal)}`);
+            return withUndo(`Updated goal (${changed.join(', ')}): ${goalSummary(goal)}`, goal);
         }
     );
 
@@ -144,13 +144,14 @@ export function registerGoalTools(server: McpServer, ctx: ToolContext): void {
             annotations: ADDS,
         },
         async ({ goalId, title, dueDay }) => {
-            const { milestone, goal } = await orNotFound(
+            const { milestone, goal, ...answer } = await orNotFound(
                 api.post<MilestoneResult>(`/api/goals/${goalId}/milestones`, { title, ...(dueDay ? { dueDay } : {}) }),
                 `No goal with id ${goalId} (list_goals shows them).`
             );
             return withUndo(
                 `Added milestone ${quote(milestone.title, 100)}${milestone.dueDay ? ` (due ${milestone.dueDay})` : ''} to ${quote(goal.title, 80)} · id ${milestone._id} · ` +
-                    `goal at ${goal.progress.done}/${goal.progress.total} milestones, ${forecastText(goal.forecast)}.`
+                    `goal at ${goal.progress.done}/${goal.progress.total} milestones, ${forecastText(goal.forecast)}.`,
+                answer
             );
         }
     );
@@ -166,13 +167,14 @@ export function registerGoalTools(server: McpServer, ctx: ToolContext): void {
             annotations: CHANGES,
         },
         async ({ milestoneId }) => {
-            const { milestone, goal } = await orNotFound(
+            const { milestone, goal, ...answer } = await orNotFound(
                 api.patch<MilestoneResult>(`/api/goal-milestones/${milestoneId}`, { done: true }),
                 `No milestone with id ${milestoneId} (list_goals shows them).`
             );
             return withUndo(
                 `Completed milestone ${quote(milestone.title, 100)} in ${quote(goal.title, 80)} · ${goal.progress.done}/${goal.progress.total} done · ` +
-                    `${forecastText(goal.forecast)} · ${nextMilestoneText(goal.nextMilestone)}.`
+                    `${forecastText(goal.forecast)} · ${nextMilestoneText(goal.nextMilestone)}.`,
+                answer
             );
         }
     );
@@ -196,12 +198,13 @@ export function registerGoalTools(server: McpServer, ctx: ToolContext): void {
         async ({ milestoneId, title, dueDay, done }) => {
             if (title === undefined && dueDay === undefined && done === undefined) throw new ToolError('Send title, dueDay, done, or a mix.');
             const body = { ...(title !== undefined ? { title } : {}), ...(dueDay !== undefined ? { dueDay } : {}), ...(done !== undefined ? { done } : {}) };
-            const { milestone, goal } = await orNotFound(
+            const { milestone, goal, ...answer } = await orNotFound(
                 api.patch<MilestoneResult>(`/api/goal-milestones/${milestoneId}`, body),
                 `No milestone with id ${milestoneId} (list_goals shows them).`
             );
             return withUndo(
-                `Milestone ${milestoneLine(milestone)} in ${quote(goal.title, 80)} · ${goal.progress.done}/${goal.progress.total} done · ${forecastText(goal.forecast)}.`
+                `Milestone ${milestoneLine(milestone)} in ${quote(goal.title, 80)} · ${goal.progress.done}/${goal.progress.total} done · ${forecastText(goal.forecast)}.`,
+                answer
             );
         }
     );
@@ -217,11 +220,11 @@ export function registerGoalTools(server: McpServer, ctx: ToolContext): void {
             annotations: CHANGES,
         },
         async ({ milestoneId }) => {
-            const { goal } = await orNotFound(
+            const { goal, ...answer } = await orNotFound(
                 api.delete<{ deleted: true; goal: Goal }>(`/api/goal-milestones/${milestoneId}`),
                 `No milestone with id ${milestoneId} (list_goals shows them).`
             );
-            return withUndo(`Removed the milestone from ${quote(goal.title, 80)} · ${goal.progress.done}/${goal.progress.total} done · ${forecastText(goal.forecast)}.`);
+            return withUndo(`Removed the milestone from ${quote(goal.title, 80)} · ${goal.progress.done}/${goal.progress.total} done · ${forecastText(goal.forecast)}.`, answer);
         }
     );
 }

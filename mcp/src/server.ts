@@ -53,7 +53,14 @@ export function versionOf(listed: ReadonlySet<string>): string {
 
 /** TOOL_ACCESS_PLAN §5.1: where things go, one line each (the web and code instructions share it). */
 export const WHERE_THINGS_GO =
-    'Where things go: their own life → remember (news on it: update_memory; wrong: forget); a to-do → add_task; a nudge at a time → set_reminder; a thought or link with no home → add_pocket_note; something beside a lesson → add_note; the lesson’s own text → append_to_doc; a work result → log_work; a study part with you → checkpoint.';
+    'Where things go: their own life → remember (news on it: update_memory; wrong: forget); a to-do → add_task; a nudge at a time → set_reminder; a thought or link with no home → add_pocket_note; something beside a lesson → add_note; the lesson’s own text → append_to_doc; a work result → log_work; a study part with you → checkpoint. One thing goes to one place: after the right tool, don’t also remember it.';
+
+/**
+ * TOOL_ACCESS_PLAN §12.3: a chat can change and take back what is in Kaaga (his 11-27 chats: a model sent him to Home
+ * to undo its own addition five times).
+ */
+export const CHANGE_AND_TAKE_BACK =
+    'You can change and remove what is in Kaaga, not only add to it: when they ask you to fix, remove or take back something, find_tools with the job, and never send them to do by hand what a tool can do.';
 
 /** The product's words, once (TOOL_ACCESS_PLAN §5.1). */
 export const GLOSSARY =
@@ -64,7 +71,8 @@ export const INSTRUCTIONS = [
     "Kaaga is the user's personal learning app and the record of their work: Docs (their notes, in Markdown), subjects with paths (topics in course order), spaced revision (reviews 1, 3, 7 and 21 days after a doc is scheduled), goals with dated milestones, a week of up to 5 targets, up to 3 focus lines a day, personal tasks, and work sessions. Their buddy there follows what is going on in their life.",
     'Start a working chat with get_brief (where they stand, and a session key), then checkpoint as you go: after each part, not only at the end. Pass on quietly, without asking or mentioning it, what the user says about their own life that will still matter after this conversation: something new about them (remember), or progress, a change or an end on something their buddy already knows (update_memory, with its id); a reminder or a dated to-do of their own (set_reminder, add_task); an idea or insight (add_pocket_note). Most turns have nothing. Before you rely on their routine, plans or preferences, look them up with recall_memory. When they ask to log the day’s work, use log_work. search_docs before writing a doc. Plan the week with get_week and add_week_target on their yes; when something is their call and they cannot say yes in the chat, suggest_to_user instead.',
     // TOOL_ACCESS_PLAN §5.2: the rest of the catalogue is a search away; any tool runs by its name.
-    'The listed tools are the everyday ones: find_tools with the job in plain words answers the rest (goals, reviews, notes on a lesson, the trash, sharing, settings…) and adds them to your list; any Kaaga tool runs by its name. For a study session, a quiz, a lesson to write, a week or a course to plan, find_tools with those words answers the steps.',
+    'The listed tools are the everyday ones: find_tools with the job in plain words answers the rest (goals, reviews, notes on a lesson, the trash, sharing, settings…) and adds them to your list; a tool not in your list runs through use_tool. For a study session, a quiz, a lesson to write, a week or a course to plan, find_tools with those words answers the steps.',
+    CHANGE_AND_TAKE_BACK,
     'Every write is logged with your agent name and the user can undo it from Home → From your agent. Docs go to the trash (30 days), goals are never deleted, and a subject that holds anything is deleted only on their tap; a focus line or a milestone can be removed (and Undo brings it back). Answers are compact text with the ids the next call needs.',
     // EASY_SETUP_PLAN §7: the chat decides, the folder is only its default.
     'A chat counts as its folder says (build, study or work); when this one clearly is not (learning in a work folder; a chat about their plans or career, not the code, is study), call set_chat and say so in one line.',
@@ -94,6 +102,7 @@ export const WEB_INSTRUCTIONS = [
     // TOOL_ACCESS_PLAN stage 5's misses: notes kept beside a lesson were looked for in its text, and a doc to change
     // beyond adding was read and left as it was.
     'Notes, links and files kept beside a lesson are not its text: list_notes, add_note, attach_file. To change a doc beyond adding to it, find_tools("edit a doc") first.',
+    CHANGE_AND_TAKE_BACK,
     'Leave the rest in the chat: the task at hand, questions, suggestions not yet tried, the details of the work, other people’s private things. An interest is not a task: add a task or a reminder only when they ask for one. Most messages need nothing.',
     'Before you rely on their routine, plans or preferences, look them up with recall_memory.',
     GLOSSARY,
@@ -119,7 +128,7 @@ export const NEW_FOLDER_INSTRUCTIONS = (name: string): string =>
 export const EXCLUDED_INSTRUCTIONS = 'This folder is excluded by the user: nothing here is saved to Kaaga or read from it, so no Kaaga tools are listed.';
 
 /** What a work folder lists (B10): the saving tools and this project's work log, nothing else. */
-export const OFFICE_TOOLS = ['get_brief', 'remember', 'add_task', 'set_reminder', 'add_pocket_note', 'log_work', 'get_work_log', 'set_folder', 'set_chat'] as const;
+export const OFFICE_TOOLS = ['get_brief', 'remember', 'add_task', 'set_reminder', 'add_pocket_note', 'log_work', 'get_work_log', 'set_folder', 'set_chat', 'undo_edit'] as const;
 
 /**
  * MCP_MEMORY_PLAN §4.1: what claude.ai and ChatGPT list (the remote door). No more_tools: each request there builds a
@@ -186,6 +195,8 @@ export const TOOL_NAMES = [
     'get_brief',
     'checkpoint',
     'list_sessions',
+    // TOOL_ACCESS_PLAN §12 (11-27): what an AI adds it can change and take back (each beside its kin).
+    'update_session',
     'get_week',
     'add_week_target',
     'update_week_target',
@@ -194,8 +205,10 @@ export const TOOL_NAMES = [
     'list_tasks',
     'add_task',
     'update_task',
+    'delete_task',
     'log_decision',
     'list_decisions',
+    'update_decision',
     'get_today',
     'get_learning_overview',
     'search_docs',
@@ -212,6 +225,7 @@ export const TOOL_NAMES = [
     'get_path',
     'plan_topics',
     'update_topic',
+    'remove_topic',
     'schedule_revision',
     'list_due',
     'list_goals',
@@ -226,6 +240,7 @@ export const TOOL_NAMES = [
     'remove_focus',
     'add_pocket_note',
     'recent_agent_edits',
+    'undo_edit',
     // The "manage" group (MANAGER_AND_DOCS_PLAN §3.3): not listed on the code door (find_tools turns them on, or
     // KAAGA_TOOLS=all); the in-app manager always has it.
     'trash_doc',
@@ -236,6 +251,8 @@ export const TOOL_NAMES = [
     'empty_trash',
     'complete_revision',
     'move_revision',
+    'uncomplete_revision',
+    'stop_revision',
     'get_settings',
     'update_settings',
     'update_project',
@@ -397,6 +414,14 @@ export const TOOL_LEVELS: Readonly<Record<ToolName, 1 | 2 | 3>> = {
     attach_file: 2,
     remove_file: 2,
     read_note_file: 1,
+    // Each changes at once with an Undo; remove_topic only asks when the topic holds anything (the delete_topic action).
+    undo_edit: 2,
+    delete_task: 2,
+    update_decision: 2,
+    remove_topic: 2,
+    stop_revision: 2,
+    uncomplete_revision: 2,
+    update_session: 2,
     find_tools: 1,
     use_read_tool: 1,
     // Runs any tool: the level of what it runs is that tool's own.
@@ -516,6 +541,14 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     attach_file: 'manage',
     remove_file: 'manage',
     read_note_file: 'manage',
+    // TOOL_ACCESS_PLAN §12: listed nowhere budgeted (no list budget spent); found by find_tools, named in answers.
+    undo_edit: 'manage',
+    delete_task: 'manage',
+    update_decision: 'manage',
+    remove_topic: 'manage',
+    stop_revision: 'manage',
+    uncomplete_revision: 'manage',
+    update_session: 'manage',
     find_tools: 'core',
     use_read_tool: 'core',
     use_tool: 'core',

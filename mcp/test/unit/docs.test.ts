@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { TOKEN, UNDO, UUID_RE, connect, fail, lastLine, ok, type Harness } from './harness.js';
+import { TOKEN, UNDO, UNDO_OF, UUID_RE, connect, fail, lastLine, ok, type Harness } from './harness.js';
 import { subjects } from './fixtures.js';
 import { STUDY_NOTE_LINE } from '../../src/tools/docs.js';
 
@@ -120,7 +120,7 @@ describe('create_doc', () => {
         expect(req).toMatchObject({ method: 'POST', path: '/api/agent/docs', body: { title: 'Postgres locks', markdown: '## Summary\n\n> [!TIP]\n> Keep transactions short.' } });
         expect(req!.headers['idempotency-key']).toMatch(UUID_RE);
         expect(req!.headers['x-agent-name']).toBe('Claude Code');
-        expect(res.text).toBe(`Created doc "Postgres locks" · id docNew1.\n${UNDO}`);
+        expect(res.text).toBe(`Created doc "Postgres locks" · id docNew1.\n${UNDO_OF('edit1')}`);
     });
 
     it('finds the subject by name (case-insensitive) and schedules revision', async () => {
@@ -133,7 +133,7 @@ describe('create_doc', () => {
         expect(h.requests[1]!.body).toEqual({ title: 'Rate limiter', markdown: 'x', subjectId: 'subjSys2', revise: true });
         expect(res.text).toContain('in System Design · id docNew1.');
         expect(res.text).toContain('Revision scheduled: first review 2026-11-15');
-        expect(lastLine(res.text)).toBe(UNDO);
+        expect(lastLine(res.text)).toBe(UNDO_OF('edit1'));
     });
 
     it("topicId: the doc becomes a planned topic's note (revise needs no subject then)", async () => {
@@ -242,7 +242,7 @@ describe('create_doc', () => {
                 'Created doc "Postgres locks" · id docNew1.',
                 'Canvas cv_Ab3dE6gH9jK0: 12 boxes, 14 arrows, 2 zones, 980×520, shows at 73% in a doc. Check: 2 arrows cross (lb→a1 × cache→db); box "x" has no arrows.',
                 'Canvas cv_Zz3dE6gH9jK1: 1 box, 0 arrows, 160×64, shows at 100% in a doc. No problems found.',
-                UNDO,
+                UNDO_OF('edit1'),
             ].join('\n')
         );
     });
@@ -264,7 +264,7 @@ describe('update_doc', () => {
         const res = await h.call('update_doc', { docId: 'docA', title: 'Rate limiter', subject: 'system design' });
         expect(h.requests[1]).toMatchObject({ method: 'PATCH', path: '/api/agent/docs/docA', body: { title: 'Rate limiter', subjectId: 'subjSys2' } });
         expect(res.text).toBe(
-            ['Updated doc docA: renamed it "Rate limiter", filed it under System Design.', 'Now "Rate limiter" · in System Design · topic tNew', UNDO].join('\n').replace('topic tNew\n', 'topic tNew.\n')
+            ['Updated doc docA: renamed it "Rate limiter", filed it under System Design.', 'Now "Rate limiter" · in System Design · topic tNew', UNDO_OF('e9')].join('\n').replace('topic tNew\n', 'topic tNew.\n')
         );
     });
 
@@ -283,7 +283,7 @@ describe('append_to_doc', () => {
         const res = await h.call('append_to_doc', { docId: 'docA', markdown: '## Practice\n\n- [ ] Two sum' });
         expect(h.requests[0]).toMatchObject({ method: 'POST', path: '/api/agent/docs/docA/append', body: { markdown: '## Practice\n\n- [ ] Two sum' } });
         expect(h.requests[0]!.headers['idempotency-key']).toMatch(UUID_RE);
-        expect(res.text).toBe(`Appended 3 blocks to the end of doc docA.\n${UNDO}`);
+        expect(res.text).toBe(`Appended 3 blocks to the end of doc docA.\n${UNDO_OF('e2')}`);
     });
 
     it('rejects empty Markdown', async () => {
@@ -296,7 +296,7 @@ describe('append_to_doc', () => {
         const canvases = [{ canvasId: 'cv_Ab3dE6gH9jK0', boxes: 3, arrows: 2, zones: 0, width: 520, height: 64, zoom: 1, warnings: [] }];
         h = await connect({ 'POST /api/agent/docs/docA/append': ok({ id: 'docA', appended: 2, editId: 'e2', canvases }) });
         const res = await h.call('append_to_doc', { docId: 'docA', markdown: '## Flow\n\n```canvas\na --> b --> c\n```' });
-        expect(res.text).toBe(`Appended 2 blocks to the end of doc docA.\nCanvas cv_Ab3dE6gH9jK0: 3 boxes, 2 arrows, 520×64, shows at 100% in a doc. No problems found.\n${UNDO}`);
+        expect(res.text).toBe(`Appended 2 blocks to the end of doc docA.\nCanvas cv_Ab3dE6gH9jK0: 3 boxes, 2 arrows, 520×64, shows at 100% in a doc. No problems found.\n${UNDO_OF('e2')}`);
     });
 
     it('a viewer-only doc: the 403 message passes through', async () => {
@@ -310,7 +310,7 @@ describe('replace_section', () => {
         h = await connect({ 'POST /api/agent/docs/docA/replace-section': ok({ id: 'docA', heading: 'Complexity', removed: 2, inserted: 1, editId: 'e3' }) });
         const res = await h.call('replace_section', { docId: 'docA', heading: '## Complexity', markdown: 'O(n log n) time.' });
         expect(h.requests[0]!.body).toEqual({ heading: '## Complexity', markdown: 'O(n log n) time.' });
-        expect(res.text).toBe(`Replaced section "Complexity" in doc docA: removed 2 blocks, inserted 1 block.\n${UNDO}`);
+        expect(res.text).toBe(`Replaced section "Complexity" in doc docA: removed 2 blocks, inserted 1 block.\n${UNDO_OF('e3')}`);
     });
 
     it("an unknown heading: the API's list of the doc's headings reaches the agent", async () => {
@@ -336,7 +336,7 @@ describe('add_canvas', () => {
         h = await connect({ 'POST /api/agent/docs/docA/append': appended });
         const res = await h.call('add_canvas', { docId: 'docA', diagram: DIAGRAM });
         expect(res).toEqual({
-            text: `Added a canvas to doc docA.\nCanvas cv_Ab3dE6gH9jK0: 3 boxes, 2 arrows, 520×96, shows at 100% in a doc. No problems found.\n${UNDO}`,
+            text: `Added a canvas to doc docA.\nCanvas cv_Ab3dE6gH9jK0: 3 boxes, 2 arrows, 520×96, shows at 100% in a doc. No problems found.\n${UNDO_OF('e9')}`,
             isError: false,
         });
         const [req] = h.requests;
@@ -395,7 +395,7 @@ describe('update_canvas', () => {
         h = await connect({ [`POST /api/agent/docs/docA/canvas/${CANVAS}`]: updated() });
         const res = await h.call('update_canvas', { docId: 'docA', canvasId: CANVAS, add: 'api --> cache[(Redis)]', remove: ['db', 'a --> b'], rename: { lb: 'L7 LB' } });
         expect(res).toEqual({
-            text: `Updated canvas ${CANVAS} in doc docA.\nCanvas ${CANVAS}: 6 boxes, 5 arrows, 900×300, shows at 71% in a doc. No problems found.\n${UNDO}`,
+            text: `Updated canvas ${CANVAS} in doc docA.\nCanvas ${CANVAS}: 6 boxes, 5 arrows, 900×300, shows at 71% in a doc. No problems found.\n${UNDO_OF('e7')}`,
             isError: false,
         });
         expect(h.requests[0]).toMatchObject({ method: 'POST', path: `/api/agent/docs/docA/canvas/${CANVAS}`, body: { add: 'api --> cache[(Redis)]', remove: ['db', 'a --> b'], rename: { lb: 'L7 LB' } } });

@@ -44,7 +44,7 @@ export function registerSubjectTools(server: McpServer, ctx: ToolContext): void 
             const existing = findSubject(await listSubjects(api), name);
             if (existing) return `Subject ${quote(existing.name, 60)} already exists (id ${existing._id}). Nothing created.`;
             const subject = await api.post<Subject>('/api/subjects', { name: name.replace(/\s+/g, ' ') });
-            return withUndo(`Created subject ${quote(subject.name, 60)} · id ${subject._id}.`);
+            return withUndo(`Created subject ${quote(subject.name, 60)} · id ${subject._id}.`, subject);
         }
     );
 }

@@ -146,7 +146,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         async ({ docId }) => {
             const s = await api.post<TrashState>(`/api/agent/docs/${docId}/trash`, {});
             const pages = s.pages ? ` and the ${plural(s.pages, 'page')} inside it` : '';
-            return s.editId ? withUndo(`Moved ${quote(s.title)}${pages} to the trash (30 days).`) : `${quote(s.title)} was already in the trash.`;
+            return s.editId ? withUndo(`Moved ${quote(s.title)}${pages} to the trash (30 days).`, s) : `${quote(s.title)} was already in the trash.`;
         }
     );
 
@@ -164,7 +164,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
             const s = await api.post<TrashState>(`/api/agent/docs/${docId}/restore`, {});
             const pages = s.pages ? ` and ${plural(s.pages, 'page')}` : '';
             const top = s.detached ? ' It came back at the top level: the doc it was in is still in the trash.' : '';
-            return s.editId ? withUndo(`Restored ${quote(s.title)}${pages}.${top}`) : `${quote(s.title)} was not in the trash.`;
+            return s.editId ? withUndo(`Restored ${quote(s.title)}${pages}.${top}`, s) : `${quote(s.title)} was not in the trash.`;
         }
     );
 
@@ -233,7 +233,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
             const change = moved.changes.find((c) => c.startsWith('moved it'));
             if (!moved.editId || !change) return `${quote(moved.title)} is already there.`;
             const into = moved.parent ? ' Everything inside it moved with it.' : '';
-            return withUndo(`Moved ${quote(moved.title)}${change.slice('moved it'.length)} · id ${moved.id}.${into}`);
+            return withUndo(`Moved ${quote(moved.title)}${change.slice('moved it'.length)} · id ${moved.id}.${into}`, moved);
         }
     );
 
@@ -266,7 +266,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         async ({ revisionId }) => {
             const r = await api.post<{ item: { title: string; cycleNumber: number }; chain: ChainRevision[]; mastered: boolean }>(`/api/revisions/${revisionId}/complete`, {});
             const next = r.chain.find((c) => c.status === 'pending');
-            return withUndo(`Done: ${quote(r.item.title)}, review ${r.item.cycleNumber}. ${r.mastered ? 'All four reviews done: mastered.' : next ? `Next review ${next.scheduledFor}.` : ''}`.trim());
+            return withUndo(`Done: ${quote(r.item.title)}, review ${r.item.cycleNumber}. ${r.mastered ? 'All four reviews done: mastered.' : next ? `Next review ${next.scheduledFor}.` : ''}`.trim(), r);
         }
     );
 
@@ -282,7 +282,40 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         },
         async ({ revisionId, day }) => {
             const r = await api.post<{ item: { title: string; cycleNumber: number } }>(`/api/revisions/${revisionId}/reschedule`, { day });
-            return withUndo(`Moved ${quote(r.item.title)} (review ${r.item.cycleNumber}) to ${day}.`);
+            return withUndo(`Moved ${quote(r.item.title)} (review ${r.item.cycleNumber}) to ${day}.`, r);
+        }
+    );
+
+    // TOOL_ACCESS_PLAN §12.4: a review ticked by mistake, and a doc taken off revision (each with an Undo).
+    defineTool(
+        server,
+        ctx,
+        'uncomplete_revision',
+        {
+            title: 'Mark a review not done',
+            description: 'A review marked done by mistake goes back to waiting (its id: from the complete_revision answer, list_due or recent_agent_edits).',
+            input: { revisionId: zId('revision') },
+            annotations: CHANGES,
+        },
+        async ({ revisionId }) => {
+            const r = await api.post<{ revisionId: string; title: string; scheduledFor: string; editId: string }>(`/api/agent/revisions/${encodeURIComponent(revisionId)}/uncomplete`, {});
+            return withUndo(`The review of ${quote(r.title)} is waiting again (due ${r.scheduledFor}).`, r);
+        }
+    );
+
+    defineTool(
+        server,
+        ctx,
+        'stop_revision',
+        {
+            title: 'Stop revising a doc',
+            description: 'Take a doc off spaced revision: its coming reviews go; reviews already done stay as its history. Undo on Home puts them back. One review on another day instead: move_revision.',
+            input: { docId: zDocId },
+            annotations: CHANGES,
+        },
+        async ({ docId }) => {
+            const r = await api.post<{ docId: string; title: string; removed: number; kept: number; editId: string }>(`/api/agent/docs/${encodeURIComponent(docId)}/stop-revision`, {});
+            return withUndo(`Stopped revising ${quote(r.title)}: ${plural(r.removed, 'coming review')} removed${r.kept ? `, ${plural(r.kept, 'done review')} kept` : ''}.`, r);
         }
     );
 
@@ -312,7 +345,8 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         },
         async (patch) => {
             if (Object.values(patch).every((v) => v === undefined)) throw new ToolError('Send at least one setting.');
-            return withUndo(`Changed.\n${settingsText(await api.patch<Settings>('/api/learning/settings', patch))}`);
+            const settings = await api.patch<Settings>('/api/learning/settings', patch);
+            return withUndo(`Changed.\n${settingsText(settings)}`, settings);
         }
     );
 
@@ -340,7 +374,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
             const found = all.find((p) => p.key.toLowerCase() === want) ?? all.find((p) => p.name.toLowerCase() === want);
             if (!found) throw new ToolError(`No project ${quote(project)}. Projects: ${all.map((p) => p.key).join(', ') || 'none'}.`);
             const p = await api.patch<Project>(`/api/projects/${found._id}`, { ...patch, ...(patch.kind ? { kind: kindOfWord(patch.kind) } : {}) });
-            return withUndo(`Project ${quote(p.name)}: next ${p.nextStep ? quote(p.nextStep) : 'not set'}${p.goal ? ` · goal ${quote(p.goal.title)}` : ''}${p.isArchived ? ' · archived' : ''}${p.kind ? ` · ${KIND_WORDS[p.kind]}` : ''}.`);
+            return withUndo(`Project ${quote(p.name)}: next ${p.nextStep ? quote(p.nextStep) : 'not set'}${p.goal ? ` · goal ${quote(p.goal.title)}` : ''}${p.isArchived ? ' · archived' : ''}${p.kind ? ` · ${KIND_WORDS[p.kind]}` : ''}.`, p);
         }
     );
 
@@ -395,7 +429,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
             }
             // An older server says nothing of how it rings: there every reminder rings (an alarm on the phone, an email), once.
             const kind = r.ring === undefined ? ' (this Kaaga server rings every reminder, once: silent and repeating ones come with its next release)' : ` (${howItRings(r)})`;
-            return quietly(ctx.workMode, withUndo(`Reminder set: ${quote(r.task)} at ${r.when}${kind}${r.createdTask ? ' (a new task)' : ''} · id ${r._id}.`));
+            return quietly(ctx.workMode, withUndo(`Reminder set: ${quote(r.task)} at ${r.when}${kind}${r.createdTask ? ' (a new task)' : ''} · id ${r._id}.`, r));
         }
     );
 
@@ -459,7 +493,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
         { title: 'Cancel a reminder', description: 'Cancel a reminder still to come (list_reminders shows ids). The task stays.', input: { reminderId: zId('reminder') }, annotations: CHANGES },
         async ({ reminderId }) => {
             const r = await api.post<Reminder>(`/api/reminders/${reminderId}/cancel`, {});
-            return withUndo(`Cancelled the reminder for ${quote(r.task)} (${r.when}).`);
+            return withUndo(`Cancelled the reminder for ${quote(r.task)} (${r.when}).`, r);
         }
     );
 
@@ -560,7 +594,7 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
             const r = await api.post<Spread>('/api/revisions/spread', reason ? { reason } : {});
             if (r.moved === 0) return 'Nothing is overdue: nothing to spread.';
             if (r.asked) return `Asked: ${r.card?.text ?? `spread ${r.moved} overdue reviews`}. ${TAP}`;
-            return withUndo(`Spread ${plural(r.moved, 'overdue review')} over ${plural(r.spreadDays, 'day')}.`);
+            return withUndo(`Spread ${plural(r.moved, 'overdue review')} over ${plural(r.spreadDays, 'day')}.`, r);
         }
     );
 }

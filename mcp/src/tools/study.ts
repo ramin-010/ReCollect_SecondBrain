@@ -107,7 +107,7 @@ export function registerStudyTools(server: McpServer, ctx: ToolContext): void {
             const card = await api.put<CardWritten>(`/api/agent/docs/${docId}/card`, { markdown });
             const lines = [`${card.replaced ? 'Replaced' : 'Wrote'} the revision card (${plural(card.blocks, 'block')}) under ${quote(card.heading, 60)} at the end of doc ${card.id}. Each review opens it first.`];
             lines.push(...(card.canvases ?? []).map(canvasLine));
-            return withUndo(lines.join('\n'));
+            return withUndo(lines.join('\n'), card);
         }
     );
 
@@ -133,7 +133,7 @@ export function registerStudyTools(server: McpServer, ctx: ToolContext): void {
             if (!markdown?.trim() && !url) throw new ToolError('Send the note (markdown) or a link (url).');
             const note = await api.post<NoteAdded>('/api/agent/notes', { ...(docId ? { docId } : { subject }), title, ...(markdown ? { markdown } : {}), ...(url ? { url } : {}) });
             if (note.already) return `Already saved on ${where(note.lesson, note.subject, note.page)}: ${quote(note.title, 80)} · id ${note.id}. Nothing added.`;
-            return withUndo(`Saved ${note.kind === 'link' ? 'the link' : 'the note'} ${quote(note.title, 80)} on ${where(note.lesson, note.subject, note.page)} · id ${note.id}. attach_file adds a file to it.`);
+            return withUndo(`Saved ${note.kind === 'link' ? 'the link' : 'the note'} ${quote(note.title, 80)} on ${where(note.lesson, note.subject, note.page)} · id ${note.id}. attach_file adds a file to it.`, note);
         }
     );
 
@@ -206,7 +206,7 @@ export function registerStudyTools(server: McpServer, ctx: ToolContext): void {
                 ...(docId ? { docId } : {}),
                 ...(subject ? { subject } : {}),
             });
-            return withUndo(`Changed the note ${quote(note.title, 80)} on ${where(note.lesson, note.subject)} · id ${note.id}.`);
+            return withUndo(`Changed the note ${quote(note.title, 80)} on ${where(note.lesson, note.subject)} · id ${note.id}.`, note);
         }
     );
 
@@ -225,7 +225,7 @@ export function registerStudyTools(server: McpServer, ctx: ToolContext): void {
         },
         async ({ id, into }) => {
             const done = await api.post<NoteRemoved>(`/api/agent/notes/${id}/remove`, into ? { into } : {});
-            return withUndo(done.into ? `Merged note ${done.id} into ${done.into}.` : `Removed note ${done.id}.`);
+            return withUndo(done.into ? `Merged note ${done.id} into ${done.into}.` : `Removed note ${done.id}.`, done);
         }
     );
 }

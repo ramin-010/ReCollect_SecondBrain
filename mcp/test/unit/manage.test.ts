@@ -19,7 +19,7 @@ describe('manage tools', () => {
             [`POST /api/agent/docs/${DOC}/trash`]: [ok({ id: DOC, title: 'Old draft', trashedAt: '2026-11-14T10:00:00Z', editId: 'e1' }), ok({ id: DOC, title: 'Old draft', trashedAt: '2026-11-14T10:00:00Z', editId: null })],
             [`POST /api/agent/docs/${DOC}/restore`]: ok({ id: DOC, title: 'Old draft', trashedAt: null, editId: 'e2' }),
         });
-        expect((await h.call('trash_doc', { docId: DOC })).text).toBe('Moved "Old draft" to the trash (30 days).\nUndo: the user can undo this from Home → From your agent.');
+        expect((await h.call('trash_doc', { docId: DOC })).text).toBe('Moved "Old draft" to the trash (30 days).\nUndo: undo_edit {"editId":"e1"} takes this back if they ask; they can also undo it on Home → From your agent.');
         expect((await h.call('trash_doc', { docId: DOC })).text).toBe('"Old draft" was already in the trash.');
         expect((await h.call('restore_doc', { docId: DOC })).text).toContain('Restored "Old draft".');
     });
@@ -99,7 +99,7 @@ describe('manage tools', () => {
         });
         // An older server (no `ring` in its answer): every reminder rings there, and the reply says so.
         expect((await h.call('set_reminder', { at: '19:00', taskId: 't1' })).text).toBe(
-            `Reminder set: "Book the mock" at ${when} (this Kaaga server rings every reminder, once: silent and repeating ones come with its next release) · id m1.\nUndo: the user can undo this from Home → From your agent.`
+            `Reminder set: "Book the mock" at ${when} (this Kaaga server rings every reminder, once: silent and repeating ones come with its next release) · id m1.\nUndo: if they ask to take this back, recent_agent_edits shows its id for undo_edit; they can also undo it on Home → From your agent.`
         );
         expect(h.requests.at(-1)).toMatchObject({ method: 'POST', path: '/api/reminders', body: { at: '19:00', taskId: 't1' } });
         expect((await h.call('set_reminder', { at: '19:00', title: 'Call the bank' })).text).toContain('(a new task)');
@@ -173,7 +173,7 @@ describe('manage tools', () => {
                 ok({ moved: 0, spreadDays: 0, changes: [], asked: false, card: null }),
             ],
         });
-        expect((await h.call('spread_backlog', {})).text).toBe('Spread 6 overdue reviews over 3 days.\nUndo: the user can undo this from Home → From your agent.');
+        expect((await h.call('spread_backlog', {})).text).toBe('Spread 6 overdue reviews over 3 days.\nUndo: if they ask to take this back, recent_agent_edits shows its id for undo_edit; they can also undo it on Home → From your agent.');
         expect((await h.call('spread_backlog', { reason: 'he is back' })).text).toMatch(/^Asked: Spread 34 overdue reviews over the next 6 days, as your daily budget allows\. Waiting for the user’s tap/);
         expect(h.requests.at(-1)).toMatchObject({ body: { reason: 'he is back' } });
         expect((await h.call('spread_backlog', {})).text).toBe('Nothing is overdue: nothing to spread.');
