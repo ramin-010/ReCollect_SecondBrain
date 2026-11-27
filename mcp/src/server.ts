@@ -27,7 +27,7 @@ import { registerSubjectTools } from './tools/subjects.js';
 import { registerManageTools } from './tools/manage.js';
 import { registerBlockTools } from './tools/blocks.js';
 import { registerBuddyTools } from './tools/buddy.js';
-import { newChatMemory, registerFolderTools } from './tools/folders.js';
+import { newChatMemory, registerFolderTools, type ChatMemory } from './tools/folders.js';
 import { registerStudyTools } from './tools/study.js';
 import { registerPocketTools } from './tools/pocket.js';
 import { registerFileTools } from './tools/files.js';
@@ -256,6 +256,8 @@ export const TOOL_NAMES = [
     'update_block',
     'move_blocks',
     'delete_blocks',
+    // TOOL_ACCESS_PLAN §10 (11-27): one part of a doc named in words, changed in one call.
+    'edit_doc_part',
     // The buddy's memory (BUDDY_MEMORY_PLAN; MCP_MEMORY_PLAN §4.1: saving, finding and correcting are listed together).
     'remember',
     'update_memory',
@@ -371,6 +373,7 @@ export const TOOL_LEVELS: Readonly<Record<ToolName, 1 | 2 | 3>> = {
     update_block: 2,
     move_blocks: 2,
     delete_blocks: 2,
+    edit_doc_part: 2,
     remember: 2,
     update_memory: 2,
     recall_memory: 1,
@@ -483,6 +486,7 @@ export const TOOL_GROUPS: Readonly<Record<ToolName, ToolGroup>> = {
     update_block: 'docs',
     move_blocks: 'manage',
     delete_blocks: 'docs',
+    edit_doc_part: 'docs',
     // The buddy (2026-11-16): remember is listed with the record; update_goal moved to manage to make room.
     // MCP_MEMORY_PLAN §4.1: finding and correcting belong with saving.
     remember: 'record',
@@ -527,7 +531,8 @@ export function groupsFrom(value: string | undefined): ToolGroup[] {
 
 export interface ServerOptions {
     api: KaagaApi;
-    agentName: string;
+    /** A function on a pooled server: each request has its own agent (TOOL_ACCESS_PLAN §6.6). */
+    agentName: string | (() => string);
     /** A setup problem every tool reports instead of calling the API (no token, bad URL). */
     problem?: string | null;
     /** Pocket note ids (tests pass a fixed one). */
@@ -552,6 +557,8 @@ export interface ServerOptions {
     onCall?: (call: CallStat) => void;
     /** EASY_SETUP_PLAN: the folder this chat runs in (isNew: the account asks what it is). */
     folder?: { key: string; name: string; isNew?: boolean };
+    /** What a chat said it is, until its checkpoint (default: this server's own; a pooled server's is each request's). */
+    chats?: ChatMemory;
 }
 
 const INSTRUCTIONS_OF: Readonly<Record<ToolSet, string>> = { web: WEB_INSTRUCTIONS, code: INSTRUCTIONS, office: OFFICE_INSTRUCTIONS, excluded: EXCLUDED_INSTRUCTIONS, all: INSTRUCTIONS };
@@ -599,7 +606,7 @@ export function createKaagaServer(options: ServerOptions): McpServer {
         ...(options.clockProject ? { clockProject: options.clockProject } : {}),
         ...(options.project ? { project: options.project } : {}),
         ...(options.folder ? { folder: options.folder } : {}),
-        chats: newChatMemory(),
+        chats: options.chats ?? newChatMemory(),
         policy,
         listChanged: () => server.sendToolListChanged(),
     };

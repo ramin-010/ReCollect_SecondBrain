@@ -93,6 +93,15 @@ export function networkReason(err: unknown): string {
     return err instanceof Error ? err.message : String(err);
 }
 
+/**
+ * TOOL_ACCESS_PLAN §6.6: a pooled server's API is a stand-in for each request's own client; this key reads the real
+ * one behind it (a cache keyed by the client, such as the time zone, must never be shared between two people).
+ */
+export const REAL_API = Symbol('kaaga.realApi');
+
+/** The client itself, or the one a pooled server's stand-in serves right now. */
+export const realApi = (api: KaagaApi): KaagaApi => (api as unknown as { [REAL_API]?: KaagaApi })[REAL_API] ?? api;
+
 export class KaagaApi {
     readonly baseUrl: string;
     private readonly token: string;

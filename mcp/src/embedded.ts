@@ -5,10 +5,13 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { KaagaApi } from './api.js';
+import { KaagaApi, REAL_API } from './api.js';
 import { createKaagaServer, TOOL_LEVELS, type ToolName } from './server.js';
 import type { CallStat } from './tool.js';
+import { newChatMemory, type ChatMemory } from './tools/folders.js';
 
 export interface CatalogueTool {
     name: string;
@@ -81,10 +84,70 @@ export async function quickAnswer(req: IncomingMessage & { body?: unknown }, res
 }
 
 /**
- * Remote MCP (ALWAYS_ON_SPEC 6.5): one Streamable HTTP request, stateless. A fresh server per request
- * on the caller's own token, so the API's token rules, scopes and edit log apply exactly as for the
- * stdio server. It lists the `web` set (MCP_MEMORY_PLAN §4.1) and reaches the rest through find_tools, use_read_tool
- * and use_tool (TOOL_ACCESS_PLAN §3): nothing turned on in one request could last to the next.
+ * TOOL_ACCESS_PLAN §6.6 (1): built web servers, reused. Building one registers every tool (a few milliseconds of CPU),
+ * which was most of a call's cost at 50 at a time. A pooled server serves one request at a time, and everything that
+ * belongs to a request (its API client on its own token, its agent's name, its chat memory, its counting) is read
+ * from that request's async context, never from the server: a request whose client went away while a tool still ran
+ * keeps its own context to the end, and the server it used is dropped, not reused.
+ */
+interface RequestSlot {
+    api: KaagaApi;
+    agentName: string;
+    chats: ChatMemory;
+    onCall?: (call: CallStat) => void;
+}
+
+const requestScope = new AsyncLocalStorage<RequestSlot>();
+
+function slot(): RequestSlot {
+    const s = requestScope.getStore();
+    if (!s) throw new Error('A pooled Kaaga server ran outside its request.');
+    return s;
+}
+
+/** The API of whichever request runs now (REAL_API reads the client itself: caches key on it, never on this). */
+const pooledApi = new Proxy({} as KaagaApi, {
+    get(_target, prop) {
+        const api = slot().api;
+        if (prop === REAL_API) return api;
+        const value = Reflect.get(api, prop, api) as unknown;
+        return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(api) : value;
+    },
+});
+
+/** The chat memory of whichever request runs now (the web door keeps nothing between requests). */
+const pooledChats = new Proxy({} as ChatMemory, {
+    get: (_target, prop) => Reflect.get(slot().chats, prop) as unknown,
+    set: (_target, prop, value) => Reflect.set(slot().chats, prop, value),
+    deleteProperty: (_target, prop) => Reflect.deleteProperty(slot().chats, prop),
+});
+
+/** Idle servers kept for the next requests (more are built while many run at once, and dropped after). */
+export const POOL_IDLE_MAX = 32;
+const idle: McpServer[] = [];
+
+function pooledServer(): McpServer {
+    return (
+        idle.pop() ??
+        createKaagaServer({
+            api: pooledApi,
+            agentName: () => slot().agentName,
+            chats: pooledChats,
+            problem: null,
+            set: 'web',
+            onCall: (call) => requestScope.getStore()?.onCall?.(call),
+        })
+    );
+}
+
+/** For tests: how many built servers wait. */
+export const idleServers = (): number => idle.length;
+
+/**
+ * Remote MCP (ALWAYS_ON_SPEC 6.5): one Streamable HTTP request, stateless, on the caller's own token, so the API's
+ * token rules, scopes and edit log apply exactly as for the stdio server. It lists the `web` set (MCP_MEMORY_PLAN §4.1)
+ * and reaches the rest through find_tools, use_read_tool and use_tool (TOOL_ACCESS_PLAN §3): nothing turned on in one
+ * request lasts to the next. A pooled server answers (above); a traced request (the simulations) gets its own.
  */
 export async function handleMcpHttp(
     req: IncomingMessage & { body?: unknown },
@@ -93,14 +156,38 @@ export async function handleMcpHttp(
 ): Promise<void> {
     if (await quickAnswer(req, res)) return;
     const api = new KaagaApi({ baseUrl: options.baseUrl, token: options.token, agentName: options.agentName, timeoutMs: options.timeoutMs ?? 30_000, log: () => {} });
-    const server = createKaagaServer({ api, agentName: options.agentName, problem: null, set: 'web', ...(options.trace ? { trace: options.trace } : {}), ...(options.onCall ? { onCall: options.onCall } : {}) });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    if (options.trace) {
+        const server = createKaagaServer({ api, agentName: options.agentName, problem: null, set: 'web', trace: options.trace, ...(options.onCall ? { onCall: options.onCall } : {}) });
+        res.on('close', () => {
+            void transport.close();
+            void server.close();
+        });
+        await server.connect(transport);
+        await transport.handleRequest(req, res, req.body);
+        return;
+    }
+    const server = pooledServer();
     res.on('close', () => {
-        void transport.close();
-        void server.close();
+        // A response sent in full means every handler answered: the server goes back. A request its client left
+        // (a handler may still run) drops its server.
+        const reuse = res.writableFinished;
+        void transport.close().then(
+            () => {
+                if (reuse && idle.length < POOL_IDLE_MAX) idle.push(server);
+                else void server.close();
+            },
+            () => void server.close()
+        );
     });
-    await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
+    const request: RequestSlot = { api, agentName: options.agentName, chats: newChatMemory(), ...(options.onCall ? { onCall: options.onCall } : {}) };
+    try {
+        await server.connect(transport);
+    } catch (err) {
+        void server.close();
+        throw err;
+    }
+    await requestScope.run(request, () => transport.handleRequest(req, res, req.body));
 }
 
 export async function openCatalogue(options: CatalogueOptions): Promise<Catalogue> {

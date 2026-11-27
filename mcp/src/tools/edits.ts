@@ -12,8 +12,10 @@ function stateOf(edit: AgentEdit): string {
     return 'not reviewed yet';
 }
 
-export function registerEditTools(server: McpServer, ctx: ToolContext, agentName: string): void {
+/** `agentName` is a function on a pooled server (each request has its own agent). */
+export function registerEditTools(server: McpServer, ctx: ToolContext, agentName: string | (() => string)): void {
     const { api } = ctx;
+    const me = () => (typeof agentName === 'function' ? agentName() : agentName);
 
     defineTool(
         server,
@@ -36,7 +38,7 @@ export function registerEditTools(server: McpServer, ctx: ToolContext, agentName
                 [
                     `- ${timestamp(e.createdAt, zone)}`,
                     e.summary,
-                    ...(e.agentName && e.agentName !== agentName ? [`by ${e.agentName}`] : []),
+                    ...(e.agentName && e.agentName !== me() ? [`by ${e.agentName}`] : []),
                     ...(e.docId ? [`doc ${e.docId}`] : []),
                     stateOf(e),
                 ].join(' · ')

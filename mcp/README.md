@@ -75,7 +75,7 @@ Every save is kept at once with when it was said, the app and whether you said i
 | Scope | Lets the agent |
 |---|---|
 | `read` | Every read tool, and the lookups the write tools make first (subjects, a doc's topic). |
-| `docs:write` | `create_doc`, `update_doc`, `append_to_doc`, `replace_section`, `add_canvas`, `update_canvas`, `trash_doc`, `restore_doc`, `move_doc`, `insert_blocks`, `update_block`, `move_blocks`, `delete_blocks`. |
+| `docs:write` | `create_doc`, `update_doc`, `append_to_doc`, `replace_section`, `add_canvas`, `update_canvas`, `trash_doc`, `restore_doc`, `move_doc`, `insert_blocks`, `update_block`, `move_blocks`, `delete_blocks`, `edit_doc_part`. |
 | `sessions:write` | `checkpoint`, `update_project`, `remember`, `update_memory`, `forget` (a Claude Code hook's token needs only this and `read`). |
 | `tasks:write` | `add_task`, `update_task` (personal tasks only). Tokens that had `learning:write` got it with the migration. |
 | `learning:write` | `complete_revision`, `move_revision`, `update_settings`, `empty_trash`, `publish_doc`, `share_doc` (these three ask), `create_subject`, `schedule_revision`, `create_goal`, `update_goal`, `add_milestone`, `complete_milestone`, `update_milestone`, `remove_milestone`, `add_focus`, `update_focus`, `remove_focus`, `plan_topics`, `update_topic`, `add_pocket_note`, `add_week_target`, `update_week_target`, `suggest_to_user`, `log_decision`, and `create_subject_if_missing` on `create_doc`. |
@@ -84,7 +84,7 @@ A call without the scope it needs fails with the scope named, e.g. `The Kaaga to
 
 ## Tools
 
-94 tools (some rows below hold two or more), plus the `study`, `build`, `work`, `catch_up` and `note_recipe` prompts (and, on the web, `log_my_work`) and the skills (`npm run install:skill`, or `npx kaaga-setup`).
+95 tools (some rows below hold two or more), plus the `study`, `build`, `work`, `catch_up` and `note_recipe` prompts (and, on the web, `log_my_work`) and the skills (`npm run install:skill`, or `npx kaaga-setup`).
 
 **A tool set per door** (MCP_MEMORY_PLAN §4.1, `createKaagaServer({ set })`):
 **Finding the rest** (TOOL_ACCESS_PLAN §3-§5): every tool has a card (`src/cards.ts`: when to use it, what it is not for, its inputs, an example, what it answers, the words people say); `find_tools` searches them by the job in plain words (deterministic word matching, no network) and answers the cards, plus the steps of a job with steps: `study_session`, `quiz_me`, `write_lesson`, `plan_week`, `plan_course`, `log_day`, `start_day`, `tidy_docs` (`src/playbooks.ts`; also MCP prompts on the web and code doors). The web's instructions open with three rules in 512 characters (ChatGPT reads only those as standing alone). Inputs that don't fit answer what to fix with the tool's inputs and an example; the tools list leaves out annotation hints MCP assumes anyway.
@@ -166,6 +166,7 @@ A tool a door can't reach answers one line saying so (with the closest names and
 | **manage:** `spread_backlog` | Spread every overdue review over the next days by their daily budget, undoable; more than 20 at once only asks ("Do it" on Home) | `POST /api/revisions/spread` |
 | `get_outline` | A doc's blocks, one line each (id · kind · first words, children indented): the ids the block tools take. Every doc is on the new editor since the switch (2026-11-15); a doc with old content and no blocks would answer 409 | `GET /api/agent/docs/:id/outline` |
 | `insert_blocks`, `update_block`, `delete_blocks`; **manage:** `move_blocks` | Change the new editor's blocks by id, live: insert Markdown after / before / under a block or at the start or end; change one block (one block of Markdown, or props: a heading's level, a to-do's tick, a callout's kind; its children stay); move blocks with their children; delete them. Each is one change the user can undo (`doc_blocks`) | `POST /api/agent/docs/:id/blocks`, `PATCH …/blocks/:blockId`, `POST …/blocks/move`, `POST …/blocks/delete` |
+| `edit_doc_part` | One part of a doc named in words, changed in one call (no outline first): a heading (its whole section), words quoted from inside a block, or a kind ("the code block", "the last bullet list", "the empty to-do list"); replace it, insert before or after it, delete it, move it to the start or end, tick or untick its to-dos. Words that fit several blocks are listed with ids. One change the user can undo (`doc_blocks`) | `POST /api/agent/docs/:id/part` |
 
 There are no tools that delete for good: a doc goes to the trash, and emptying it waits for the user's tap. Every write is logged; the user can undo it from **Home → From your agent**, and every write answer ends with that line. Agents can't undo or "keep" their own edits (those endpoints are cookie-only).
 

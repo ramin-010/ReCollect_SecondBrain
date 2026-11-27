@@ -382,6 +382,17 @@ export const CARDS: Readonly<Record<ToolName, ToolCard>> = {
         example: { docId: 'doccache', ids: ['blk_2'] },
         keywords: ['delete paragraph', 'remove lines', 'cut', 'erase', 'remove list', 'delete callout', 'remove block', 'empty list', 'duplicate callout', 'remove sentence'],
     },
+    edit_doc_part: {
+        use: '"move the self-test questions to the end", "put a warning before the code", "tick the to-do I did", "delete the empty list at the bottom", "fix the paragraph that says …".',
+        not: 'adding at the end (append_to_doc); a whole section rewritten by its heading (replace_section also does it).',
+        params: {
+            part: 'a heading (its whole section), words quoted from the block, or a kind: "the code block", "the last bullet list", "the empty to-do list"',
+            action: 'replace, insert_before, insert_after, delete, move_to_start, move_to_end, tick, untick',
+        },
+        returns: 'what changed, and the new block ids (Undo on Home); several matches: the list of them with ids.',
+        example: { docId: 'docsliding', part: 'Self-test questions', action: 'move_to_end' },
+        keywords: ['edit part', 'change part', 'move section', 'move to the end', 'move to the top', 'insert before', 'insert after', 'put before', 'put after', 'tick', 'check off', 'untick', 'delete list', 'empty list', 'fix paragraph', 'replace paragraph', 'edit a doc', 'warning before code'],
+    },
     add_canvas: {
         use: '"draw the architecture", "a diagram of the request flow", "boxes and arrows".',
         not: 'sequence, ER, state or timeline diagrams (a ```mermaid fence with append_to_doc).',
@@ -776,6 +787,7 @@ export const AREAS: Readonly<Record<string, readonly ToolName[]>> = {
         'update_block',
         'move_blocks',
         'delete_blocks',
+        'edit_doc_part',
         'add_canvas',
         'update_canvas',
         'preview_diagram',

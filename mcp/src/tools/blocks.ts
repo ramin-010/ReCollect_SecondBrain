@@ -3,6 +3,7 @@
 // move_blocks is on more_tools.
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { ToolError } from '../errors.js';
 import { plural, quote, withUndo } from '../format.js';
 import { zDocId } from '../schemas.js';
 import { ADDS, CHANGES, READ_ONLY, defineTool, type ToolContext } from '../tool.js';
@@ -160,6 +161,33 @@ export function registerBlockTools(server: McpServer, ctx: ToolContext): void {
         async ({ docId, ids }) => {
             const r = await api.post<{ id: string; deleted: number }>(`/api/agent/docs/${docId}/blocks/delete`, { ids });
             return withUndo(`Deleted ${plural(r.deleted, 'block')} from doc ${r.id}.`);
+        }
+    );
+
+    // TOOL_ACCESS_PLAN §10 (11-27): one call for a part named in words (the picking test's block edits ran out of steps
+    // between get_outline and the edit). The server finds the part in the full text.
+    defineTool(
+        server,
+        ctx,
+        'edit_doc_part',
+        {
+            title: 'Change one part of a doc, named in words',
+            description:
+                "Change one part of a doc without its outline: name the part in the doc's own words (a heading: its whole section; words quoted from inside a block; " +
+                'or a kind: "the code block", "the last bullet list", "the empty to-do list") and say what to do: replace it with markdown, insert markdown before or after it, ' +
+                'delete it, move it to the start or end, tick or untick its to-dos. When the words fit several blocks the answer lists them with ids. The user can undo it.',
+            input: {
+                docId: zDocId,
+                part: z.string().trim().min(1).max(300).describe('A heading, words quoted from the block, or a kind ("the code block", "the last bullet list").'),
+                action: z.enum(['replace', 'insert_before', 'insert_after', 'delete', 'move_to_start', 'move_to_end', 'tick', 'untick']),
+                markdown: zMarkdown.optional().describe('For replace and the inserts: the new blocks, in Markdown.'),
+            },
+            annotations: CHANGES,
+        },
+        async ({ docId, part, action, markdown }) => {
+            if ((action === 'replace' || action === 'insert_before' || action === 'insert_after') && !markdown?.trim()) throw new ToolError(`${action} needs markdown: the new blocks.`);
+            const r = await api.post<{ id: string; title: string; done: string; ids?: string[] }>(`/api/agent/docs/${docId}/part`, { part, action, ...(markdown ? { markdown } : {}) });
+            return withUndo(`${r.done} in ${quote(r.title)} (doc ${r.id})${r.ids?.length ? `; new blocks ${r.ids.join(', ')}` : ''}.`);
         }
     );
 }
