@@ -58,21 +58,9 @@ final class ConnectLink {
         return new ConnectLink(origin, token.trim());
     }
 
-    /** localhost, the private IPv4 ranges and .local names. */
+    /** localhost, the private IPv4 ranges and .local names (the rule lives in Hosts, shared with the updater). */
     static boolean isLocal(String host) {
-        String h = host.toLowerCase();
-        if (h.equals("localhost") || h.endsWith(".local") || h.equals("[::1]")) return true;
-        String[] p = h.split("\\.");
-        if (p.length != 4) return false;
-        int a;
-        int b;
-        try {
-            a = Integer.parseInt(p[0]);
-            b = Integer.parseInt(p[1]);
-        } catch (NumberFormatException e) {
-            return false;
-        }
-        return a == 127 || a == 10 || (a == 192 && b == 168) || (a == 172 && b >= 16 && b <= 31);
+        return Hosts.isLocal(host);
     }
 
     /** "localhost:8002", "192.168.43.20:8002", "recollect.example.com" */

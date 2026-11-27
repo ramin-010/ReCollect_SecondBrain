@@ -40,12 +40,29 @@ The first build creates the signing key in `keys/` (git-ignored). **Back up `key
 | The wallpaper, and the copy of yours | `Wallpapers.java` |
 | The token, sealed with a key in the Android Keystore | `Vault.java`, `Prefs.java` |
 | The three calls it makes | `Api.java` (`GET /api/ambient/widget`, `GET /api/ambient/wallpaper.png`, `POST /api/ambient/disconnect`) |
+| Its own updates (0.9.0): what the server's release is, one notification per version, the download, its checks, Android's installer | `Updates.java`, `UpdateRule.java` (`node build.mjs --test`), the phone pages' `components/phone/update.ts` |
 
 If the server can't be reached, nothing on the phone changes: no error picture; the screen says what went wrong.
+
+## Releasing an update (0.9.0 and later update themselves)
+
+1. In `build.mjs`, raise `VERSION` and write `NOTES`: up to three short lines on what is new, for the people who use it.
+2. `node build.mjs`. It writes `backend/assets/phone/kaaga.apk` and its description `kaaga.json` (package, version, build number, notes). Commit **both** in the backend repo.
+3. Deploy the backend. Its `GET /phone/kaaga.json` now names the new build (the server measures the file's size and SHA-256 itself).
+4. Each phone finds it within 12 hours (its background refresh), or as soon as Today or Settings opens. It shows one silent notification, the row on Today and the row in Settings › This phone. Nothing downloads until the person taps **Update**. The app then checks the file's SHA-256, that it is this app and a newer build, and hands it to Android, which asks them to confirm. The first time, Android asks once to allow "Install unknown apps" for Kaaga.
+
+- **Same key, always:** Android installs an update only when `keys/` signed it, as it signed the app on the phone. An app older than 0.9.0 can't update itself: its pages offer **Download** instead, and the phone's browser installs the file over the app, with its data kept.
+- **To stop offering an update,** take `kaaga.json` out of `backend/assets/phone`.
+- **Never go down a version:** Android refuses a lower build. To undo a bad release, build again with the fix; the build number grows by itself.
+- **The QA app** updates only from the laptop's QA build (`node build.mjs --qa` writes `build/kaaga-qa.apk` and `build/kaaga-qa.json`; the laptop's server serves them at `/phone/kaaga-qa.*`), never from the real app's file.
 
 **realme / OPPO phones:** turn off Glance (Settings → Home screen, Lock screen & Always-On Display → Glance for realme → Activate on Lockscreen), or it shows its own pictures on the lock screen. Also allow the app in the background (App info → Battery usage → Allow background activity, and Allow auto-launch) so the picture changes on its own. The app's screen says both on these phones.
 
 Licence: as the rest of this repository. Inter, the picture's typeface (bundled with the backend), is under the SIL Open Font License 1.1.
+
+## 0.9.0
+
+- The app updates itself from its server (above, "Releasing an update"). Settings › This phone shows its version and, when one is out, the newer version with Update. While a newer version waits, Today shows one slim row; its × closes that row for that version.
 
 ## 0.7.1 (the QA app; his app gets it as 0.7.0 after the deploy)
 

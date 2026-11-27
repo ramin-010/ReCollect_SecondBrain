@@ -8,6 +8,8 @@ import android.content.Intent;
 public final class Wake extends BroadcastReceiver {
     @Override
     public void onReceive(Context ctx, Intent intent) {
+        // 0.9.0: after the app updated itself, the downloaded file and the update's notifications go.
+        if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(intent.getAction())) Updates.afterUpdate(ctx);
         Schedule.ensure(ctx);
         DayWidget.updateAll(ctx);
         // Alarms don't survive a restart: the reminders' alarms again, from the saved list (0.5.0).

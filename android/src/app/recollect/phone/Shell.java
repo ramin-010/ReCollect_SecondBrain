@@ -68,6 +68,8 @@ public final class Shell extends Activity {
      * over USB (adb reverse tcp:3005 tcp:3005; its API on 8002, live editing on 1234).
      */
     static final String HOME = BuildConfig.QA ? "http://localhost:3005" : BuildConfig.HOME;
+    /** 0.9.0: a page of the phone world to open (the update's notification opens Settings), as "/m/settings". */
+    static final String EXTRA_PAGE = "page";
     private static final int ASK_VOICE = 21;
     private static final int ASK_NOTIFY = 22;
     /** Paper's ground in light (mockups/phone-app/tokens.css): the default look's, until the page says another. */
@@ -88,6 +90,8 @@ public final class Shell extends Activity {
     private boolean failed;
     private volatile boolean refreshing;
     private boolean voice;
+    /** 0.9.0: the updater's steps reach the page as "changed". */
+    private final Runnable updateSteps = () -> emit("changed", null);
 
     @Override
     protected void onCreate(Bundle state) {
@@ -127,6 +131,7 @@ public final class Shell extends Activity {
             }
         });
         web.addJavascriptInterface(new Bridge(), "RcShell");
+        Updates.listener = updateSteps;
         root.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         offline = offlineView();
         root.addView(offline, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -163,7 +168,7 @@ public final class Shell extends Activity {
             return;
         }
         boolean share = Intent.ACTION_SEND.equals(intent.getAction());
-        if (web != null && (share || intent.getData() != null)) web.loadUrl(urlFor(intent));
+        if (web != null && (share || intent.getData() != null || intent.hasExtra(EXTRA_PAGE))) web.loadUrl(urlFor(intent));
     }
 
     @Override
@@ -183,6 +188,7 @@ public final class Shell extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (Updates.listener == updateSteps) Updates.listener = null;
         work.shutdown();
         if (web != null) web.destroy();
         super.onDestroy();
@@ -199,6 +205,9 @@ public final class Shell extends Activity {
                 return origin + "/m/buddy?q=" + Uri.encode(words);
             }
         }
+        // 0.9.0: one of the phone world's own pages (the update's notification opens Settings); only a plain path under /m/.
+        String page = i == null ? null : i.getStringExtra(EXTRA_PAGE);
+        if (page != null && page.matches("/m/[a-z]+")) return origin + page;
         Uri data = i == null ? null : i.getData();
         // Only a page of the web app on this computer or the home network (any app may open an exported activity).
         if (data != null && ("http".equals(data.getScheme()) || "https".equals(data.getScheme())) && data.getHost() != null && ConnectLink.isLocal(data.getHost())) {
@@ -654,6 +663,9 @@ public final class Shell extends Activity {
                 o.put("theme", p.theme());
                 o.put("liveAllowed", NotifIcons.allowed(Shell.this));
                 o.put("liveActive", Live.active(Shell.this));
+                // 0.9.0 (PHONE_UPDATE_PLAN): this build's number and the updater's state.
+                o.put("versionCode", BuildConfig.VERSION_CODE);
+                o.put("update", Updates.state(Shell.this));
             } catch (JSONException e) {
                 return "{}";
             }
@@ -842,6 +854,47 @@ public final class Shell extends Activity {
         public void openLivePicker() {
             if (!trusted()) return;
             main.post(Shell.this::openLivePicker);
+        }
+
+        /**
+         * 0.9.0 (PHONE_UPDATE_PLAN): asks the server for this app's release. `api` is the page's API address (an app not
+         * connected still checks there); `now` false checks only when the last answer is over an hour old.
+         */
+        @JavascriptInterface
+        public void checkUpdate(String api, boolean now) {
+            if (!trusted()) return;
+            Context app = getApplicationContext();
+            Updates.setApi(app, api);
+            Updates.checkSoon(app, now ? 0 : UpdateRule.OPEN_GAP_MS);
+        }
+
+        /** The person tapped Update: download, check, then Android's own installer asks them to confirm. */
+        @JavascriptInterface
+        public void startUpdate() {
+            if (!trusted()) return;
+            Updates.start(getApplicationContext());
+        }
+
+        /** Android's "Install unknown apps" switch for this app (asked once, before the first update). */
+        @JavascriptInterface
+        public void allowInstalls() {
+            if (!trusted()) return;
+            main.post(() -> {
+                Intent i = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()));
+                try {
+                    startActivity(i);
+                } catch (ActivityNotFoundException e) {
+                    startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
+                }
+            });
+        }
+
+        /** Today's row: × hides this version there. */
+        @JavascriptInterface
+        public void hideUpdate() {
+            if (!trusted()) return;
+            Updates.hide(getApplicationContext());
+            emit("changed", null);
         }
 
         /** Android's own speech recognizer; the words come back as window.__rcShell('heard', text). */

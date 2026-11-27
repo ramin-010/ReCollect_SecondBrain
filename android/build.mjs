@@ -27,7 +27,13 @@ const KEYS = path.join(ROOT, 'keys');
 const QA_BUILD = process.argv.includes('--qa');
 // 0.8.0 (11-26): Kaaga (KAAGA_REBRAND_PLAN): its name, icon and address. The package id stays app.recollect.phone, so it
 // installs over the app already on a phone.
-const VERSION = '0.8.0';
+// 0.9.0 (11-27, PHONE_UPDATE_PLAN): the app updates itself from its server.
+const VERSION = '0.9.0';
+/**
+ * What is new in VERSION, in up to three short lines for the people who use the app: the phone's Settings shows them under
+ * "Kaaga x.y.z is ready" (PHONE_UPDATE_PLAN U8). Write them with every new VERSION.
+ */
+const NOTES = ['Kaaga now updates itself: when a new version is out, it says so and installs it in a tap.'];
 const MIN_SDK = 26;
 const TARGET_SDK = 34;
 /** Grows with every build (minutes since 2026-01-01), so `adb install -r` always takes the new one. */
@@ -155,6 +161,9 @@ if (process.argv.includes('--test')) {
     // Stage 19 (0.7.0): the widget's card: its size by height, the Later row, a Later kept here, the look.
     run(path.join(bin, exe('javac')), ['--release', '11', '-encoding', 'UTF-8', '-d', out, path.join(ROOT, 'src', 'app', 'recollect', 'phone', 'CardRule.java'), path.join(ROOT, 'test', 'CardRuleTest.java')]);
     run(path.join(bin, exe('java')), ['-cp', out, 'app.recollect.phone.CardRuleTest']);
+    // 0.9.0 (PHONE_UPDATE_PLAN): the updater's rules (newer, when, where from, the checksum, Android's answers, the words).
+    run(path.join(bin, exe('javac')), ['--release', '11', '-encoding', 'UTF-8', '-d', out, path.join(ROOT, 'src', 'app', 'recollect', 'phone', 'Hosts.java'), path.join(ROOT, 'src', 'app', 'recollect', 'phone', 'UpdateRule.java'), path.join(ROOT, 'test', 'UpdateRuleTest.java')]);
+    run(path.join(bin, exe('java')), ['-cp', out, 'app.recollect.phone.UpdateRuleTest']);
     process.exit(0);
 }
 
@@ -164,12 +173,12 @@ const { tools, androidJar } = findSdk();
 const jdk = findJdk();
 console.log(`SDK build tools: ${tools}\nPlatform: ${androidJar}\nJDK: ${jdk}`);
 
-// Start clean, but keep the other variant's APK (his app's and the QA app's sit side by side).
-const keep = path.join(BUILD, QA ? 'kaaga.apk' : 'kaaga-qa.apk');
-const kept = fs.existsSync(keep) ? fs.readFileSync(keep) : null;
+// Start clean, but keep the other variant's APK and its description (his app's and the QA app's sit side by side).
+const keeps = (QA ? ['kaaga.apk', 'kaaga.json'] : ['kaaga-qa.apk', 'kaaga-qa.json']).map((name) => path.join(BUILD, name));
+const kept = keeps.map((file) => (fs.existsSync(file) ? fs.readFileSync(file) : null));
 fs.rmSync(BUILD, { recursive: true, force: true });
 for (const d of ['gen', 'classes', 'dex']) fs.mkdirSync(path.join(BUILD, d), { recursive: true });
-if (kept) fs.writeFileSync(keep, kept);
+keeps.forEach((file, i) => kept[i] && fs.writeFileSync(file, kept[i]));
 
 // 1. BuildConfig
 const pkgDir = path.join(BUILD, 'gen', 'app', 'recollect', 'phone');
@@ -214,17 +223,25 @@ run(path.join(jdk, exe('java')), ['-jar', apksigner, 'verify', apk]);
 for (const f of ['base.apk', 'unaligned.apk', 'aligned.apk', 'res.zip', 'qa.zip', 'classes.jar', 'sources.txt', 'AndroidManifest.xml']) fs.rmSync(path.join(BUILD, f), { force: true });
 fs.rmSync(path.join(BUILD, 'qa-res'), { recursive: true, force: true });
 
-console.log(`\nBuilt ${path.relative(process.cwd(), apk)}: ${(fs.statSync(apk).size / 1024).toFixed(0)} KB, version ${VERSION} (${VERSION_CODE}), opens ${QA ? 'http://localhost:3005' : HOME}, in ${((Date.now() - started) / 1000).toFixed(1)} s`);
+// The file's description beside it (PHONE_UPDATE_PLAN §2): the app's updater compares the build number with its own; the
+// server measures the size and the SHA-256 from the file itself.
+const sha256 = crypto.createHash('sha256').update(fs.readFileSync(apk)).digest('hex');
+const sidecar = apk.replace(/\.apk$/, '.json');
+fs.writeFileSync(sidecar, `${JSON.stringify({ package: QA ? 'app.recollect.phone.qa' : 'app.recollect.phone', version: `${VERSION}${QA ? '-qa' : ''}`, versionCode: VERSION_CODE, minSdk: MIN_SDK, notes: NOTES, builtAt: new Date().toISOString() }, null, 2)}\n`);
 
-// The release build rides with the backend (the owner, 11-23 night): backend/assets/phone/kaaga.apk is committed in
-// the backend's repo, so every backend deploy carries the newest app and Settings > Phone app offers it. Never the QA one.
+console.log(`\nBuilt ${path.relative(process.cwd(), apk)}: ${(fs.statSync(apk).size / 1024).toFixed(0)} KB, version ${VERSION} (${VERSION_CODE}), opens ${QA ? 'http://localhost:3005' : HOME}, in ${((Date.now() - started) / 1000).toFixed(1)} s\nSHA-256 ${sha256}`);
+
+// The release build rides with the backend (the owner, 11-23 night): backend/assets/phone/kaaga.apk and its description
+// kaaga.json are committed in the backend's repo, so every backend deploy carries the newest app, Settings > Phone app
+// offers it and the apps on phones offer to update to it. Never the QA one (the laptop's server serves that from build/).
 if (!QA) {
     const served = path.join(ROOT, '..', 'backend', 'assets', 'phone', 'kaaga.apk');
     fs.mkdirSync(path.dirname(served), { recursive: true });
     fs.copyFileSync(apk, served);
+    fs.copyFileSync(sidecar, served.replace(/\.apk$/, '.json'));
     // The file before the rename goes, so the server serves this one.
     fs.rmSync(path.join(path.dirname(served), 'recollect.apk'), { force: true });
-    console.log(`Copied to ${path.relative(process.cwd(), served)}: commit it in the backend repo; its next deploy serves it.`);
+    console.log(`Copied to ${path.relative(process.cwd(), served)} with kaaga.json: commit both in the backend repo; its next deploy serves them.`);
 }
 
 if (process.argv.includes('--install')) {

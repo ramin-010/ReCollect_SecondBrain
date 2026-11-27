@@ -69,4 +69,10 @@
     <string name="shell_offline_title">Can\'t reach Kaaga</string>
     <string name="shell_offline_body">Kaaga needs the internet. Check your connection, then try again.</string>
     <string name="shell_retry">Try again</string>
+    <!-- 0.9.0 (PHONE_UPDATE_PLAN): the app's own updates. -->
+    <string name="update_channel_name">App updates</string>
+    <string name="update_channel_description">When a new version of the app is out: once per version, without a sound.</string>
+    <string name="update_ready_text">Tap to see what\'s new and update.</string>
+    <string name="update_downloaded_title">%1$s %2$s is downloaded</string>
+    <string name="update_downloaded_text">Tap to install it.</string>
 </resources>

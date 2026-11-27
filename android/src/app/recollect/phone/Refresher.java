@@ -87,6 +87,8 @@ final class Refresher {
             if (!Session.inFront) Notes.maybeNotify(ctx, a);
             // 0.5.0: the reminders to come ring on this phone; the server is told which, so no email goes for them.
             reminders(ctx, p, api, data);
+            // 0.9.0 (PHONE_UPDATE_PLAN): at most every 12 hours, whether a newer app is out (one notification per version).
+            Updates.maybeCheck(ctx);
             boolean anywhere = p.home() || p.lock();
             // The QA app (build.mjs --qa) fetches the home picture for its preview even with both screens
             // off, and sets nothing: a test of the pictures never touches his wallpapers.

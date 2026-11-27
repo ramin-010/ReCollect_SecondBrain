@@ -31,6 +31,8 @@
 /context/specs/DOC_PAGES_PLAN.md
 /context/specs/TOOL_ACCESS_PLAN.md
 /context/specs/OVERNIGHT_RUN.md
+/context/specs/PHONE_UPDATE_PLAN.md
+/context/specs/TRUST_PLAN.md
 
 # The Android app's build tools, outputs and signing key
 /android/.toolchain/

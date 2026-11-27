@@ -22,6 +22,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- 0.9.0 (PHONE_UPDATE_PLAN): the app installs its own updates through Android's installer, which asks the person to
+         confirm; Android asks once to allow it ("Install unknown apps"). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Only to keep a copy of the wallpaper he had, so Disconnect can put it back (Android 12 and older; asked when he ticks it). -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
@@ -145,6 +148,11 @@
             android:turnScreenOn="true"
             android:taskAffinity=""
             android:theme="@style/Theme.Recollect" />
+
+        <!-- 0.9.0: Android's installer answers here (the app's own PendingIntent; nothing outside may send it). -->
+        <receiver
+            android:name=".Updates"
+            android:exported="false" />
 
         <receiver
             android:name=".Wake"
