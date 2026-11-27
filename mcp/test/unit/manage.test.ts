@@ -39,6 +39,24 @@ describe('manage tools', () => {
         expect((await h.call('share_doc', { docId: DOC, email: 'not an email' })).isError).toBe(true);
     });
 
+    it('publish_doc and share_doc pass withPages only when asked (DOC_PAGES_PLAN §7: the pages inside too)', async () => {
+        const card = (text: string) => ok({ _id: 's1', kind: 'action', text, reason: null, proposedBy: 'agent', agentName: 'Claude Code' });
+        h = await all({
+            'POST /api/actions': [
+                card('Publish "Course" and the 2 pages inside to the web: anyone with a link can read them (never edit)'),
+                card('Share "Course" and the 2 pages inside with Asha (asha@example.com): they can view'),
+                card('Share "Course" with Asha (asha@example.com): they can view (not the 2 pages inside)'),
+            ],
+        });
+        const pub = await h.call('publish_doc', { docId: DOC, withPages: true });
+        expect(pub.text).toContain('Asked: Publish "Course" and the 2 pages inside');
+        expect(h.requests[0]).toMatchObject({ body: { action: 'publish_doc', input: { docId: DOC, on: true, withPages: true } } });
+        await h.call('share_doc', { docId: DOC, email: 'asha@example.com', role: 'viewer', withPages: true });
+        expect(h.requests[1]).toMatchObject({ body: { action: 'share_doc', input: { docId: DOC, email: 'asha@example.com', role: 'viewer', withPages: true } } });
+        await h.call('share_doc', { docId: DOC, email: 'asha@example.com', role: 'viewer' });
+        expect((h.requests[2]!.body as { input: object }).input).not.toHaveProperty('withPages');
+    });
+
     it('empty_trash only asks: it posts the action and says it waits for his tap', async () => {
         h = await all({ 'POST /api/actions': ok({ _id: 's1', kind: 'action', text: 'Empty the trash: delete 2 docs for good ("A", "B")', reason: null, proposedBy: 'agent', agentName: 'Claude Code' }, 201) });
         const res = await h.call('empty_trash', { reason: 'he asked' });

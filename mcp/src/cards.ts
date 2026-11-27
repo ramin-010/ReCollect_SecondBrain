@@ -445,13 +445,14 @@ export const CARDS: Readonly<Record<ToolName, ToolCard>> = {
     },
     publish_doc: {
         use: '"publish my doc", "make it public", "unpublish it".',
+        params: { withPages: 'true: the pages inside it too (the card says how many; without it, it says they stay out)' },
         returns: 'a card on Home: they tap "Do it".',
         example: { docId: 'dockafka', on: true },
         keywords: ['publish', 'public link', 'make public', 'unpublish', 'take off the web', 'web link', 'kill link', 'note'],
     },
     share_doc: {
         use: '"share my doc with asha@…", "take her access away".',
-        params: { role: 'viewer, editor, or remove' },
+        params: { role: 'viewer, editor, or remove', withPages: 'true: the same on every page inside it (a course with its pages)' },
         returns: 'a card on Home: they tap "Do it".',
         example: { docId: 'dockafka', email: 'asha@example.com', role: 'viewer' },
         keywords: ['share', 'invite', 'give access', 'let edit', 'study partner', 'collaborate', 'remove access', 'editor', 'viewer', 'note'],

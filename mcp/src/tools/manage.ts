@@ -117,6 +117,8 @@ interface Project {
 }
 
 const TAP = 'Waiting for the user’s tap: it shows under Suggested on their Home with "Do it"; nothing happens until they tap it.';
+/** DOC_PAGES_PLAN §7: each page has its own sharing; this does the same to every page inside the doc. */
+const WITH_PAGES = z.boolean().optional().describe('Also every page inside it (each page has its own sharing).');
 
 function settingsText(s: Settings): string {
     return [
@@ -512,11 +514,11 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
             title: 'Publish a doc to the web (needs their tap)',
             description:
                 'Ask to publish a doc of theirs (anyone with the link can read it, never edit; the link stays until unpublished) or to stop publishing it (on: false; its link stops working). It leaves the app, so it only asks: they tap "Do it" on Home.',
-            input: { docId: zDocId, on: z.boolean().default(true), reason: z.string().trim().max(200).optional() },
+            input: { docId: zDocId, on: z.boolean().default(true), withPages: WITH_PAGES, reason: z.string().trim().max(200).optional() },
             annotations: ADDS,
         },
-        async ({ docId, on, reason }) => {
-            const card = await api.post<Suggestion>('/api/actions', { action: 'publish_doc', input: { docId, on }, reason });
+        async ({ docId, on, withPages, reason }) => {
+            const card = await api.post<Suggestion>('/api/actions', { action: 'publish_doc', input: { docId, on, ...(withPages ? { withPages } : {}) }, reason });
             return `Asked: ${card.text}. ${TAP}`;
         }
     );
@@ -533,12 +535,13 @@ export function registerManageTools(server: McpServer, ctx: ToolContext): void {
                 docId: zDocId,
                 email: z.string().trim().email().max(200),
                 role: z.enum(['viewer', 'editor', 'remove']).default('editor'),
+                withPages: WITH_PAGES,
                 reason: z.string().trim().max(200).optional(),
             },
             annotations: ADDS,
         },
-        async ({ docId, email, role, reason }) => {
-            const card = await api.post<Suggestion>('/api/actions', { action: 'share_doc', input: { docId, email, role }, reason });
+        async ({ docId, email, role, withPages, reason }) => {
+            const card = await api.post<Suggestion>('/api/actions', { action: 'share_doc', input: { docId, email, role, ...(withPages ? { withPages } : {}) }, reason });
             return `Asked: ${card.text}. ${TAP}`;
         }
     );
